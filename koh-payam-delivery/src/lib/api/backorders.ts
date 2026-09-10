@@ -16,7 +16,7 @@ export type BackorderRow = {
 export async function syncShortageBackorders(orderId: string): Promise<void> {
   const { data: items, error: readErr } = await supabase
     .from('order_items')
-    .select('id,product_name,qty_ordered,status')
+    .select('id,product_name,qty_ordered,qty_shipped,shortage_qty,status')
     .eq('order_id', orderId)
   if (readErr) throw new Error('โหลดรายการสินค้าไม่สำเร็จ: ' + readErr.message)
   // Only clear rows that are still unresolved — a shortage backorder already
@@ -29,14 +29,20 @@ export async function syncShortageBackorders(orderId: string): Promise<void> {
     .eq('status', 'pending')
   const shorts = (items ?? []).filter((i: any) => i.status === 'short')
   if (!shorts.length) return
-  const rows = shorts.map((i: any) => ({
-    source_order_id: orderId,
-    reason: 'shortage',
-    product_name: i.product_name,
-    qty: i.qty_ordered,
-    status: 'pending',
-    target_ship_date: null,
-  }))
+  const rows = shorts.map((i: any) => {
+    // The backorder covers only what was actually short — the makro shortage_qty,
+    // falling back to ordered - shipped when that column is 0/absent.
+    const shortage = Number(i.shortage_qty) || 0
+    const qty = shortage > 0 ? shortage : Math.max(0, Number(i.qty_ordered) - Number(i.qty_shipped))
+    return {
+      source_order_id: orderId,
+      reason: 'shortage',
+      product_name: i.product_name,
+      qty,
+      status: 'pending',
+      target_ship_date: null,
+    }
+  })
   const { error } = await supabase.from('backorders').insert(rows)
   if (error) throw new Error('สร้างรายการค้างส่งไม่สำเร็จ: ' + error.message)
 }
