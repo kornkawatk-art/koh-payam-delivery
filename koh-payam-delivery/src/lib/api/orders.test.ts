@@ -98,8 +98,8 @@ test('updateOrderStatus rejects an illegal transition', async () => {
 
 test('updateOrderStatus writes a legal transition', async () => {
   state.current = { status: 'imported' }
-  await updateOrderStatus('o1', 'packing')
-  expect(state.updated).toEqual([{ table: 'orders', patch: { status: 'packing' } }])
+  await updateOrderStatus('o1', 'packed')
+  expect(state.updated).toEqual([{ table: 'orders', patch: { status: 'packed' } }])
 })
 
 test('regenTokenLink returns a fresh token and persists it', async () => {

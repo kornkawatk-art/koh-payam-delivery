@@ -15,7 +15,7 @@ import { formatTHB } from '../../lib/format'
 
 const STATUS_LABEL: Record<OrderStatus, string> = {
   imported: 'นำเข้าแล้ว',
-  packing: 'กำลังแพ็ค',
+  // TODO R2: 'packing' removed from the flow (Batch R1 Task 6); Task 10 owns the rest of this file
   packed: 'แพ็คเสร็จ',
   at_pier: 'ถึงท่าเรือ',
   shipped: 'ส่งแล้ว',
