@@ -62,6 +62,30 @@ at the user's request — coverage rested on the unit suite (new
 tests), the green `tsc`+`vite` build, three review passes, and the
 `order-view` live cloud smoke.
 
+## UI polish + pack-stage photos 2026-09-10 (on `main`)
+
+- **Responsive visual system** (`d533470`): Tailwind design tokens (warm
+  stone neutrals + one ochre accent), Inter + IBM Plex Sans Thai, an
+  `index.css` component layer (`.card` / `.btn` / `.badge` / `.alert` /
+  `.table-wrap` / `.data-table` / `.field`), semantic form-control base,
+  focus rings, `prefers-reduced-motion`. `AppShell` is a fixed sidebar on
+  `lg+` and an off-canvas drawer + sticky top bar on mobile. Every
+  list/table scrolls inside its own container — no screen overflows the
+  viewport. All visible strings / labels / ARIA names unchanged.
+- **Pier date picker** (`b8e9c81`): the pier screen was hardcoded to
+  today; added the date control the dashboard and boat setup already have.
+- **Pack-stage evidence photos** (`551ea40`, plan
+  `docs/superpowers/plans/2026-09-10-pack-stage-photos.md`): migration
+  `0009` adds `evidence_photos.stage` (`'pack'` | `'handoff'`, default
+  `'handoff'`). `บันทึก + แพ็คเสร็จ` now requires ≥1 pack-stage photo and
+  ≥1 box. The pier ship-off gate counts only `stage='handoff'` photos, so
+  a pack photo can't satisfy it. `OrderDetail` + `ClaimDetail` split team
+  evidence into "รูปตอนแพ็ค" / "รูปตอนส่งขึ้นเรือ"; the customer page
+  shows both stages together, ordered by `taken_at`. Migration applied to
+  cloud + verified; `photo-upload-url` + `order-view` redeployed;
+  `order-view` photo sort live-smoked. 159 tests pass. One implementer
+  batch, review Approved, no fix round.
+
 ## Deferred to Phase 2 (from the review; none block Phase-1 use)
 
 - RLS `aal2` requirement (2FA is enforced in the UI, not yet in the DB policies).
