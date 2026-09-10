@@ -12,27 +12,6 @@ import { cors } from '../_shared/cors.ts'
 
 const JSON_HEADERS = { ...cors, 'Content-Type': 'application/json' }
 const CLAIM_WINDOW_MS = 48 * 60 * 60 * 1000
-const round2 = (n: number) => Math.round((n + Number.EPSILON) * 100) / 100
-
-// MUST STAY IN SYNC WITH src/lib/credit.ts (Deno cannot import from src/).
-function computeCreditSummary(
-  totalValue: number,
-  items: Array<{ unit_price: unknown; qty_ordered: unknown; status: string }>,
-  claims: Array<{ status: string; resolution: string | null; refund_amount: unknown }>,
-) {
-  const shortageValue = round2(
-    items
-      .filter((i) => i.status === 'short')
-      .reduce((s, i) => s + Number(i.unit_price) * Number(i.qty_ordered), 0),
-  )
-  const approvedRefund = round2(
-    claims
-      .filter((c) => c.status === 'approved' && c.resolution === 'refund')
-      .reduce((s, c) => s + Number(c.refund_amount), 0),
-  )
-  const netPayable = Math.max(0, round2(totalValue - shortageValue - approvedRefund))
-  return { orderValue: round2(totalValue), shortageValue, approvedRefund, netPayable }
-}
 
 // Best-effort, in-memory, per-instance rate limit (~60 req/min/IP). NOT durable
 // and NOT shared across edge-function instances — a determined caller can still
@@ -75,7 +54,7 @@ Deno.serve(async (req) => {
   const { data: o, error } = await admin
     .from('orders')
     .select(
-      '*, order_items(product_name,qty_ordered,unit_price,status,line_no), evidence_photos(r2_key), claims(id,type,qty,description,status,resolution,created_at,refund_amount), ship_days(boats)',
+      '*, order_items(product_name,qty_ordered,qty_shipped,shortage_qty,status,line_no), evidence_photos(r2_key), claims(id,type,qty,description,status,resolution,created_at,refund_amount), ship_days(boats)',
     )
     .eq('link_token', token)
     .single()
@@ -114,23 +93,22 @@ Deno.serve(async (req) => {
     foamBoxCount: o.foam_box_count,
     items: items.map((i) => ({
       productName: i.product_name,
-      qtyOrdered: Number(i.qty_ordered),
-      unitPrice: Number(i.unit_price),
-      status: i.status,
+      orderedQty: Number(i.qty_ordered),
+      shippedQty: Number(i.qty_shipped),
+      isShort: i.status === 'short',
     })),
     shortages: items
       .filter((i) => i.status === 'short')
-      .map((i) => ({ productName: i.product_name, qtyOrdered: Number(i.qty_ordered) })),
+      .map((i) => ({
+        productName: i.product_name,
+        orderedQty: Number(i.qty_ordered),
+        shippedQty: Number(i.qty_shipped),
+      })),
     evidencePhotos: ((o.evidence_photos ?? []) as Array<{ r2_key: string }>).map(
       (p) => `${base}/${p.r2_key}`,
     ),
     claimDeadlineAt,
     canClaim,
-    credit: computeCreditSummary(
-      Number(o.total_value_cached),
-      items as Array<{ unit_price: unknown; qty_ordered: unknown; status: string }>,
-      claims as Array<{ status: string; resolution: string | null; refund_amount: unknown }>,
-    ),
     claims: claims.map((c) => ({
       id: c.id,
       type: c.type,
