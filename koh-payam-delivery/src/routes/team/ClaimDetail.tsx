@@ -15,7 +15,7 @@ export default function ClaimDetail() {
   const [evi, setEvi] = useState<string[]>([])
   const [decision, setDecision] = useState<'approved' | 'rejected'>('approved')
   const [resolution, setResolution] = useState<'refund' | 'resend_next_day'>('refund')
-  const [amount, setAmount] = useState('0')
+  const [amount, setAmount] = useState('')
   const [note, setNote] = useState('')
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState('')
@@ -26,10 +26,6 @@ export default function ClaimDetail() {
       .then((claim) => {
         if (!active) return
         setC(claim)
-        const guess = claim.order_items
-          ? Number(claim.order_items.unit_price ?? 0) * Number(claim.qty)
-          : 0
-        setAmount(String(guess || 0))
       })
       .catch(() => {
         if (active) setFailed(true)
@@ -99,12 +95,7 @@ export default function ClaimDetail() {
       <p className="text-sm">
         ประเภท: {c.type} · จำนวน: {c.qty}
       </p>
-      {item && (
-        <p className="text-sm">
-          รายการ: {item.product_name}
-          {item.unit_price != null && ` · ${item.unit_price} บาท/หน่วย`}
-        </p>
-      )}
+      {item && <p className="text-sm">รายการ: {item.product_name}</p>}
       <p className="whitespace-pre-wrap text-sm">{c.description}</p>
 
       <p className="text-sm font-medium">รูปจากลูกค้า</p>

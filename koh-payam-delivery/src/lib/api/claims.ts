@@ -41,7 +41,7 @@ export async function getClaim(id: string) {
   const { data, error } = await supabase
     .from('claims')
     .select(
-      '*, orders(makro_order_no,customer_name_en,total_value_cached), order_items(product_name,unit_price), claim_photos(r2_key)',
+      '*, orders(makro_order_no,customer_name_en), order_items(product_name,qty_ordered,qty_shipped), claim_photos(r2_key)',
     )
     .eq('id', id)
     .single()

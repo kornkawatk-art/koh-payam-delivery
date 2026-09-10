@@ -24,8 +24,17 @@ const order = {
   ship_date: '2026-10-01',
   status: 'imported',
   link_token: 'o_test123',
-  total_value_cached: 1000,
-  order_items: [{ id: 'i1', product_name: 'rice', qty_ordered: 2, unit_price: 100, status: 'ok' }],
+  sub_district: 'เกาะพยาม',
+  order_items: [
+    {
+      id: 'i1',
+      product_name: 'rice',
+      qty_ordered: 2,
+      qty_shipped: 2,
+      status: 'ok',
+      item_remark: '',
+    },
+  ],
   claims: [],
   evidence_photos: [],
 }

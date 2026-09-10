@@ -14,7 +14,6 @@ vi.mock('../../lib/api/shipDays', () => ({
       boat_id: null,
       paper_box_count: 2,
       foam_box_count: 0,
-      total_value_cached: 100,
     },
     {
       id: '2',
@@ -24,7 +23,6 @@ vi.mock('../../lib/api/shipDays', () => ({
       boat_id: null,
       paper_box_count: 1,
       foam_box_count: 1,
-      total_value_cached: 50,
     },
     {
       id: '3',
@@ -34,7 +32,6 @@ vi.mock('../../lib/api/shipDays', () => ({
       boat_id: '1',
       paper_box_count: 3,
       foam_box_count: 0,
-      total_value_cached: 80,
     },
   ]),
 }))

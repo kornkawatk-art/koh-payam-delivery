@@ -8,8 +8,8 @@ export type PackInput = {
   foamCount: number
 }
 
-// Shortages now come from the makro import, not a manual tick, so packing only
-// records how many boxes went out. Order items are never touched here.
+// Shortages now come from the makro import, not a manual tick, so the pack step
+// only records how many boxes went out. Order items are never touched here.
 export async function savePack(input: PackInput): Promise<void> {
   // Box counts are always saved — editing them after the order is packed must
   // still persist, so this update is NOT status-gated.

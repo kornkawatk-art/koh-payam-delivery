@@ -29,7 +29,7 @@ const claim = {
   qty: 2,
   description: 'ข้าวสารเปียก',
   orders: { makro_order_no: 'PO-1', customer_name_en: 'BLUE VIEW' },
-  order_items: { product_name: 'rice', unit_price: 100 },
+  order_items: { product_name: 'rice' },
   claim_photos: [],
 }
 
@@ -52,9 +52,9 @@ const renderPage = () =>
     </MemoryRouter>,
   )
 
-test('pre-fills the refund amount from unit_price * qty', async () => {
+test('leaves the refund amount empty for the team to type', async () => {
   renderPage()
-  expect(await screen.findByLabelText('จำนวนเงินคืน')).toHaveValue(200)
+  expect(await screen.findByLabelText('จำนวนเงินคืน')).toHaveValue(null)
 })
 
 test('switching to resend hides the amount field and resolves without a refund', async () => {
@@ -72,14 +72,14 @@ test('switching to resend hides the amount field and resolves without a refund',
   expect(await screen.findByText('claims queue')).toBeInTheDocument()
 })
 
-test('a refund resolution passes the pre-filled amount through', async () => {
+test('a refund resolution with no typed amount passes 0 through', async () => {
   renderPage()
   await screen.findByLabelText('จำนวนเงินคืน')
   await userEvent.click(screen.getByRole('button', { name: 'บันทึกผล' }))
   expect(resolveClaim).toHaveBeenCalledWith('c1', {
     decision: 'approved',
     resolution: 'refund',
-    refundAmount: 200,
+    refundAmount: 0,
     note: undefined,
   })
 })
@@ -105,7 +105,7 @@ test('passes a typed note through to resolveClaim', async () => {
   expect(resolveClaim).toHaveBeenCalledWith('c1', {
     decision: 'approved',
     resolution: 'refund',
-    refundAmount: 200,
+    refundAmount: 0,
     note: 'ตรวจแล้ว',
   })
 })

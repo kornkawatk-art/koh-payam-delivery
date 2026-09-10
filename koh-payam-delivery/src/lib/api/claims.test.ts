@@ -107,12 +107,13 @@ test('listClaims without a status filter never calls eq', async () => {
   expect(state.eqArgs).toHaveLength(0)
 })
 
-test('getClaim asks for order_items unit_price so the refund amount can pre-fill', async () => {
+test('getClaim selects order_items without any price column', async () => {
   state.singleData = { id: 'c1', description: '' }
   await getClaim('c1')
   expect(
-    state.selectArgs.some((s) => s.includes('order_items(product_name,unit_price)')),
+    state.selectArgs.some((s) => s.includes('order_items(product_name,qty_ordered,qty_shipped)')),
   ).toBe(true)
+  expect(state.selectArgs.some((s) => /price|value_cached/.test(s))).toBe(false)
 })
 
 test('getClaim throws a Thai message when the load fails', async () => {
