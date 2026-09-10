@@ -2,15 +2,13 @@ import { useCallback, useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { t, type Lang } from './i18n'
 import OrderStatusTimeline from '../../components/OrderStatusTimeline'
-import { CreditSummaryTable } from '../../components/CreditSummaryTable'
 import CustomerClaimForm from './CustomerClaimForm'
-import { formatTHB, formatDate, formatDateTime } from '../../lib/format'
-import type { CreditSummary } from '../../lib/credit'
+import { formatDate, formatDateTime } from '../../lib/format'
 
 const FN = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/order-view`
 const ANON = import.meta.env.VITE_SUPABASE_ANON_KEY as string
 
-type Item = { productName: string; qtyOrdered: number; unitPrice: number; status: string }
+type Item = { productName: string; orderedQty: number; shippedQty: number; isShort: boolean }
 type Claim = {
   id: string
   type: string
@@ -29,11 +27,10 @@ type OrderView = {
   paperBoxCount: number
   foamBoxCount: number
   items: Item[]
-  shortages: { productName: string; qtyOrdered: number }[]
+  shortages: { productName: string; orderedQty: number; shippedQty: number }[]
   evidencePhotos: string[]
   claimDeadlineAt: string | null
   canClaim: boolean
-  credit: CreditSummary
   claims: Claim[]
 }
 
@@ -141,21 +138,27 @@ export default function CustomerOrderView() {
         <table className="w-full text-sm">
           <thead>
             <tr className="text-left text-gray-500">
-              <th className="font-medium">{t(lang, 'items')}</th>
-              <th className="font-medium">{t(lang, 'qty')}</th>
-              <th className="font-medium">{t(lang, 'unit_price')}</th>
-              <th className="font-medium" />
+              <th className="font-medium">{t(lang, 'col_item')}</th>
+              <th className="font-medium">{t(lang, 'col_ordered')}</th>
+              <th className="font-medium">{t(lang, 'col_shipped')}</th>
             </tr>
           </thead>
           <tbody>
             {data.items.map((it, i) => (
-              <tr key={`${it.productName}-${i}`} className="border-t">
-                <td className="py-0.5">{it.productName}</td>
-                <td className="py-0.5">{it.qtyOrdered}</td>
-                <td className="py-0.5">{formatTHB(it.unitPrice)}</td>
-                <td className="py-0.5 text-right">
-                  {it.status === 'short' ? t(lang, 'item_short') : t(lang, 'item_ok')}
+              <tr
+                key={`${it.productName}-${i}`}
+                className={'border-t ' + (it.isShort ? 'bg-amber-50' : '')}
+              >
+                <td className="py-0.5">
+                  {it.productName}
+                  {it.isShort && (
+                    <span className="ml-1 rounded bg-amber-200 px-1 text-xs text-amber-900">
+                      {t(lang, 'badge_short')}
+                    </span>
+                  )}
                 </td>
+                <td className="py-0.5">{it.orderedQty}</td>
+                <td className="py-0.5">{it.shippedQty}</td>
               </tr>
             ))}
           </tbody>
@@ -163,7 +166,7 @@ export default function CustomerOrderView() {
       </section>
 
       <section className="mt-4 text-sm">
-        <h2 className="font-semibold">{t(lang, 'shortages')}</h2>
+        <h2 className="font-semibold">{t(lang, 'shortages_heading')}</h2>
         {data.shortages.length === 0 ? (
           <p className="text-gray-500">{t(lang, 'none')}</p>
         ) : (
@@ -172,7 +175,11 @@ export default function CustomerOrderView() {
             <ul className="list-inside list-disc">
               {data.shortages.map((s, i) => (
                 <li key={`${s.productName}-${i}`}>
-                  {s.productName} × {s.qtyOrdered}
+                  {s.productName} —{' '}
+                  {t(lang, 'shipped_of_ordered', {
+                    shipped: s.shippedQty,
+                    ordered: s.orderedQty,
+                  })}
                 </li>
               ))}
             </ul>
@@ -207,11 +214,6 @@ export default function CustomerOrderView() {
           </div>
         </section>
       )}
-
-      <section className="mt-4">
-        <h2 className="text-sm font-semibold">{t(lang, 'credit')}</h2>
-        <CreditSummaryTable summary={data.credit} lang={lang} />
-      </section>
 
       {data.claims.length > 0 && (
         <section className="mt-4 text-sm">

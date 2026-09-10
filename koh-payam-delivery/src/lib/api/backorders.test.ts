@@ -82,9 +82,9 @@ beforeEach(() => {
 
 test('syncShortageBackorders deletes old shortage rows then inserts one per short item', async () => {
   orderItems = [
-    { id: 'i1', product_name: 'rice', qty_ordered: 2, status: 'short' },
-    { id: 'i2', product_name: 'oil', qty_ordered: 1, status: 'ok' },
-    { id: 'i3', product_name: 'sugar', qty_ordered: 5, status: 'short' },
+    { id: 'i1', product_name: 'rice', qty_ordered: 2, qty_shipped: 0, shortage_qty: 2, status: 'short' },
+    { id: 'i2', product_name: 'oil', qty_ordered: 1, qty_shipped: 1, shortage_qty: 0, status: 'ok' },
+    { id: 'i3', product_name: 'sugar', qty_ordered: 5, qty_shipped: 3, shortage_qty: 0, status: 'short' },
   ]
   await syncShortageBackorders('ord1')
   const del = calls.find((c) => c[0] === 'delete' && c[1] === 'backorders')
@@ -99,6 +99,7 @@ test('syncShortageBackorders deletes old shortage rows then inserts one per shor
   const ins = calls.find((c) => c[0] === 'insert')
   expect(ins[1]).toBe('backorders')
   expect(ins[2]).toHaveLength(2)
+  // rice: qty comes straight from the makro shortage_qty column
   expect(ins[2][0]).toMatchObject({
     source_order_id: 'ord1',
     product_name: 'rice',
@@ -107,7 +108,17 @@ test('syncShortageBackorders deletes old shortage rows then inserts one per shor
     status: 'pending',
     target_ship_date: null,
   })
-  expect(ins[2][1]).toMatchObject({ product_name: 'sugar', qty: 5 })
+  // sugar: shortage_qty is 0 -> fall back to ordered - shipped (5 - 3)
+  expect(ins[2][1]).toMatchObject({ product_name: 'sugar', qty: 2 })
+})
+
+test('syncShortageBackorders backorder qty uses shortage_qty for a partial line', async () => {
+  orderItems = [
+    { id: 'i1', product_name: 'tomato', qty_ordered: 6, qty_shipped: 5.43, shortage_qty: 0.57, status: 'short' },
+  ]
+  await syncShortageBackorders('ord1')
+  const ins = calls.find((c) => c[0] === 'insert')
+  expect(ins[2][0].qty).toBeCloseTo(0.57, 5)
 })
 
 test('syncShortageBackorders inserts nothing when no item is short', async () => {

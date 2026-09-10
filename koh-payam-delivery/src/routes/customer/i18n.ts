@@ -14,7 +14,6 @@ export const STRINGS: Record<Lang, Record<string, string>> = {
     customer: 'Customer',
     ship_date: 'Delivery date',
     status_imported: 'Received',
-    status_packing: 'Packing',
     status_packed: 'Packed',
     status_at_pier: 'At the pier',
     status_shipped: 'Shipped',
@@ -24,14 +23,18 @@ export const STRINGS: Record<Lang, Record<string, string>> = {
     foam: 'Foam boxes',
     items: 'Items',
     qty: 'Qty',
-    unit_price: 'Unit price',
+    col_item: 'Item',
+    col_ordered: 'Ordered',
+    col_shipped: 'Shipped',
+    badge_short: 'Short',
     item_ok: 'OK',
     item_short: 'Short',
     shortages: 'Shortages',
+    shortages_heading: 'Shortages',
     shortages_note: 'Out of stock — not shipped in this delivery',
+    shipped_of_ordered: 'shipped {shipped} of {ordered}',
     none: 'None',
     evidence: 'Delivery photos',
-    credit: 'Payment summary',
     report_problem: 'Report a problem',
     claim_deadline: 'You can report a problem until',
     claim_closed: 'The window to report a problem has closed.',
@@ -62,7 +65,6 @@ export const STRINGS: Record<Lang, Record<string, string>> = {
     customer: 'ลูกค้า',
     ship_date: 'วันจัดส่ง',
     status_imported: 'รับออเดอร์แล้ว',
-    status_packing: 'กำลังแพ็ค',
     status_packed: 'แพ็คเสร็จ',
     status_at_pier: 'ถึงท่าเรือ',
     status_shipped: 'ส่งขึ้นเรือแล้ว',
@@ -72,14 +74,18 @@ export const STRINGS: Record<Lang, Record<string, string>> = {
     foam: 'ลังโฟม',
     items: 'รายการสินค้า',
     qty: 'จำนวน',
-    unit_price: 'ราคา/หน่วย',
+    col_item: 'สินค้า',
+    col_ordered: 'สั่ง',
+    col_shipped: 'ส่งจริง',
+    badge_short: 'ขาด',
     item_ok: 'ครบ',
     item_short: 'ของขาด',
     shortages: 'ของขาด',
+    shortages_heading: 'ของขาด',
     shortages_note: 'สินค้าหมด — ไม่ได้จัดส่งในรอบนี้',
+    shipped_of_ordered: 'ส่ง {shipped} / สั่ง {ordered}',
     none: 'ไม่มี',
     evidence: 'รูปการจัดส่ง',
-    credit: 'สรุปยอดชำระ',
     report_problem: 'แจ้งปัญหา',
     claim_deadline: 'แจ้งปัญหาได้ถึง',
     claim_closed: 'ปิดรับแจ้งปัญหาแล้ว',
@@ -104,6 +110,14 @@ export const STRINGS: Record<Lang, Record<string, string>> = {
   },
 }
 
-export function t(lang: Lang, key: string): string {
-  return STRINGS[lang]?.[key] ?? STRINGS.en[key] ?? key
+export function t(
+  lang: Lang,
+  key: string,
+  vars?: Record<string, string | number>,
+): string {
+  const raw = STRINGS[lang]?.[key] ?? STRINGS.en[key] ?? key
+  if (!vars) return raw
+  return raw.replace(/\{(\w+)\}/g, (m, name) =>
+    name in vars ? String(vars[name]) : m,
+  )
 }

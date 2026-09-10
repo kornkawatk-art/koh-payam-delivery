@@ -1,10 +1,9 @@
-export const ORDER_STATUS = ['imported', 'packing', 'packed', 'at_pier', 'shipped'] as const
+export const ORDER_STATUS = ['imported', 'packed', 'at_pier', 'shipped'] as const
 export type OrderStatus = (typeof ORDER_STATUS)[number]
 
 const FORWARD: Record<OrderStatus, OrderStatus[]> = {
-  imported: ['packing'],
-  packing: ['packed'],
-  packed: ['packing', 'at_pier'], // ย้อนกลับได้ถ้ายังไม่ at_pier
+  imported: ['packed'],
+  packed: ['at_pier'],
   at_pier: ['shipped'],
   shipped: [],
 }

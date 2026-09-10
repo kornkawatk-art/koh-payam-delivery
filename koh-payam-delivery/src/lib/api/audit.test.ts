@@ -28,14 +28,14 @@ afterEach(() => {
 })
 
 test('logAction inserts an audit_logs row with the current user id', async () => {
-  await logAction('status_change', 'order', 'o1', { from: 'imported', to: 'packing' })
+  await logAction('status_change', 'order', 'o1', { from: 'imported', to: 'packed' })
   expect(from).toHaveBeenCalledWith('audit_logs')
   expect(insert).toHaveBeenCalledWith({
     user_id: 'u1',
     action: 'status_change',
     entity_type: 'order',
     entity_id: 'o1',
-    meta: { from: 'imported', to: 'packing' },
+    meta: { from: 'imported', to: 'packed' },
   })
 })
 

@@ -5,17 +5,13 @@ import {
   listRelatedBackordersForOrder,
   type BackorderRow,
 } from '../../lib/api/backorders'
-import { computeCreditSummary } from '../../lib/credit'
 import { nextStatus, type OrderStatus } from '../../lib/status'
 import { StatusBadge } from '../../components/ui/StatusBadge'
-import { CreditSummaryTable } from '../../components/CreditSummaryTable'
 import { Button } from '../../components/ui/Button'
 import { Spinner } from '../../components/ui/Spinner'
-import { formatTHB } from '../../lib/format'
 
 const STATUS_LABEL: Record<OrderStatus, string> = {
   imported: 'นำเข้าแล้ว',
-  packing: 'กำลังแพ็ค',
   packed: 'แพ็คเสร็จ',
   at_pier: 'ถึงท่าเรือ',
   shipped: 'ส่งแล้ว',
@@ -54,11 +50,6 @@ export default function OrderDetail() {
   // least one evidence photo — both captured on the "ที่ท่าเรือ" screen.
   const pierBlocked =
     (next === 'at_pier' || next === 'shipped') && !(order.boat_id && photos.length >= 1)
-  const summary = computeCreditSummary({
-    totalValue: order.total_value_cached ?? 0,
-    items,
-    claims,
-  })
 
   async function advance() {
     if (!next) return
@@ -109,6 +100,8 @@ export default function OrderDetail() {
         )}
       </div>
 
+      <p className="text-sm text-gray-600">ส่งที่: {order.sub_district || '—'}</p>
+
       <div className="flex gap-4 text-sm underline">
         <Link to={`/order/${id}/pack`}>แพ็คของ</Link>
         <Link to={`/order/${id}/label`}>ใบเขียนหน้าลัง</Link>
@@ -134,9 +127,10 @@ export default function OrderDetail() {
         <thead>
           <tr className="text-left">
             <th>สินค้า</th>
-            <th>จำนวน</th>
-            <th>ราคา/หน่วย</th>
-            <th>สถานะ</th>
+            <th>สั่ง</th>
+            <th>ส่งจริง</th>
+            <th />
+            <th>หมายเหตุ</th>
           </tr>
         </thead>
         <tbody>
@@ -144,14 +138,17 @@ export default function OrderDetail() {
             <tr key={it.id} className="border-t">
               <td>{it.product_name}</td>
               <td>{it.qty_ordered}</td>
-              <td>{formatTHB(it.unit_price)}</td>
-              <td>{it.status === 'short' ? 'ของขาด' : 'ครบ'}</td>
+              <td>{it.qty_shipped}</td>
+              <td>
+                {it.status === 'short' && (
+                  <span className="rounded bg-amber-100 px-1 text-xs text-amber-800">ขาด</span>
+                )}
+              </td>
+              <td>{it.item_remark}</td>
             </tr>
           ))}
         </tbody>
       </table>
-
-      <CreditSummaryTable summary={summary} lang="th" />
 
       <div className="text-sm">
         <p className="font-medium">เคลมของออเดอร์นี้</p>

@@ -14,14 +14,13 @@ const payload = {
   paperBoxCount: 3,
   foamBoxCount: 1,
   items: [
-    { productName: 'Rice 5kg', qtyOrdered: 10, unitPrice: 200, status: 'ok' },
-    { productName: 'Fish sauce', qtyOrdered: 4, unitPrice: 50, status: 'short' },
+    { productName: 'Rice 5kg', orderedQty: 10, shippedQty: 10, isShort: false },
+    { productName: 'Fish sauce', orderedQty: 4, shippedQty: 2, isShort: true },
   ],
-  shortages: [{ productName: 'Fish sauce', qtyOrdered: 4 }],
+  shortages: [{ productName: 'Fish sauce', orderedQty: 4, shippedQty: 2 }],
   evidencePhotos: ['https://pub.example/evidence/a.jpg'],
   claimDeadlineAt: '2026-09-12T09:00:00.000Z',
   canClaim: true,
-  credit: { orderValue: 12000, shortageValue: 1150, approvedRefund: 0, netPayable: 10850 },
   claims: [],
 }
 
@@ -63,9 +62,9 @@ test('fetches order-view with the token and the anon bearer header', async () =>
   })
 })
 
-test('renders the net payable amount and the report-a-problem button', async () => {
+test('renders the shortage line and the report-a-problem button', async () => {
   renderAt()
-  expect(await screen.findByText(/10,850/)).toBeInTheDocument()
+  expect(await screen.findByText(/shipped 2 of 4/)).toBeInTheDocument()
   expect(screen.getByRole('button', { name: 'Report a problem' })).toBeInTheDocument()
 })
 

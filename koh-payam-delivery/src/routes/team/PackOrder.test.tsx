@@ -5,7 +5,7 @@ import PackOrder from './PackOrder'
 
 const getOrder = vi.fn()
 const updateOrderStatus = vi.fn().mockResolvedValue(undefined)
-const savePack = vi.fn().mockResolvedValue({ shortageValue: 0 })
+const savePack = vi.fn().mockResolvedValue(undefined)
 const listPendingBackordersForOrder = vi.fn().mockResolvedValue([])
 const markBackorderFulfilled = vi.fn().mockResolvedValue(undefined)
 
@@ -15,7 +15,6 @@ vi.mock('../../lib/api/orders', () => ({
 }))
 vi.mock('../../lib/api/pack', () => ({
   savePack: (...a: unknown[]) => savePack(...a),
-  computeShortageValue: () => 0,
 }))
 vi.mock('../../lib/api/backorders', () => ({
   listPendingBackordersForOrder: (...a: unknown[]) => listPendingBackordersForOrder(...a),
@@ -29,8 +28,22 @@ const order = {
   paper_box_count: 0,
   foam_box_count: 0,
   order_items: [
-    { id: 'i1', product_name: 'rice', qty_ordered: 2, unit_price: 100, status: 'ok' },
-    { id: 'i2', product_name: 'oil', qty_ordered: 1, unit_price: 50, status: 'ok' },
+    {
+      id: 'i1',
+      product_name: 'rice',
+      qty_ordered: 2,
+      qty_shipped: 1.5,
+      item_remark: 'แยกถุง',
+      status: 'short',
+    },
+    {
+      id: 'i2',
+      product_name: 'oil',
+      qty_ordered: 1,
+      qty_shipped: 1,
+      item_remark: '',
+      status: 'ok',
+    },
   ],
 }
 
@@ -54,26 +67,35 @@ const renderPage = () =>
     </MemoryRouter>,
   )
 
-test('marks an item short, records the box count, and calls savePack', async () => {
+test('renders the makro items read-only (ordered / shipped / short badge / remark, no inputs)', async () => {
   renderPage()
-  const shortToggle = await screen.findByLabelText('ของขาด rice')
-  await userEvent.click(shortToggle)
+  expect(await screen.findByText('rice')).toBeInTheDocument()
+  // shipped quantity from the file is shown
+  expect(screen.getByText('1.5')).toBeInTheDocument()
+  // short line carries the "ขาด" badge, ok line does not
+  expect(screen.getByText('ขาด')).toBeInTheDocument()
+  expect(screen.getByText('แยกถุง')).toBeInTheDocument()
+  // no per-item editing controls
+  expect(screen.queryByRole('checkbox')).not.toBeInTheDocument()
+  expect(screen.queryByLabelText(/ของขาด/)).not.toBeInTheDocument()
+})
+
+test('"บันทึก" records the box count via savePack', async () => {
+  renderPage()
+  await screen.findByText('rice')
   const paper = screen.getByLabelText(/ลังกระดาษ/)
   await userEvent.clear(paper)
   await userEvent.type(paper, '3')
   await userEvent.click(screen.getByRole('button', { name: 'บันทึก' }))
 
   expect(savePack).toHaveBeenCalledTimes(1)
-  const arg = savePack.mock.calls[0][0]
-  expect(arg.orderId).toBe('ord1')
-  expect(arg.paperCount).toBe(3)
-  expect(arg.items[0]).toEqual({ id: 'i1', status: 'short', qtyShipped: 0 })
-  expect(arg.items[1]).toEqual({ id: 'i2', status: 'ok', qtyShipped: 1 })
+  expect(savePack.mock.calls[0][0]).toEqual({ orderId: 'ord1', paperCount: 3, foamCount: 0 })
+  expect(updateOrderStatus).not.toHaveBeenCalled()
 })
 
 test('"บันทึก + แพ็คเสร็จ" saves first, then marks the order packed', async () => {
   renderPage()
-  await screen.findByLabelText('ของขาด rice')
+  await screen.findByText('rice')
   await userEvent.click(screen.getByRole('button', { name: 'บันทึก + แพ็คเสร็จ' }))
 
   expect(savePack).toHaveBeenCalledTimes(1)

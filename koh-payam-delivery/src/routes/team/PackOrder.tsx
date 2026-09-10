@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { getOrder, updateOrderStatus } from '../../lib/api/orders'
-import { savePack, computeShortageValue } from '../../lib/api/pack'
+import { savePack } from '../../lib/api/pack'
 import {
   listPendingBackordersForOrder,
   markBackorderFulfilled,
@@ -9,13 +9,13 @@ import {
 } from '../../lib/api/backorders'
 import { Button } from '../../components/ui/Button'
 import { Spinner } from '../../components/ui/Spinner'
-import { formatTHB } from '../../lib/format'
 
 type ItemState = {
   id: string
   product_name: string
   qty_ordered: number
-  unit_price: number
+  qty_shipped: number
+  item_remark: string | null
   status: 'ok' | 'short'
 }
 
@@ -34,7 +34,7 @@ export default function PackOrder() {
     getOrder(id!)
       .then((o: any) => {
         setOrder(o)
-        setItems(o.order_items.map((it: any) => ({ ...it, status: it.status })))
+        setItems(o.order_items.map((it: any) => ({ ...it })))
         setPaper(o.paper_box_count)
         setFoam(o.foam_box_count)
       })
@@ -46,24 +46,12 @@ export default function PackOrder() {
 
   if (failed) return <p className="text-sm text-red-600">โหลดออเดอร์ไม่สำเร็จ</p>
   if (!order) return <Spinner />
-  const shortageValue = computeShortageValue(
-    items.map((i) => ({ unit_price: i.unit_price, qty_ordered: i.qty_ordered, status: i.status })),
-  )
 
   async function save(markPacked: boolean) {
     setBusy(true)
     setMsg(undefined)
     try {
-      await savePack({
-        orderId: id!,
-        paperCount: paper,
-        foamCount: foam,
-        items: items.map((i) => ({
-          id: i.id,
-          status: i.status,
-          qtyShipped: i.status === 'short' ? 0 : i.qty_ordered,
-        })),
-      })
+      await savePack({ orderId: id!, paperCount: paper, foamCount: foam })
       if (markPacked) await updateOrderStatus(id!, 'packed')
       setMsg(markPacked ? 'บันทึกและทำเครื่องหมายแพ็คเสร็จแล้ว' : 'บันทึกแล้ว')
     } catch (e) {
@@ -114,30 +102,23 @@ export default function PackOrder() {
           <tr className="text-left">
             <th>สินค้า</th>
             <th>สั่ง</th>
-            <th>ราคา/หน่วย</th>
-            <th>ของขาด</th>
+            <th>ส่งจริง</th>
+            <th>สถานะ</th>
+            <th>หมายเหตุ</th>
           </tr>
         </thead>
         <tbody>
-          {items.map((it, idx) => (
+          {items.map((it) => (
             <tr key={it.id} className="border-t">
               <td>{it.product_name}</td>
               <td>{it.qty_ordered}</td>
-              <td>{formatTHB(it.unit_price)}</td>
+              <td>{it.qty_shipped}</td>
               <td>
-                <input
-                  type="checkbox"
-                  aria-label={`ของขาด ${it.product_name}`}
-                  checked={it.status === 'short'}
-                  onChange={(e) =>
-                    setItems((s) =>
-                      s.map((x, i) =>
-                        i === idx ? { ...x, status: e.target.checked ? 'short' : 'ok' } : x,
-                      ),
-                    )
-                  }
-                />
+                {it.status === 'short' && (
+                  <span className="rounded bg-red-100 px-1.5 py-0.5 text-xs text-red-700">ขาด</span>
+                )}
               </td>
+              <td>{it.item_remark}</td>
             </tr>
           ))}
         </tbody>
@@ -165,7 +146,6 @@ export default function PackOrder() {
           />
         </label>
       </div>
-      <p className="text-sm text-amber-700">มูลค่าของขาด: {formatTHB(shortageValue)}</p>
       <div className="flex gap-2">
         <Button onClick={() => save(false)} disabled={busy}>
           บันทึก

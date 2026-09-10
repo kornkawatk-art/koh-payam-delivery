@@ -10,7 +10,7 @@ type ClaimType = (typeof CLAIM_TYPES)[number]
 
 type Props = {
   token: string
-  items: { productName: string; qtyOrdered: number }[]
+  items: { productName: string }[]
   lang: Lang
   onDone: () => void
 }

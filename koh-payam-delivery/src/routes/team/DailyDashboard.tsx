@@ -5,7 +5,7 @@ import { listBackordersForDay, type BackorderRow } from '../../lib/api/backorder
 import { supabase } from '../../lib/supabase'
 import { StatusBadge } from '../../components/ui/StatusBadge'
 import { Spinner } from '../../components/ui/Spinner'
-import { formatTHB, todayLocalISO } from '../../lib/format'
+import { todayLocalISO } from '../../lib/format'
 
 export default function DailyDashboard() {
   const [date, setDate] = useState(todayLocalISO())
@@ -133,7 +133,6 @@ export default function DailyDashboard() {
             <th>สถานะ</th>
             <th>ลัง</th>
             <th>เรือ</th>
-            <th>มูลค่า</th>
           </tr>
         </thead>
         <tbody>
@@ -150,7 +149,6 @@ export default function DailyDashboard() {
               </td>
               <td>{o.paper_box_count + o.foam_box_count}</td>
               <td>{o.boat_id ?? '—'}</td>
-              <td>{formatTHB(o.total_value_cached)}</td>
             </tr>
           ))}
         </tbody>

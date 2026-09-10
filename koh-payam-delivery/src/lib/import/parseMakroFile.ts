@@ -13,3 +13,16 @@ export async function parseMakroFile(input: File | ArrayBuffer): Promise<RawRow[
     return out
   })
 }
+
+/**
+ * แยกแยะว่าไฟล์ที่อัปโหลดเป็น "รายการสินค้า" (OrderDetailExport) หรือ
+ * "ที่อยู่/ระดับออเดอร์" (OrderExport) จาก header ของไฟล์
+ * - detail: มี `Item Id` และ `Product Name`
+ * - order:  มี `Sub District` และ `Shipping Address`
+ */
+export function detectFileKind(headers: string[]): 'detail' | 'order' | 'unknown' {
+  const set = new Set(headers.map((h) => String(h).trim()))
+  if (set.has('Item Id') && set.has('Product Name')) return 'detail'
+  if (set.has('Sub District') && set.has('Shipping Address')) return 'order'
+  return 'unknown'
+}
