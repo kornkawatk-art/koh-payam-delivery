@@ -5,8 +5,17 @@ const LABEL: Record<string, string> = {
   shipped: 'ส่งแล้ว',
 }
 
+const TONE: Record<string, string> = {
+  imported: 'badge-neutral',
+  packed: 'badge-warn',
+  at_pier: 'badge-brand',
+  shipped: 'badge-ok',
+}
+
 export function StatusBadge({ status }: { status: string }) {
   return (
-    <span className="rounded-full border px-2 py-0.5 text-xs">{LABEL[status] ?? status}</span>
+    <span className={`badge ${TONE[status] ?? 'badge-neutral'}`}>
+      {LABEL[status] ?? status}
+    </span>
   )
 }

@@ -12,7 +12,7 @@ import {
   type BuildResult,
 } from '../../lib/import/buildImport'
 import { commitImport } from '../../lib/api/orders'
-import { Button } from '../../components/ui/Button'
+import { PageHeader } from '../../components/ui/PageHeader'
 import { todayLocalISO } from '../../lib/format'
 
 function loadMapping<T>(key: string, fallback: T): T {
@@ -120,40 +120,33 @@ export default function ImportOrders() {
     }
   }
 
+  const allProblems = [...detailProblems, ...orderProblems]
+
   return (
-    <div className="flex flex-col gap-4">
-      <h1 className="text-xl font-semibold">นำเข้าออเดอร์</h1>
+    <div className="flex flex-col gap-5">
+      <PageHeader title="นำเข้าออเดอร์" />
 
-      <label className="text-sm">
-        ไฟล์รายการสินค้า (OrderDetailExport)
-        <input
-          type="file"
-          accept=".csv,.xlsx,.xls"
-          onChange={(e) => onFile('detail', e)}
-          className="block"
-        />
-      </label>
-      {slotWarn.detail && <p className="text-sm text-red-600">{slotWarn.detail}</p>}
+      <div className="card grid gap-4 sm:grid-cols-2">
+        <label className="field">
+          <span className="field-label">ไฟล์รายการสินค้า (OrderDetailExport)</span>
+          <input type="file" accept=".csv,.xlsx,.xls" onChange={(e) => onFile('detail', e)} />
+          {slotWarn.detail && <span className="text-sm text-danger-ink">{slotWarn.detail}</span>}
+        </label>
 
-      <label className="text-sm">
-        ไฟล์ที่อยู่ (OrderExport)
-        <input
-          type="file"
-          accept=".csv,.xlsx,.xls"
-          onChange={(e) => onFile('order', e)}
-          className="block"
-        />
-      </label>
-      {slotWarn.order && <p className="text-sm text-red-600">{slotWarn.order}</p>}
+        <label className="field">
+          <span className="field-label">ไฟล์ที่อยู่ (OrderExport)</span>
+          <input type="file" accept=".csv,.xlsx,.xls" onChange={(e) => onFile('order', e)} />
+          {slotWarn.order && <span className="text-sm text-danger-ink">{slotWarn.order}</span>}
+        </label>
+      </div>
 
       {detailHeaders.length > 0 && (
-        <fieldset className="grid grid-cols-2 gap-2 rounded border p-3">
-          <legend className="text-sm font-medium">จับคู่คอลัมน์ — รายการสินค้า</legend>
+        <fieldset className="card grid gap-3 sm:grid-cols-2">
+          <legend className="section-title px-1">จับคู่คอลัมน์ — รายการสินค้า</legend>
           {(Object.keys(FIELD_LABELS_DETAIL) as (keyof DetailMapping)[]).map((k) => (
-            <label key={k} className="text-sm">
-              {FIELD_LABELS_DETAIL[k]}
+            <label key={k} className="field">
+              <span className="field-label">{FIELD_LABELS_DETAIL[k]}</span>
               <select
-                className="block w-full rounded border p-1"
                 value={dm[k]}
                 onChange={(e) => {
                   const next = { ...dm, [k]: e.target.value }
@@ -174,13 +167,12 @@ export default function ImportOrders() {
       )}
 
       {orderHeaders.length > 0 && (
-        <fieldset className="grid grid-cols-2 gap-2 rounded border p-3">
-          <legend className="text-sm font-medium">จับคู่คอลัมน์ — ที่อยู่</legend>
+        <fieldset className="card grid gap-3 sm:grid-cols-2">
+          <legend className="section-title px-1">จับคู่คอลัมน์ — ที่อยู่</legend>
           {(Object.keys(FIELD_LABELS_ORDER) as (keyof OrderMapping)[]).map((k) => (
-            <label key={k} className="text-sm">
-              {FIELD_LABELS_ORDER[k]}
+            <label key={k} className="field">
+              <span className="field-label">{FIELD_LABELS_ORDER[k]}</span>
               <select
-                className="block w-full rounded border p-1"
                 value={om[k]}
                 onChange={(e) => {
                   const next = { ...om, [k]: e.target.value }
@@ -200,70 +192,70 @@ export default function ImportOrders() {
         </fieldset>
       )}
 
-      {[...detailProblems, ...orderProblems].length > 0 && (
-        <ul className="text-sm text-red-600">
-          {[...detailProblems, ...orderProblems].map((p) => (
+      {allProblems.length > 0 && (
+        <ul className="alert alert-danger flex flex-col gap-0.5">
+          {allProblems.map((p) => (
             <li key={p}>• {p}</li>
           ))}
         </ul>
       )}
 
-      <Button onClick={doPreview} disabled={!canPreview}>
+      <button className="btn btn-primary w-full sm:w-auto" onClick={doPreview} disabled={!canPreview}>
         ดูตัวอย่าง
-      </Button>
+      </button>
 
       {result && (
-        <>
-          <p className="text-sm font-medium text-green-700">
+        <div className="flex flex-col gap-4 border-t border-line pt-5">
+          <p className="text-sm font-semibold text-ok-ink">
             เจอออเดอร์เกาะพยาม {result.orders.length} เจ้า
           </p>
 
           {result.shippedAllZero && (
-            <p className="rounded border border-amber-300 bg-amber-50 p-3 text-sm text-amber-800">
-              ⚠️ ไฟล์นี้ยังไม่มีข้อมูลจัดส่งจากแม็คโคร (ส่งจริง = 0 ทั้งหมด) — นำเข้าได้ แต่ควร export
-              ใหม่หลังจัดของเสร็จแล้ว sync
+            <p className="alert alert-warn">
+              ⚠️ ไฟล์นี้ยังไม่มีข้อมูลจัดส่งจากแม็คโคร (ส่งจริง = 0 ทั้งหมด) — นำเข้าได้ แต่ควร
+              export ใหม่หลังจัดของเสร็จแล้ว sync
             </p>
           )}
 
           {result.skippedNoItems.length > 0 && (
-            <p className="text-sm text-amber-700">
+            <p className="muted">
               ข้าม {result.skippedNoItems.length} ออเดอร์ (มีที่อยู่แต่ไม่มีรายการสินค้า):{' '}
               {result.skippedNoItems.join(', ')}
             </p>
           )}
 
           {result.cancelledLinesDropped > 0 && (
-            <p className="text-sm text-amber-700">
-              ข้ามรายการที่ยกเลิก {result.cancelledLinesDropped} รายการ
-            </p>
+            <p className="muted">ข้ามรายการที่ยกเลิก {result.cancelledLinesDropped} รายการ</p>
           )}
 
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="text-left">
-                <th>เลขออเดอร์</th>
-                <th>ลูกค้า</th>
-                <th>#รายการ</th>
-                <th>#ของขาด</th>
-              </tr>
-            </thead>
-            <tbody>
-              {result.orders.map((o) => (
-                <tr key={o.makroOrderNo}>
-                  <td>{o.makroOrderNo}</td>
-                  <td>{o.customerName}</td>
-                  <td>{o.items.length}</td>
-                  <td>{o.items.filter((i) => i.isShort).length}</td>
+          <div className="table-wrap">
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th>เลขออเดอร์</th>
+                  <th>ลูกค้า</th>
+                  <th>#รายการ</th>
+                  <th>#ของขาด</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {result.orders.map((o) => (
+                  <tr key={o.makroOrderNo}>
+                    <td className="whitespace-nowrap">{o.makroOrderNo}</td>
+                    <td>{o.customerName}</td>
+                    <td className="tnum">{o.items.length}</td>
+                    <td className="tnum">{o.items.filter((i) => i.isShort).length}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
 
-          <label className="text-sm">
-            วันจัดส่ง{' '}
+          <label className="field w-fit">
+            <span className="field-label">วันจัดส่ง</span>
             <input
               type="date"
-              className="rounded border p-1"
+              className="w-auto"
               value={shipDate}
               onChange={(e) => {
                 setDateTouched(true)
@@ -272,14 +264,18 @@ export default function ImportOrders() {
             />
           </label>
 
-          <Button onClick={doImport} disabled={result.orders.length === 0}>
+          <button
+            className="btn btn-primary w-full sm:w-auto"
+            onClick={doImport}
+            disabled={result.orders.length === 0}
+          >
             นำเข้า {result.orders.length} ออเดอร์
-          </Button>
-        </>
+          </button>
+        </div>
       )}
 
-      {error && <p className="text-sm text-red-600">{error}</p>}
-      {importMsg && <p className="text-sm text-green-700">{importMsg}</p>}
+      {error && <p className="alert alert-danger">{error}</p>}
+      {importMsg && <p className="alert alert-ok">{importMsg}</p>}
     </div>
   )
 }

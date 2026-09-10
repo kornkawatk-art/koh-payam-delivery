@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { getOrCreateShipDay, setBoats } from '../../lib/api/shipDays'
 import { supabase } from '../../lib/supabase'
-import { Button } from '../../components/ui/Button'
+import { PageHeader } from '../../components/ui/PageHeader'
 import { todayLocalISO } from '../../lib/format'
 
 type Boat = { id: string; name: string }
@@ -59,47 +59,68 @@ export default function BoatSetup() {
 
   if (failed)
     return (
-      <div className="flex flex-col items-start gap-2">
-        <p className="text-sm text-red-600">โหลดข้อมูลเรือไม่สำเร็จ</p>
-        <button className="rounded border px-3 py-1 text-sm" onClick={load}>
+      <div className="flex flex-col items-start gap-3">
+        <p className="alert alert-danger">โหลดข้อมูลเรือไม่สำเร็จ</p>
+        <button className="btn btn-secondary btn-sm" onClick={load}>
           ลองใหม่
         </button>
       </div>
     )
 
   return (
-    <div className="flex flex-col gap-3">
-      <h1 className="text-xl font-semibold">ตั้งค่าเรือประจำวัน</h1>
-      <input
-        type="date"
-        className="rounded border p-1"
-        value={date}
-        onChange={(e) => setDate(e.target.value)}
-      />
-      {boats.map((b, i) => (
-        <div key={b.id} className="flex items-center gap-2">
+    <div className="flex flex-col gap-5">
+      <PageHeader
+        title="ตั้งค่าเรือประจำวัน"
+        actions={
           <input
-            className="rounded border p-1"
-            value={b.name}
-            onChange={(e) =>
-              setBoatsState((s) => s.map((x, j) => (j === i ? { ...x, name: e.target.value } : x)))
-            }
+            type="date"
+            className="w-auto"
+            value={date}
+            onChange={(e) => setDate(e.target.value)}
           />
-          <button className="text-sm text-red-600" onClick={() => removeBoat(b.id)}>
-            ลบ
-          </button>
-        </div>
-      ))}
-      <button
-        className="w-fit text-sm underline"
-        onClick={() =>
-          setBoatsState((s) => [...s, { id: String(Date.now()), name: `เรือ ${s.length + 1}` }])
         }
-      >
-        + เพิ่มเรือ
-      </button>
-      <Button onClick={save}>บันทึก</Button>
-      {msg && <p className="text-sm">{msg}</p>}
+      />
+
+      <div className="card flex flex-col gap-3">
+        {boats.length === 0 && <p className="muted">ยังไม่มีเรือสำหรับวันนี้</p>}
+        {boats.map((b, i) => (
+          <div key={b.id} className="flex items-center gap-2">
+            <input
+              className="flex-1"
+              value={b.name}
+              onChange={(e) =>
+                setBoatsState((s) =>
+                  s.map((x, j) => (j === i ? { ...x, name: e.target.value } : x)),
+                )
+              }
+            />
+            <button
+              className="btn btn-ghost btn-sm text-danger-ink"
+              onClick={() => removeBoat(b.id)}
+            >
+              ลบ
+            </button>
+          </div>
+        ))}
+        <button
+          className="btn btn-secondary btn-sm w-fit"
+          onClick={() =>
+            setBoatsState((s) => [
+              ...s,
+              { id: String(Date.now()), name: `เรือ ${s.length + 1}` },
+            ])
+          }
+        >
+          + เพิ่มเรือ
+        </button>
+      </div>
+
+      <div className="flex items-center gap-3">
+        <button className="btn btn-primary" onClick={save}>
+          บันทึก
+        </button>
+        {msg && <p className="muted">{msg}</p>}
+      </div>
     </div>
   )
 }

@@ -3,7 +3,7 @@ import { getOrCreateShipDay, listOrdersForDay } from '../../lib/api/shipDays'
 import { setOrderBoat, updateOrderStatus } from '../../lib/api/orders'
 import { attachEvidencePhoto } from '../../lib/api/photos'
 import PhotoCapture from '../../components/PhotoCapture'
-import { Button } from '../../components/ui/Button'
+import { PageHeader } from '../../components/ui/PageHeader'
 import { todayLocalISO } from '../../lib/format'
 
 type Boat = { id: string; name: string }
@@ -69,9 +69,9 @@ export default function PierLoad() {
 
   if (failed)
     return (
-      <div className="flex flex-col items-start gap-2">
-        <p className="text-sm text-red-600">โหลดข้อมูลท่าเรือไม่สำเร็จ</p>
-        <button className="rounded border px-3 py-1 text-sm" onClick={load}>
+      <div className="flex flex-col items-start gap-3">
+        <p className="alert alert-danger">โหลดข้อมูลท่าเรือไม่สำเร็จ</p>
+        <button className="btn btn-secondary btn-sm" onClick={load}>
           ลองใหม่
         </button>
       </div>
@@ -79,55 +79,66 @@ export default function PierLoad() {
 
   if (!sel)
     return (
-      <div className="flex flex-col gap-2">
-        <h1 className="text-xl font-semibold">ที่ท่าเรือ</h1>
-        {orders.length === 0 && <p className="text-sm text-gray-500">ไม่มีออเดอร์ที่พร้อมส่งขึ้นเรือ</p>}
-        {orders.map((o) => (
-          <button
-            key={o.id}
-            className="rounded border p-3 text-left"
-            onClick={() => {
-              setSel(o)
-              setPhotoCount(0)
-              setMsg(undefined)
-            }}
-          >
-            {o.makro_order_no} · {o.customer_name_en} · {o.paper_box_count + o.foam_box_count} ลัง
-          </button>
-        ))}
-        {msg && <p className="text-sm">{msg}</p>}
+      <div className="flex flex-col gap-4">
+        <PageHeader title="ที่ท่าเรือ" />
+        {orders.length === 0 && (
+          <p className="muted">ไม่มีออเดอร์ที่พร้อมส่งขึ้นเรือ</p>
+        )}
+        <div className="flex flex-col gap-2">
+          {orders.map((o) => (
+            <button
+              key={o.id}
+              className="card flex items-center justify-between gap-3 text-left hover:border-line-strong"
+              onClick={() => {
+                setSel(o)
+                setPhotoCount(0)
+                setMsg(undefined)
+              }}
+            >
+              <span className="font-medium">
+                {o.makro_order_no} · {o.customer_name_en}
+              </span>
+              <span className="badge badge-neutral">
+                {o.paper_box_count + o.foam_box_count} ลัง
+              </span>
+            </button>
+          ))}
+        </div>
+        {msg && <p className="muted">{msg}</p>}
       </div>
     )
 
   return (
-    <div className="flex flex-col gap-3">
-      <button className="text-sm underline" onClick={() => setSel(null)}>
+    <div className="flex flex-col gap-4">
+      <button className="btn btn-ghost btn-sm -ml-2 w-fit" onClick={() => setSel(null)}>
         ← กลับ
       </button>
-      <h1 className="text-lg font-semibold">
+      <h1 className="page-title">
         {sel.makro_order_no} · {sel.customer_name_en}
       </h1>
 
-      <div>
-        <p className="mb-1 text-sm font-medium">เลือกเรือ</p>
+      <section>
+        <p className="section-title mb-2">เลือกเรือ</p>
         <div className="flex flex-wrap gap-2">
           {boats.map((b) => (
             <button
               key={b.id}
               onClick={() => void chooseBoat(b.id)}
               className={
-                'rounded-lg border px-4 py-3 text-lg ' +
-                (sel.boat_id === b.id ? 'bg-black text-white' : '')
+                'min-h-[3.25rem] rounded-xl border px-5 text-lg font-medium transition-colors ' +
+                (sel.boat_id === b.id
+                  ? 'border-ink bg-ink text-white'
+                  : 'border-line-strong bg-surface hover:bg-paper')
               }
             >
               {b.name}
             </button>
           ))}
         </div>
-      </div>
+      </section>
 
-      <div>
-        <p className="mb-1 text-sm font-medium">รูปหลักฐาน (สูงสุด 3)</p>
+      <section>
+        <p className="section-title mb-2">รูปหลักฐาน (สูงสุด 3)</p>
         <PhotoCapture
           scope="evidence"
           orderId={sel.id}
@@ -141,12 +152,16 @@ export default function PierLoad() {
             }
           }}
         />
-      </div>
+      </section>
 
-      <Button onClick={ship} disabled={!sel.boat_id || photoCount < 1} className="py-4 text-lg">
+      <button
+        className="btn btn-primary min-h-[3.25rem] w-full text-lg"
+        onClick={ship}
+        disabled={!sel.boat_id || photoCount < 1}
+      >
         ส่งขึ้นเรือแล้ว
-      </Button>
-      {msg && <p className="text-sm">{msg}</p>}
+      </button>
+      {msg && <p className="muted">{msg}</p>}
     </div>
   )
 }

@@ -7,8 +7,8 @@ import {
   markBackorderFulfilled,
   type BackorderRow,
 } from '../../lib/api/backorders'
-import { Button } from '../../components/ui/Button'
 import { Spinner } from '../../components/ui/Spinner'
+import { PageHeader } from '../../components/ui/PageHeader'
 
 type ItemState = {
   id: string
@@ -44,7 +44,7 @@ export default function PackOrder() {
       .catch(() => setBackorders([]))
   }, [id])
 
-  if (failed) return <p className="text-sm text-red-600">โหลดออเดอร์ไม่สำเร็จ</p>
+  if (failed) return <p className="alert alert-danger">โหลดออเดอร์ไม่สำเร็จ</p>
   if (!order) return <Spinner />
 
   async function save(markPacked: boolean) {
@@ -71,22 +71,20 @@ export default function PackOrder() {
   }
 
   return (
-    <div className="flex flex-col gap-3">
-      <h1 className="text-xl font-semibold">
-        แพ็ค · {order.makro_order_no} · {order.customer_name_en}
-      </h1>
+    <div className="flex flex-col gap-5">
+      <PageHeader title={`แพ็ค · ${order.makro_order_no} · ${order.customer_name_en}`} />
 
       {backorders.length > 0 && (
-        <div className="rounded border border-amber-300 bg-amber-50 p-3 text-sm text-amber-800">
-          <p className="font-medium">ของค้างส่งจากออเดอร์ก่อนหน้า</p>
-          <ul className="mt-1 flex flex-col gap-1">
+        <div className="alert alert-warn">
+          <p className="font-semibold">ของค้างส่งจากออเดอร์ก่อนหน้า</p>
+          <ul className="mt-1.5 flex flex-col gap-1.5">
             {backorders.map((b) => (
               <li key={b.id} className="flex items-center gap-3">
                 <span>
                   {b.product_name} x{b.qty}
                 </span>
                 <button
-                  className="rounded border border-amber-400 px-2 py-0.5"
+                  className="btn btn-secondary btn-sm"
                   onClick={() => fulfil(b.id)}
                 >
                   ส่งแล้ว
@@ -97,64 +95,71 @@ export default function PackOrder() {
         </div>
       )}
 
-      <table className="w-full text-sm">
-        <thead>
-          <tr className="text-left">
-            <th>สินค้า</th>
-            <th>สั่ง</th>
-            <th>ส่งจริง</th>
-            <th>สถานะ</th>
-            <th>หมายเหตุ</th>
-          </tr>
-        </thead>
-        <tbody>
-          {items.map((it) => (
-            <tr key={it.id} className="border-t">
-              <td>{it.product_name}</td>
-              <td>{it.qty_ordered}</td>
-              <td>{it.qty_shipped}</td>
-              <td>
-                {it.status === 'short' && (
-                  <span className="rounded bg-red-100 px-1.5 py-0.5 text-xs text-red-700">ขาด</span>
-                )}
-              </td>
-              <td>{it.item_remark}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+      <section className="flex flex-col gap-2">
+        <p className="section-title">รายการสินค้า</p>
+        <div className="table-wrap">
+          <table className="data-table">
+            <thead>
+              <tr>
+                <th>สินค้า</th>
+                <th>สั่ง</th>
+                <th>ส่งจริง</th>
+                <th>สถานะ</th>
+                <th>หมายเหตุ</th>
+              </tr>
+            </thead>
+            <tbody>
+              {items.map((it) => (
+                <tr key={it.id}>
+                  <td>{it.product_name}</td>
+                  <td className="tnum">{it.qty_ordered}</td>
+                  <td className="tnum">{it.qty_shipped}</td>
+                  <td>
+                    {it.status === 'short' && (
+                      <span className="badge badge-danger">ขาด</span>
+                    )}
+                  </td>
+                  <td>{it.item_remark}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </section>
 
-      <div className="flex gap-4 text-sm">
-        <label>
-          ลังกระดาษ{' '}
-          <input
-            type="number"
-            min={0}
-            className="w-16 rounded border p-1"
-            value={paper}
-            onChange={(e) => setPaper(+e.target.value)}
-          />
-        </label>
-        <label>
-          ลังโฟม{' '}
-          <input
-            type="number"
-            min={0}
-            className="w-16 rounded border p-1"
-            value={foam}
-            onChange={(e) => setFoam(+e.target.value)}
-          />
-        </label>
+      <div className="card flex flex-col gap-4">
+        <div className="flex flex-wrap gap-4">
+          <label className="field">
+            <span className="field-label">ลังกระดาษ</span>
+            <input
+              type="number"
+              min={0}
+              className="w-24"
+              value={paper}
+              onChange={(e) => setPaper(+e.target.value)}
+            />
+          </label>
+          <label className="field">
+            <span className="field-label">ลังโฟม</span>
+            <input
+              type="number"
+              min={0}
+              className="w-24"
+              value={foam}
+              onChange={(e) => setFoam(+e.target.value)}
+            />
+          </label>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <button className="btn btn-secondary" onClick={() => save(false)} disabled={busy}>
+            บันทึก
+          </button>
+          <button className="btn btn-primary" onClick={() => save(true)} disabled={busy}>
+            บันทึก + แพ็คเสร็จ
+          </button>
+        </div>
+        {msg && <p className="muted">{msg}</p>}
       </div>
-      <div className="flex gap-2">
-        <Button onClick={() => save(false)} disabled={busy}>
-          บันทึก
-        </Button>
-        <Button onClick={() => save(true)} disabled={busy}>
-          บันทึก + แพ็คเสร็จ
-        </Button>
-      </div>
-      {msg && <p className="text-sm">{msg}</p>}
     </div>
   )
 }

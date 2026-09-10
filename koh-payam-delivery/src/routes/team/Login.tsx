@@ -21,27 +21,43 @@ export default function Login() {
   }
 
   return (
-    <form onSubmit={onSubmit} className="mx-auto mt-24 flex w-80 flex-col gap-3">
-      <h1 className="text-xl font-semibold">เข้าสู่ระบบทีมงาน</h1>
-      <input
-        className="rounded border p-2"
-        placeholder="อีเมล"
-        value={email}
-        onChange={(e) => setEmail(e.target.value)}
-        autoComplete="username"
-      />
-      <input
-        className="rounded border p-2"
-        placeholder="รหัสผ่าน"
-        type="password"
-        value={password}
-        onChange={(e) => setPassword(e.target.value)}
-        autoComplete="current-password"
-      />
-      {err && <p className="text-sm text-red-600">{err}</p>}
-      <button className="rounded bg-black p-2 text-white disabled:opacity-50" disabled={busy}>
-        {busy ? 'กำลังเข้าสู่ระบบ…' : 'เข้าสู่ระบบ'}
-      </button>
-    </form>
+    <div className="flex min-h-screen items-center justify-center bg-paper px-4 py-12">
+      <div className="w-full max-w-sm">
+        <div className="mb-6 flex flex-col items-center gap-2 text-center">
+          <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-ink text-base font-semibold text-white">
+            KP
+          </span>
+          <h1 className="page-title">เข้าสู่ระบบทีมงาน</h1>
+          <p className="muted">ระบบจัดส่งสินค้าเกาะพยาม</p>
+        </div>
+
+        <form onSubmit={onSubmit} className="card flex flex-col gap-4">
+          <label className="field">
+            <span className="field-label">อีเมล</span>
+            <input
+              placeholder="อีเมล"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              autoComplete="username"
+              inputMode="email"
+            />
+          </label>
+          <label className="field">
+            <span className="field-label">รหัสผ่าน</span>
+            <input
+              placeholder="รหัสผ่าน"
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              autoComplete="current-password"
+            />
+          </label>
+          {err && <p className="alert alert-danger">{err}</p>}
+          <button className="btn btn-primary w-full" disabled={busy}>
+            {busy ? 'กำลังเข้าสู่ระบบ…' : 'เข้าสู่ระบบ'}
+          </button>
+        </form>
+      </div>
+    </div>
   )
 }

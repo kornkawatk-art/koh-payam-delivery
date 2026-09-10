@@ -77,18 +77,18 @@ export default function PhotoCapture({ scope, orderId, token, onUploaded, max = 
         onChange={onPick}
         aria-label="ถ่ายรูป / เลือกรูป"
       />
-      <p className="text-sm text-gray-600">
+      <p className="text-sm text-ink-soft">
         {keys.length} / {max} รูป
       </p>
-      {busy && <p className="text-sm text-gray-500">กำลังอัปโหลด…</p>}
-      {err && <p className="text-sm text-red-600">{err}</p>}
+      {busy && <p className="text-sm text-ink-faint">กำลังอัปโหลด…</p>}
+      {err && <p className="text-sm text-danger-ink">{err}</p>}
       <div className="flex flex-wrap gap-2">
         {thumbs.map((src, i) => (
           <img
             key={keys[i] ?? i}
             src={src}
             alt="รูปที่อัปโหลด"
-            className="h-20 w-20 rounded border object-cover"
+            className="h-20 w-20 rounded-lg border border-line object-cover"
           />
         ))}
       </div>

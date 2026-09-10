@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useState, type ReactNode } from 'react'
 import { useParams } from 'react-router-dom'
 import { t, type Lang } from './i18n'
 import OrderStatusTimeline from '../../components/OrderStatusTimeline'
@@ -82,96 +82,100 @@ export default function CustomerOrderView() {
   }
 
   const toggle = (
-    <div className="mb-3 flex justify-end gap-3 text-sm">
-      <button
-        onClick={() => switchLang('en')}
-        className={lang === 'en' ? 'font-bold underline' : 'text-gray-500'}
-      >
-        EN
-      </button>
-      <button
-        onClick={() => switchLang('th')}
-        className={lang === 'th' ? 'font-bold underline' : 'text-gray-500'}
-      >
-        ไทย
-      </button>
+    <div className="flex justify-end">
+      <div className="inline-flex overflow-hidden rounded-lg border border-line text-sm">
+        <button
+          onClick={() => switchLang('en')}
+          className={
+            'px-3 py-1.5 font-medium transition-colors ' +
+            (lang === 'en' ? 'bg-ink text-white' : 'text-ink-soft hover:bg-paper')
+          }
+        >
+          EN
+        </button>
+        <button
+          onClick={() => switchLang('th')}
+          className={
+            'px-3 py-1.5 font-medium transition-colors ' +
+            (lang === 'th' ? 'bg-ink text-white' : 'text-ink-soft hover:bg-paper')
+          }
+        >
+          ไทย
+        </button>
+      </div>
+    </div>
+  )
+
+  const shell = (inner: ReactNode) => (
+    <div className="min-h-screen bg-paper px-4 py-6 sm:py-10">
+      <div className="mx-auto flex w-full max-w-xl flex-col gap-4">
+        {toggle}
+        {inner}
+      </div>
     </div>
   )
 
   if (err)
-    return (
-      <div className="mx-auto max-w-lg p-4">
-        {toggle}
-        <p className="rounded border p-4 text-sm text-gray-700">{t(lang, err)}</p>
-      </div>
-    )
+    return shell(<p className="card text-sm text-ink-soft">{t(lang, err)}</p>)
 
   if (!data)
-    return (
-      <div className="mx-auto max-w-lg p-4">
-        {toggle}
-        <p className="p-2 text-sm text-gray-500">{t(lang, 'loading')}</p>
-      </div>
-    )
+    return shell(<p className="card text-sm text-ink-soft">{t(lang, 'loading')}</p>)
 
   const showClaimClosed =
     !data.canClaim && data.status === 'shipped' && data.claimDeadlineAt != null
 
-  return (
-    <div className="mx-auto max-w-lg p-4">
-      {toggle}
-
-      <h1 className="text-xl font-semibold">
-        {t(lang, 'title')} · {data.orderNo}
-      </h1>
-      <p className="text-sm text-gray-600">
-        {t(lang, 'customer')}: {data.customerNameEn}
-      </p>
-      <p className="text-sm text-gray-600">
-        {t(lang, 'ship_date')}: {formatDate(data.shipDate, lang)}
-      </p>
+  return shell(
+    <div className="card flex flex-col gap-5">
+      <header className="flex flex-col gap-1">
+        <h1 className="page-title">
+          {t(lang, 'title')} · {data.orderNo}
+        </h1>
+        <p className="muted">
+          {t(lang, 'customer')}: {data.customerNameEn}
+        </p>
+        <p className="muted">
+          {t(lang, 'ship_date')}: {formatDate(data.shipDate, lang)}
+        </p>
+      </header>
 
       <OrderStatusTimeline status={data.status} lang={lang} />
 
-      <section className="mt-4">
-        <h2 className="text-sm font-semibold">{t(lang, 'items')}</h2>
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="text-left text-gray-500">
-              <th className="font-medium">{t(lang, 'col_item')}</th>
-              <th className="font-medium">{t(lang, 'col_ordered')}</th>
-              <th className="font-medium">{t(lang, 'col_shipped')}</th>
-            </tr>
-          </thead>
-          <tbody>
-            {data.items.map((it, i) => (
-              <tr
-                key={`${it.productName}-${i}`}
-                className={'border-t ' + (it.isShort ? 'bg-amber-50' : '')}
-              >
-                <td className="py-0.5">
-                  {it.productName}
-                  {it.isShort && (
-                    <span className="ml-1 rounded bg-amber-200 px-1 text-xs text-amber-900">
-                      {t(lang, 'badge_short')}
-                    </span>
-                  )}
-                </td>
-                <td className="py-0.5">{it.orderedQty}</td>
-                <td className="py-0.5">{it.shippedQty}</td>
+      <section className="flex flex-col gap-2">
+        <h2 className="section-title">{t(lang, 'items')}</h2>
+        <div className="table-wrap">
+          <table className="data-table">
+            <thead>
+              <tr>
+                <th>{t(lang, 'col_item')}</th>
+                <th>{t(lang, 'col_ordered')}</th>
+                <th>{t(lang, 'col_shipped')}</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {data.items.map((it, i) => (
+                <tr key={`${it.productName}-${i}`} className={it.isShort ? 'bg-warn-soft' : ''}>
+                  <td>
+                    {it.productName}
+                    {it.isShort && (
+                      <span className="badge badge-warn ml-1.5">{t(lang, 'badge_short')}</span>
+                    )}
+                  </td>
+                  <td className="tnum">{it.orderedQty}</td>
+                  <td className="tnum">{it.shippedQty}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </section>
 
-      <section className="mt-4 text-sm">
-        <h2 className="font-semibold">{t(lang, 'shortages_heading')}</h2>
+      <section className="flex flex-col gap-1.5 text-sm">
+        <h2 className="section-title">{t(lang, 'shortages_heading')}</h2>
         {data.shortages.length === 0 ? (
-          <p className="text-gray-500">{t(lang, 'none')}</p>
+          <p className="muted">{t(lang, 'none')}</p>
         ) : (
           <>
-            <p className="text-gray-500">{t(lang, 'shortages_note')}</p>
+            <p className="muted">{t(lang, 'shortages_note')}</p>
             <ul className="list-inside list-disc">
               {data.shortages.map((s, i) => (
                 <li key={`${s.productName}-${i}`}>
@@ -187,7 +191,7 @@ export default function CustomerOrderView() {
         )}
       </section>
 
-      <section className="mt-4 text-sm text-gray-700">
+      <section className="flex flex-col gap-1 rounded-lg bg-paper p-3 text-sm text-ink-soft">
         <p>
           {t(lang, 'boxes')}: {t(lang, 'paper')} {data.paperBoxCount} · {t(lang, 'foam')}{' '}
           {data.foamBoxCount}
@@ -200,15 +204,15 @@ export default function CustomerOrderView() {
       </section>
 
       {data.evidencePhotos.length > 0 && (
-        <section className="mt-4 text-sm">
-          <h2 className="font-semibold">{t(lang, 'evidence')}</h2>
+        <section className="flex flex-col gap-2 text-sm">
+          <h2 className="section-title">{t(lang, 'evidence')}</h2>
           <div className="flex flex-wrap gap-2">
             {data.evidencePhotos.map((src) => (
               <img
                 key={src}
                 src={src}
                 alt={t(lang, 'evidence')}
-                className="h-24 w-24 rounded border object-cover"
+                className="h-24 w-24 rounded-lg border border-line object-cover"
               />
             ))}
           </div>
@@ -216,14 +220,17 @@ export default function CustomerOrderView() {
       )}
 
       {data.claims.length > 0 && (
-        <section className="mt-4 text-sm">
-          <h2 className="font-semibold">{t(lang, 'claims')}</h2>
-          <ul className="flex flex-col gap-1">
+        <section className="flex flex-col gap-2 text-sm">
+          <h2 className="section-title">{t(lang, 'claims')}</h2>
+          <ul className="flex flex-col gap-2">
             {data.claims.map((c) => (
-              <li key={c.id} className="rounded border p-2">
-                {t(lang, `claim_type_${c.type}`)} × {c.qty} · {t(lang, `claim_status_${c.status}`)}
+              <li key={c.id} className="rounded-lg border border-line p-3">
+                {t(lang, `claim_type_${c.type}`)} × {c.qty} ·{' '}
+                {t(lang, `claim_status_${c.status}`)}
                 {c.resolution ? ` · ${t(lang, `claim_resolution_${c.resolution}`)}` : ''}
-                <span className="block text-gray-500">{formatDateTime(c.createdAt, lang)}</span>
+                <span className="mt-1 block text-ink-faint">
+                  {formatDateTime(c.createdAt, lang)}
+                </span>
                 {c.description && <span className="block">{c.description}</span>}
               </li>
             ))}
@@ -232,23 +239,18 @@ export default function CustomerOrderView() {
       )}
 
       {data.canClaim && !claiming && (
-        <button
-          className="mt-4 rounded bg-black px-3 py-2 text-sm text-white"
-          onClick={() => setClaiming(true)}
-        >
+        <button className="btn btn-primary w-full" onClick={() => setClaiming(true)}>
           {t(lang, 'report_problem')}
         </button>
       )}
 
       {data.canClaim && !claiming && data.claimDeadlineAt && (
-        <p className="mt-2 text-xs text-gray-500">
+        <p className="text-xs text-ink-faint">
           {t(lang, 'claim_deadline')} {formatDateTime(data.claimDeadlineAt, lang)}
         </p>
       )}
 
-      {showClaimClosed && (
-        <p className="mt-4 text-sm text-gray-500">{t(lang, 'claim_closed')}</p>
-      )}
+      {showClaimClosed && <p className="muted">{t(lang, 'claim_closed')}</p>}
 
       {claiming && (
         <CustomerClaimForm
@@ -261,6 +263,6 @@ export default function CustomerOrderView() {
           }}
         />
       )}
-    </div>
+    </div>,
   )
 }

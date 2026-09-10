@@ -34,32 +34,45 @@ export default function TwoFactorSetup() {
   const isImg = qr.startsWith('data:') || qr.startsWith('http')
 
   return (
-    <form onSubmit={onSubmit} className="mx-auto mt-24 flex w-80 flex-col gap-3">
-      <h1 className="text-xl font-semibold">ตั้งค่ายืนยันตัวตนสองชั้น</h1>
-      <p className="text-sm text-gray-600">
-        สแกน QR ด้วยแอป Authenticator แล้วกรอกรหัส 6 หลักเพื่อยืนยัน
-      </p>
-      {qr &&
-        (isImg ? (
-          <img src={qr} alt="QR code" className="mx-auto h-48 w-48" />
-        ) : (
-          <div className="mx-auto h-48 w-48" dangerouslySetInnerHTML={{ __html: qr }} />
-        ))}
-      {secret && <p className="break-all text-center text-xs text-gray-500">{secret}</p>}
-      <input
-        className="rounded border p-2"
-        placeholder="รหัส 6 หลัก"
-        inputMode="numeric"
-        value={code}
-        onChange={(e) => setCode(e.target.value)}
-      />
-      {err && <p className="text-sm text-red-600">{err}</p>}
-      <button
-        className="rounded bg-black p-2 text-white disabled:opacity-50"
-        disabled={busy || !factorId}
-      >
-        {busy ? 'กำลังยืนยัน…' : 'ยืนยัน'}
-      </button>
-    </form>
+    <div className="flex min-h-screen items-center justify-center bg-paper px-4 py-12">
+      <form onSubmit={onSubmit} className="card flex w-full max-w-sm flex-col gap-4">
+        <div className="flex flex-col gap-1">
+          <h1 className="page-title">ตั้งค่ายืนยันตัวตนสองชั้น</h1>
+          <p className="muted">
+            สแกน QR ด้วยแอป Authenticator แล้วกรอกรหัส 6 หลักเพื่อยืนยัน
+          </p>
+        </div>
+        {qr && (
+          <div className="mx-auto rounded-xl border border-line bg-surface p-3">
+            {isImg ? (
+              <img src={qr} alt="QR code" className="h-44 w-44" />
+            ) : (
+              <div className="h-44 w-44" dangerouslySetInnerHTML={{ __html: qr }} />
+            )}
+          </div>
+        )}
+        {secret && (
+          <p className="break-all rounded-lg bg-paper px-3 py-2 text-center font-mono text-xs text-ink-soft">
+            {secret}
+          </p>
+        )}
+        <label className="field">
+          <span className="field-label">รหัส 6 หลัก</span>
+          <input
+            className="text-center text-lg tracking-[0.3em]"
+            placeholder="รหัส 6 หลัก"
+            inputMode="numeric"
+            autoComplete="one-time-code"
+            maxLength={6}
+            value={code}
+            onChange={(e) => setCode(e.target.value)}
+          />
+        </label>
+        {err && <p className="alert alert-danger">{err}</p>}
+        <button className="btn btn-primary w-full" disabled={busy || !factorId}>
+          {busy ? 'กำลังยืนยัน…' : 'ยืนยัน'}
+        </button>
+      </form>
+    </div>
   )
 }

@@ -16,7 +16,11 @@ import PackOrder from './routes/team/PackOrder'
 import LabelSheet from './routes/team/LabelSheet'
 import CustomerOrderView from './routes/customer/CustomerOrderView'
 
-const LOADING = <div className="p-6">กำลังโหลด…</div>
+const LOADING = (
+  <div className="flex min-h-screen items-center justify-center text-sm text-ink-soft">
+    กำลังโหลด…
+  </div>
+)
 
 function RequireAuth({ children }: { children: JSX.Element }) {
   const { loading, session, mfaLoaded, needsMfaSetup, needsMfaChallenge } = useAuth()

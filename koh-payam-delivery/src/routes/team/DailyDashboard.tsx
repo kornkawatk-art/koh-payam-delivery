@@ -5,6 +5,7 @@ import { listBackordersForDay, type BackorderRow } from '../../lib/api/backorder
 import { supabase } from '../../lib/supabase'
 import { StatusBadge } from '../../components/ui/StatusBadge'
 import { Spinner } from '../../components/ui/Spinner'
+import { PageHeader } from '../../components/ui/PageHeader'
 import { todayLocalISO } from '../../lib/format'
 
 export default function DailyDashboard() {
@@ -76,37 +77,42 @@ export default function DailyDashboard() {
 
   if (failed)
     return (
-      <div className="flex flex-col items-start gap-2">
-        <p className="text-sm text-red-600">โหลดงานวันนี้ไม่สำเร็จ</p>
-        <button className="rounded border px-3 py-1 text-sm" onClick={() => load()}>
+      <div className="flex flex-col items-start gap-3">
+        <p className="alert alert-danger">โหลดงานวันนี้ไม่สำเร็จ</p>
+        <button className="btn btn-secondary btn-sm" onClick={() => load()}>
           ลองใหม่
         </button>
       </div>
     )
   if (!rows) return <Spinner />
+
   return (
-    <div className="flex flex-col gap-3">
-      <div className="flex items-center gap-3">
-        <h1 className="text-xl font-semibold">งานวันนี้</h1>
-        <input
-          type="date"
-          className="rounded border p-1"
-          value={date}
-          onChange={(e) => setDate(e.target.value)}
-        />
-      </div>
-      <p className="text-sm text-gray-600">
+    <div className="flex flex-col gap-5">
+      <PageHeader
+        title="งานวันนี้"
+        actions={
+          <input
+            type="date"
+            className="w-auto"
+            value={date}
+            onChange={(e) => setDate(e.target.value)}
+          />
+        }
+      />
+
+      <p className="muted">
         แพ็คแล้ว {counts.packed}/{counts.total} · ถึงท่าเรือ {counts.atPier} · ส่งแล้ว{' '}
         {counts.shipped}
       </p>
+
       {backorders.length > 0 && (
-        <div className="rounded border border-amber-300 bg-amber-50 p-2 text-sm text-amber-800">
-          <p className="font-medium">ของค้างส่ง {backorders.length} รายการรอส่งวันนี้</p>
-          <ul className="mt-1 list-disc pl-5">
+        <div className="alert alert-warn">
+          <p className="font-semibold">ของค้างส่ง {backorders.length} รายการรอส่งวันนี้</p>
+          <ul className="mt-1.5 list-disc pl-5">
             {backorders.map((b) => (
               <li key={b.id}>
                 {b.target_order_id ? (
-                  <Link className="underline" to={`/order/${b.target_order_id}`}>
+                  <Link className="link" to={`/order/${b.target_order_id}`}>
                     {b.product_name} x{b.qty}
                   </Link>
                 ) : (
@@ -119,40 +125,47 @@ export default function DailyDashboard() {
           </ul>
         </div>
       )}
+
       <input
         placeholder="ค้นหาชื่อลูกค้า / เลขออเดอร์"
-        className="rounded border p-2"
         value={q}
         onChange={(e) => setQ(e.target.value)}
       />
-      <table className="w-full text-sm">
-        <thead>
-          <tr className="text-left">
-            <th>เลขออเดอร์</th>
-            <th>ลูกค้า</th>
-            <th>สถานะ</th>
-            <th>ลัง</th>
-            <th>เรือ</th>
-          </tr>
-        </thead>
-        <tbody>
-          {filtered.map((o) => (
-            <tr key={o.id} className="border-t">
-              <td>
-                <Link className="underline" to={`/order/${o.id}`}>
-                  {o.makro_order_no}
-                </Link>
-              </td>
-              <td>{o.customer_name_en}</td>
-              <td>
-                <StatusBadge status={o.status} />
-              </td>
-              <td>{o.paper_box_count + o.foam_box_count}</td>
-              <td>{o.boat_id ?? '—'}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+
+      {filtered.length === 0 ? (
+        <p className="muted">ไม่มีออเดอร์</p>
+      ) : (
+        <div className="table-wrap">
+          <table className="data-table">
+            <thead>
+              <tr>
+                <th>เลขออเดอร์</th>
+                <th>ลูกค้า</th>
+                <th>สถานะ</th>
+                <th>ลัง</th>
+                <th>เรือ</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.map((o) => (
+                <tr key={o.id}>
+                  <td className="whitespace-nowrap">
+                    <Link className="link" to={`/order/${o.id}`}>
+                      {o.makro_order_no}
+                    </Link>
+                  </td>
+                  <td>{o.customer_name_en}</td>
+                  <td>
+                    <StatusBadge status={o.status} />
+                  </td>
+                  <td className="tnum">{o.paper_box_count + o.foam_box_count}</td>
+                  <td className="whitespace-nowrap">{o.boat_id ?? '—'}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   )
 }

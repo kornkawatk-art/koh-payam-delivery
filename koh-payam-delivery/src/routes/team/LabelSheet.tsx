@@ -18,7 +18,7 @@ export default function LabelSheet() {
       .catch(() => setFailed(true))
   }, [id])
 
-  if (failed) return <p className="text-sm text-red-600">โหลดออเดอร์ไม่สำเร็จ</p>
+  if (failed) return <p className="alert alert-danger">โหลดออเดอร์ไม่สำเร็จ</p>
   if (!order) return <Spinner />
 
   const paper = order.paper_box_count ?? 0
@@ -27,24 +27,52 @@ export default function LabelSheet() {
   return (
     <div className="flex flex-col gap-4">
       <button
-        className="no-print w-fit rounded bg-black px-3 py-2 text-white"
+        className="no-print btn btn-primary w-fit"
         onClick={() => window.print()}
       >
         สั่งพิมพ์
       </button>
-      <div className="label-sheet">
-        <p className="text-4xl font-bold uppercase">{order.customer_name_en}</p>
-        <p className="mt-2 text-lg">
+
+      <div className="label-sheet card">
+        <p className="text-4xl font-bold uppercase tracking-tight">{order.customer_name_en}</p>
+        <p className="mt-2 text-lg text-ink-soft">
           ออเดอร์ {order.makro_order_no} · ส่ง {formatDateTH(order.ship_date)}
         </p>
-        <div className="mt-6 flex flex-col gap-4 text-xl">
+
+        <div className="mt-6 flex flex-col gap-5 text-xl">
           <div>
             <p className="font-semibold">เขียนหน้าลัง · ลังกระดาษ ({paper})</p>
-            <p>{seqLines(paper).join('   ') || '—'}</p>
+            <div className="mt-1.5 flex flex-wrap gap-2">
+              {paper === 0 ? (
+                <span>—</span>
+              ) : (
+                seqLines(paper).map((s) => (
+                  <span
+                    key={s}
+                    className="rounded-md border border-line px-2 py-0.5 tnum"
+                  >
+                    {s}
+                  </span>
+                ))
+              )}
+            </div>
           </div>
           <div>
             <p className="font-semibold">เขียนหน้าลัง · ลังโฟม ({foam})</p>
-            <p>{seqLines(foam).join('   ') || '—'}</p>
+            <div className="mt-1.5 flex flex-wrap gap-2">
+              {foam === 0 ? (
+                <span>—</span>
+              ) : (
+                seqLines(foam).map((s) => (
+                  <span
+                    key={s}
+                    className="rounded-md border border-line px-2 py-0.5 tnum"
+                  >
+                    {s}
+                  </span>
+                ))
+              )}
+            </div>
           </div>
         </div>
       </div>

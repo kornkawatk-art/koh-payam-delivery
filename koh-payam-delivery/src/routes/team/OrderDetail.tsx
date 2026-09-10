@@ -7,7 +7,6 @@ import {
 } from '../../lib/api/backorders'
 import { nextStatus, type OrderStatus } from '../../lib/status'
 import { StatusBadge } from '../../components/ui/StatusBadge'
-import { Button } from '../../components/ui/Button'
 import { Spinner } from '../../components/ui/Spinner'
 
 const STATUS_LABEL: Record<OrderStatus, string> = {
@@ -38,7 +37,7 @@ export default function OrderDetail() {
       .catch(() => setBackorders([]))
   }, [id, load])
 
-  if (failed) return <p className="text-sm text-red-600">โหลดออเดอร์ไม่สำเร็จ</p>
+  if (failed) return <p className="alert alert-danger">โหลดออเดอร์ไม่สำเร็จ</p>
   if (!order) return <Spinner />
 
   const link = `${location.origin}/o/${order.link_token}`
@@ -80,117 +79,130 @@ export default function OrderDetail() {
   }
 
   return (
-    <div className="flex flex-col gap-4">
-      <div className="flex items-center gap-3">
-        <h1 className="text-xl font-semibold">
-          {order.makro_order_no} · {order.customer_name_en}
-        </h1>
-        <StatusBadge status={order.status} />
+    <div className="flex flex-col gap-5">
+      <header className="flex flex-col gap-3 border-b border-line pb-4">
+        <div className="flex flex-wrap items-center gap-3">
+          <h1 className="page-title">
+            {order.makro_order_no} · {order.customer_name_en}
+          </h1>
+          <StatusBadge status={order.status} />
+        </div>
         {next && (
           <div className="flex flex-col items-start gap-1">
-            <Button onClick={advance} disabled={busy || pierBlocked}>
+            <button
+              className="btn btn-primary"
+              onClick={advance}
+              disabled={busy || pierBlocked}
+            >
               เปลี่ยนเป็น {STATUS_LABEL[next]}
-            </Button>
+            </button>
             {pierBlocked && (
-              <p className="text-xs text-gray-500">
+              <p className="muted text-xs">
                 ต้องเลือกเรือและถ่ายรูปหลักฐานที่หน้า "ที่ท่าเรือ" ก่อน
               </p>
             )}
           </div>
         )}
+      </header>
+
+      <p className="muted">ส่งที่: {order.sub_district || '—'}</p>
+
+      <div className="flex gap-4 text-sm">
+        <Link className="link" to={`/order/${id}/pack`}>
+          แพ็คของ
+        </Link>
+        <Link className="link" to={`/order/${id}/label`}>
+          ใบเขียนหน้าลัง
+        </Link>
       </div>
 
-      <p className="text-sm text-gray-600">ส่งที่: {order.sub_district || '—'}</p>
-
-      <div className="flex gap-4 text-sm underline">
-        <Link to={`/order/${id}/pack`}>แพ็คของ</Link>
-        <Link to={`/order/${id}/label`}>ใบเขียนหน้าลัง</Link>
-      </div>
-
-      <div className="flex flex-col gap-1 rounded border p-3 text-sm">
-        <p className="font-medium">ลิงก์ลูกค้า</p>
-        <p className="break-all">{link}</p>
+      <div className="card flex flex-col gap-2 text-sm">
+        <p className="section-title">ลิงก์ลูกค้า</p>
+        <p className="break-all font-mono text-xs text-ink-soft">{link}</p>
         <div className="flex gap-2">
           <button
-            className="rounded border px-2 py-0.5"
+            className="btn btn-secondary btn-sm"
             onClick={() => navigator.clipboard.writeText(link)}
           >
             คัดลอก
           </button>
-          <button className="rounded border px-2 py-0.5" onClick={regen} disabled={busy}>
+          <button className="btn btn-secondary btn-sm" onClick={regen} disabled={busy}>
             สร้างลิงก์ใหม่
           </button>
         </div>
       </div>
 
-      <table className="w-full text-sm">
-        <thead>
-          <tr className="text-left">
-            <th>สินค้า</th>
-            <th>สั่ง</th>
-            <th>ส่งจริง</th>
-            <th />
-            <th>หมายเหตุ</th>
-          </tr>
-        </thead>
-        <tbody>
-          {items.map((it) => (
-            <tr key={it.id} className="border-t">
-              <td>{it.product_name}</td>
-              <td>{it.qty_ordered}</td>
-              <td>{it.qty_shipped}</td>
-              <td>
-                {it.status === 'short' && (
-                  <span className="rounded bg-amber-100 px-1 text-xs text-amber-800">ขาด</span>
-                )}
-              </td>
-              <td>{it.item_remark}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+      <section className="flex flex-col gap-2">
+        <p className="section-title">รายการสินค้า</p>
+        <div className="table-wrap">
+          <table className="data-table">
+            <thead>
+              <tr>
+                <th>สินค้า</th>
+                <th>สั่ง</th>
+                <th>ส่งจริง</th>
+                <th />
+                <th>หมายเหตุ</th>
+              </tr>
+            </thead>
+            <tbody>
+              {items.map((it) => (
+                <tr key={it.id}>
+                  <td>{it.product_name}</td>
+                  <td className="tnum">{it.qty_ordered}</td>
+                  <td className="tnum">{it.qty_shipped}</td>
+                  <td>
+                    {it.status === 'short' && <span className="badge badge-warn">ขาด</span>}
+                  </td>
+                  <td>{it.item_remark}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </section>
 
-      <div className="text-sm">
-        <p className="font-medium">เคลมของออเดอร์นี้</p>
+      <section className="text-sm">
+        <p className="section-title">เคลมของออเดอร์นี้</p>
         {claims.length === 0 ? (
-          <p className="text-gray-500">ไม่มีเคลม</p>
+          <p className="muted mt-1">ไม่มีเคลม</p>
         ) : (
-          <ul className="flex flex-col gap-1">
+          <ul className="mt-1 flex flex-col gap-1">
             {claims.map((c) => (
               <li key={c.id}>
-                <Link className="underline" to={`/claims/${c.id}`}>
+                <Link className="link" to={`/claims/${c.id}`}>
                   เคลม #{c.id} · {c.status}
                 </Link>
               </li>
             ))}
           </ul>
         )}
-      </div>
+      </section>
 
-      <div className="text-sm">
-        <p className="font-medium">รูปหลักฐาน</p>
+      <section className="text-sm">
+        <p className="section-title">รูปหลักฐาน</p>
         {photos.length === 0 ? (
-          <p className="text-gray-500">ไม่มีรูป</p>
+          <p className="muted mt-1">ไม่มีรูป</p>
         ) : (
-          <div className="flex flex-wrap gap-2">
+          <div className="mt-1 flex flex-wrap gap-2">
             {photos.map((p) => (
               <img
                 key={p.id ?? p.r2_key}
                 src={`${import.meta.env.VITE_R2_PUBLIC_BASE_URL}/${p.r2_key}`}
                 alt="หลักฐาน"
-                className="h-24 w-24 rounded object-cover"
+                className="h-24 w-24 rounded-lg border border-line object-cover"
               />
             ))}
           </div>
         )}
-      </div>
+      </section>
 
-      <div className="text-sm">
-        <p className="font-medium">รายการค้างส่งที่เกี่ยวข้อง</p>
+      <section className="text-sm">
+        <p className="section-title">รายการค้างส่งที่เกี่ยวข้อง</p>
         {backorders.length === 0 ? (
-          <p className="text-gray-500">ไม่มี</p>
+          <p className="muted mt-1">ไม่มี</p>
         ) : (
-          <ul className="flex flex-col gap-1">
+          <ul className="mt-1 flex flex-col gap-1 text-ink-soft">
             {backorders.map((b) => (
               <li key={b.id}>
                 {b.product_name} x{b.qty} · {b.reason} · {b.status}
@@ -200,9 +212,9 @@ export default function OrderDetail() {
             ))}
           </ul>
         )}
-      </div>
+      </section>
 
-      {msg && <p className="text-sm">{msg}</p>}
+      {msg && <p className="muted">{msg}</p>}
     </div>
   )
 }

@@ -59,14 +59,14 @@ export default function CustomerClaimForm({ token, items, lang, onDone }: Props)
 
   return (
     <form
-      className="mt-4 flex flex-col gap-3 rounded border p-3"
+      className="flex flex-col gap-4 rounded-lg border border-line bg-paper p-4"
       onSubmit={(e) => {
         e.preventDefault()
         void submit()
       }}
     >
-      <fieldset className="flex flex-col gap-1">
-        <legend className="text-sm font-semibold">{t(lang, 'claim_form_type')}</legend>
+      <fieldset className="flex flex-col gap-2">
+        <legend className="section-title">{t(lang, 'claim_form_type')}</legend>
         {CLAIM_TYPES.map((ct) => (
           <label key={ct} className="flex items-center gap-2 text-sm">
             <input
@@ -82,13 +82,9 @@ export default function CustomerClaimForm({ token, items, lang, onDone }: Props)
       </fieldset>
 
       {needsItem && (
-        <label className="flex flex-col gap-1 text-sm">
-          {t(lang, 'claim_form_item')}
-          <select
-            value={itemIndex}
-            onChange={(e) => setItemIndex(Number(e.target.value))}
-            className="rounded border p-1"
-          >
+        <label className="field text-sm">
+          <span className="field-label">{t(lang, 'claim_form_item')}</span>
+          <select value={itemIndex} onChange={(e) => setItemIndex(Number(e.target.value))}>
             {items.map((it, i) => (
               <option key={`${it.productName}-${i}`} value={i}>
                 {it.productName}
@@ -98,29 +94,29 @@ export default function CustomerClaimForm({ token, items, lang, onDone }: Props)
         </label>
       )}
 
-      <label className="flex flex-col gap-1 text-sm">
-        {t(lang, 'claim_form_qty')}
+      <label className="field text-sm">
+        <span className="field-label">{t(lang, 'claim_form_qty')}</span>
         <input
           type="number"
           min={1}
+          inputMode="numeric"
           value={qty}
           onChange={(e) => setQty(Math.max(1, Math.floor(Number(e.target.value)) || 1))}
-          className="w-24 rounded border p-1"
+          className="w-28"
         />
       </label>
 
-      <label className="flex flex-col gap-1 text-sm">
-        {t(lang, 'claim_form_description')}
+      <label className="field text-sm">
+        <span className="field-label">{t(lang, 'claim_form_description')}</span>
         <textarea
           value={description}
           onChange={(e) => setDescription(e.target.value)}
           rows={3}
-          className="rounded border p-1"
         />
       </label>
 
       <div className="text-sm">
-        <p className="mb-1 font-medium">{t(lang, 'claim_form_photos')}</p>
+        <p className="field-label mb-1.5">{t(lang, 'claim_form_photos')}</p>
         <PhotoCapture
           scope="claim"
           token={token}
@@ -129,13 +125,9 @@ export default function CustomerClaimForm({ token, items, lang, onDone }: Props)
         />
       </div>
 
-      {err && <p className="text-sm text-red-600">{t(lang, 'claim_form_error')}</p>}
+      {err && <p className="alert alert-danger">{t(lang, 'claim_form_error')}</p>}
 
-      <button
-        type="submit"
-        disabled={busy}
-        className="rounded bg-black px-3 py-2 text-sm text-white disabled:opacity-50"
-      >
+      <button type="submit" disabled={busy} className="btn btn-primary w-full">
         {busy ? t(lang, 'claim_form_submitting') : t(lang, 'claim_form_submit')}
       </button>
     </form>
