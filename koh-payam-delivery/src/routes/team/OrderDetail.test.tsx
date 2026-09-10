@@ -95,12 +95,12 @@ test('blocks the pier transition until a boat and an evidence photo exist', asyn
   ).toBeInTheDocument()
 })
 
-test('allows the pier transition once a boat and photo are present', async () => {
+test('allows the pier transition once a boat and handoff photo are present', async () => {
   getOrder.mockReset().mockResolvedValue({
     ...order,
     status: 'packed',
     boat_id: '1',
-    evidence_photos: [{ id: 'p1', r2_key: 'evidence/ord1/a.jpg' }],
+    evidence_photos: [{ id: 'p1', r2_key: 'evidence/ord1/a.jpg', stage: 'handoff' }],
   })
   renderPage()
   const btn = await screen.findByRole('button', { name: 'เปลี่ยนเป็น ถึงท่าเรือ' })
@@ -108,4 +108,19 @@ test('allows the pier transition once a boat and photo are present', async () =>
   expect(
     screen.queryByText('ต้องเลือกเรือและถ่ายรูปหลักฐานที่หน้า "ที่ท่าเรือ" ก่อน'),
   ).not.toBeInTheDocument()
+})
+
+test('a pack-stage photo alone does NOT open the pier gate', async () => {
+  getOrder.mockReset().mockResolvedValue({
+    ...order,
+    status: 'packed',
+    boat_id: '1',
+    evidence_photos: [{ id: 'p1', r2_key: 'evidence/ord1/pack.jpg', stage: 'pack' }],
+  })
+  renderPage()
+  const btn = await screen.findByRole('button', { name: 'เปลี่ยนเป็น ถึงท่าเรือ' })
+  expect(btn).toBeDisabled()
+  expect(
+    screen.getByText('ต้องเลือกเรือและถ่ายรูปหลักฐานที่หน้า "ที่ท่าเรือ" ก่อน'),
+  ).toBeInTheDocument()
 })
