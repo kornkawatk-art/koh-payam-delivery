@@ -31,6 +31,37 @@ briefly lived in the task-by-task history was dropped in the squash.
 3. Run the runbook section B step-5 smoke once the site is live (only check covering the browser session + RLS + realtime + R2 CORS together).
 4. Rotate the R2 + Supabase service-role keys at handoff (they sat in a synced-folder file).
 
+## Rework 2026-09-10 — fit the real Makro export (branch `rework/makro-import`, merged `f476526`)
+
+The real Makro export files didn't match the Phase-1 import assumptions.
+After a grilling session the import model was redesigned (plan
+`docs/superpowers/plans/2026-09-10-makro-import-rework.md`, 10 tasks / 3
+batches, each reviewed):
+
+- **2-file import**: `OrderDetailExport` (line items) + `OrderExport`
+  (delivery address). Koh Payam filter = `Sub District == "เกาะพยาม"` OR
+  shipping address matches `ไต๋แขก` / `Taikak` (pier).
+- **All money removed** — the real file has no unit price. Dropped the
+  credit/value UI everywhere (customer page, dashboard, order detail,
+  claims), deleted `credit.ts` + `CreditSummaryTable`, and `order-view`
+  no longer returns a `credit` block. Migration `0008` drops
+  `order_items.unit_price` + `orders.total_value_cached`.
+- **Shortage from Makro**, not manual marking: a line is short when
+  `qty_shipped < qty_ordered`; backorder qty comes from `shortage_qty`.
+  Pack screen is now read-only line items + box counts.
+- **Non-destructive re-import**: sync by Makro order no; protected
+  columns (status, boat, boxes, photos…) preserved; `order_items`
+  replaced. Dropped the `packing` status from the app (enum value left
+  in the DB, unreferenced).
+- Customer page shows ordered vs shipped per line ("ส่ง X / สั่ง Y").
+
+Migration `0008` applied to cloud and verified; `order-view` re-deployed
+and live-smoked. 153 tests pass, build green. Browser smoke was skipped
+at the user's request — coverage rested on the unit suite (new
+`buildImport` / `commitImport` / 2-file `ImportOrders` / `CustomerOrderView`
+tests), the green `tsc`+`vite` build, three review passes, and the
+`order-view` live cloud smoke.
+
 ## Deferred to Phase 2 (from the review; none block Phase-1 use)
 
 - RLS `aal2` requirement (2FA is enforced in the UI, not yet in the DB policies).
