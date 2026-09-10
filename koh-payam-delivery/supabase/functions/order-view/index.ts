@@ -54,7 +54,7 @@ Deno.serve(async (req) => {
   const { data: o, error } = await admin
     .from('orders')
     .select(
-      '*, order_items(product_name,qty_ordered,qty_shipped,shortage_qty,status,line_no), evidence_photos(r2_key), claims(id,type,qty,description,status,resolution,created_at,refund_amount), ship_days(boats)',
+      '*, order_items(product_name,qty_ordered,qty_shipped,shortage_qty,status,line_no), evidence_photos(r2_key,taken_at), claims(id,type,qty,description,status,resolution,created_at,refund_amount), ship_days(boats)',
     )
     .eq('link_token', token)
     .single()
@@ -104,9 +104,12 @@ Deno.serve(async (req) => {
         orderedQty: Number(i.qty_ordered),
         shippedQty: Number(i.qty_shipped),
       })),
-    evidencePhotos: ((o.evidence_photos ?? []) as Array<{ r2_key: string }>).map(
-      (p) => `${base}/${p.r2_key}`,
-    ),
+    // Both stages ('pack' and 'handoff') are shown to the customer, oldest
+    // first so the pack shots precede the pier hand-off shots.
+    evidencePhotos: ((o.evidence_photos ?? []) as Array<{ r2_key: string; taken_at: string | null }>)
+      .slice()
+      .sort((a, b) => new Date(a.taken_at ?? 0).getTime() - new Date(b.taken_at ?? 0).getTime())
+      .map((p) => `${base}/${p.r2_key}`),
     claimDeadlineAt,
     canClaim,
     claims: claims.map((c) => ({
