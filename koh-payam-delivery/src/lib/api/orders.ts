@@ -3,14 +3,31 @@ import { getOrCreateShipDay } from './shipDays'
 import { linkBackordersToDay } from './backorders'
 import { logAction } from './audit'
 import { makeLinkToken } from '../token'
-import type { ParsedOrder } from '../import/mapColumns'
+import type { ParsedOrder, ParsedItem } from '../import/buildImport'
 import { canTransition, type OrderStatus } from '../status'
 
+function itemRows(orderId: string, items: ParsedItem[]) {
+  return items.map((it) => ({
+    order_id: orderId,
+    product_name: it.productName,
+    qty_ordered: it.orderedQty,
+    qty_shipped: it.shippedQty,
+    shortage_qty: it.shortageQty,
+    status: it.isShort ? 'short' : 'ok',
+    makro_item_id: it.itemId,
+    item_remark: it.itemRemark,
+    line_no: it.lineNo,
+  }))
+}
+
+// Re-import is a non-destructive sync: brand-new orders are inserted, orders that
+// already exist for this ship day get their order-level makro fields refreshed and
+// their line items replaced from the file. Box counts, boat, status, timestamps,
+// link token, photos and claims are left untouched.
 export async function commitImport(
   shipDate: string,
   orders: ParsedOrder[],
-  opts: { force?: boolean } = {},
-): Promise<{ created: number; overwrites: string[] }> {
+): Promise<{ created: number; synced: number }> {
   const day = await getOrCreateShipDay(shipDate)
   const nos = orders.map((o) => o.makroOrderNo)
   const { data: existing } = await supabase
@@ -18,50 +35,55 @@ export async function commitImport(
     .select('id,makro_order_no')
     .eq('ship_day_id', day.id)
     .in('makro_order_no', nos)
-  const dupNos = (existing ?? []).map((r: any) => r.makro_order_no)
-
-  if (dupNos.length && !opts.force) return { created: 0, overwrites: dupNos }
-  if (dupNos.length && opts.force) {
-    await supabase
-      .from('orders')
-      .delete()
-      .in(
-        'id',
-        (existing ?? []).map((r: any) => r.id),
-      )
-  }
+  const idByNo = new Map<string, string>(
+    (existing ?? []).map((r: any) => [r.makro_order_no, r.id]),
+  )
 
   let created = 0
+  let synced = 0
   for (const o of orders) {
-    const { data: ins, error } = await supabase
-      .from('orders')
-      .insert({
-        ship_day_id: day.id,
-        makro_order_no: o.makroOrderNo,
-        customer_name_en: o.customerNameEn,
-        ship_date: shipDate,
-        link_token: makeLinkToken(),
-        total_value_cached: o.totalValue,
-      })
-      .select('id')
-      .single()
-    if (error) throw new Error(`สร้างออเดอร์ ${o.makroOrderNo} ไม่สำเร็จ: ${error.message}`)
-    const orderId = (ins as any).id
-    const items = o.items.map((it) => ({
-      order_id: orderId,
-      product_name: it.productName,
-      qty_ordered: it.qtyOrdered,
-      unit_price: it.unitPrice,
-      line_no: it.lineNo,
-    }))
-    const { error: e2 } = await supabase.from('order_items').insert(items)
-    if (e2) throw new Error(`สร้างรายการของ ${o.makroOrderNo} ไม่สำเร็จ: ${e2.message}`)
-    created++
+    const existingId = idByNo.get(o.makroOrderNo)
+    if (!existingId) {
+      const { data: ins, error } = await supabase
+        .from('orders')
+        .insert({
+          ship_day_id: day.id,
+          makro_order_no: o.makroOrderNo,
+          customer_name_en: o.customerName,
+          ship_date: shipDate,
+          status: 'imported',
+          link_token: makeLinkToken(),
+          sub_district: o.subDistrict,
+          makro_order_status: o.makroOrderStatus,
+        })
+        .select('id')
+        .single()
+      if (error) throw new Error(`สร้างออเดอร์ ${o.makroOrderNo} ไม่สำเร็จ: ${error.message}`)
+      const orderId = (ins as any).id
+      const { error: e2 } = await supabase.from('order_items').insert(itemRows(orderId, o.items))
+      if (e2) throw new Error(`สร้างรายการของ ${o.makroOrderNo} ไม่สำเร็จ: ${e2.message}`)
+      created++
+    } else {
+      const { error: eU } = await supabase
+        .from('orders')
+        .update({
+          customer_name_en: o.customerName,
+          sub_district: o.subDistrict,
+          makro_order_status: o.makroOrderStatus,
+        })
+        .eq('id', existingId)
+      if (eU) throw new Error(`อัปเดตออเดอร์ ${o.makroOrderNo} ไม่สำเร็จ: ${eU.message}`)
+      const { error: eD } = await supabase.from('order_items').delete().eq('order_id', existingId)
+      if (eD) throw new Error(`ล้างรายการของ ${o.makroOrderNo} ไม่สำเร็จ: ${eD.message}`)
+      const { error: e2 } = await supabase.from('order_items').insert(itemRows(existingId, o.items))
+      if (e2) throw new Error(`sync รายการของ ${o.makroOrderNo} ไม่สำเร็จ: ${e2.message}`)
+      synced++
+    }
   }
 
   await linkBackordersToDay(shipDate)
-  await logAction('import', 'ship_day', day.id, { shipDate, created })
-  return { created, overwrites: opts.force ? dupNos : [] }
+  await logAction('import', 'ship_day', day.id, { shipDate, created, synced })
+  return { created, synced }
 }
 
 export async function getOrder(orderId: string) {

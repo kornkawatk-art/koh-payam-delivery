@@ -2,10 +2,17 @@ import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import ImportOrders from './ImportOrders'
 
+const parseMakroFile = vi.fn()
 vi.mock('../../lib/import/parseMakroFile', () => ({
-  parseMakroFile: vi.fn().mockResolvedValue([
-    { 'Order No': 'PO-1', Customer: 'A', Product: 'x', Qty: '2', 'Unit Price': '100' },
-  ]),
+  parseMakroFile: (...a: unknown[]) => parseMakroFile(...a),
+  detectFileKind: (headers: string[]) =>
+    headers.includes('Item Id') ? 'detail' : headers.includes('Sub District') ? 'order' : 'unknown',
+}))
+
+const buildImportMock = vi.fn()
+vi.mock('../../lib/import/buildImport', async (orig) => ({
+  ...(await (orig as () => Promise<Record<string, unknown>>)()),
+  buildImport: (...a: unknown[]) => buildImportMock(...a),
 }))
 
 const commitImport = vi.fn()
@@ -13,52 +20,107 @@ vi.mock('../../lib/api/orders', () => ({
   commitImport: (...a: unknown[]) => commitImport(...a),
 }))
 
-beforeEach(() => {
-  localStorage.clear()
-  commitImport.mockReset().mockResolvedValue({ created: 1, overwrites: [] })
-})
-
-async function uploadAndPreview() {
-  render(<ImportOrders />)
-  const file = new File(['dummy'], 'makro.csv', { type: 'text/csv' })
-  await userEvent.upload(screen.getByLabelText(/เลือกไฟล์/i), file)
-  await userEvent.click(await screen.findByRole('button', { name: /ดูตัวอย่าง/i }))
-  expect(await screen.findByText('PO-1')).toBeInTheDocument()
+// Detail file rows must expose every column the default detail mapping points at.
+const detailRow = {
+  'Order Number': 'P-1',
+  'Product Name': 'rice',
+  'Order Quantity': '2',
+  'Shipped Quantity': '1',
+  'Shortage Quantity': '1',
+  'Cancelled Quantity': '0',
+  'Item Remark': '',
+  'Item Id': '100001',
+}
+const orderRow = {
+  'Order Number': 'P-1',
+  'Customer Name': 'PAYAM MART',
+  'Sub District': 'เกาะพยาม',
+  'Shipping Address': 'x',
+  'Original Expected Date': '11-Sep-2026 - 11-Sep-2026',
+  'Order Status': 'Completed',
 }
 
-test('shows preview after choosing a file and mapping defaults resolve', async () => {
-  await uploadAndPreview()
+const baseResult = {
+  orders: [
+    {
+      makroOrderNo: 'P-1',
+      customerName: 'PAYAM MART',
+      subDistrict: 'เกาะพยาม',
+      shippingAddress: 'x',
+      expectedDate: '2026-09-11',
+      makroOrderStatus: 'Completed',
+      items: [
+        { productName: 'rice', isShort: true },
+        { productName: 'oil', isShort: false },
+      ],
+    },
+  ],
+  skippedNoItems: ['P-9'],
+  skippedNotPayam: 1,
+  cancelledLinesDropped: 2,
+  shippedAllZero: false,
+}
+
+beforeEach(() => {
+  localStorage.clear()
+  parseMakroFile.mockReset()
+  buildImportMock.mockReset().mockReturnValue(baseResult)
+  commitImport.mockReset().mockResolvedValue({ created: 1, synced: 0 })
 })
 
-test('successful import reports the created count', async () => {
-  await uploadAndPreview()
-  await userEvent.click(screen.getByRole('button', { name: /นำเข้า 1 ออเดอร์/i }))
-  expect(await screen.findByText(/นำเข้าสำเร็จ 1 ออเดอร์/i)).toBeInTheDocument()
+async function uploadBoth() {
+  render(<ImportOrders />)
+  parseMakroFile.mockResolvedValueOnce([detailRow]).mockResolvedValueOnce([orderRow])
+  await userEvent.upload(
+    screen.getByLabelText(/รายการสินค้า/i),
+    new File(['d'], 'detail.csv', { type: 'text/csv' }),
+  )
+  await userEvent.upload(
+    screen.getByLabelText(/ไฟล์ที่อยู่/i),
+    new File(['o'], 'order.csv', { type: 'text/csv' }),
+  )
+}
+
+test('renders two separate file inputs', () => {
+  render(<ImportOrders />)
+  expect(screen.getByLabelText(/รายการสินค้า/i)).toHaveAttribute('type', 'file')
+  expect(screen.getByLabelText(/ไฟล์ที่อยู่/i)).toHaveAttribute('type', 'file')
 })
 
-test('overwrite guard: shows confirm dialog then re-imports with force', async () => {
-  commitImport
-    .mockResolvedValueOnce({ created: 0, overwrites: ['PO-1'] })
-    .mockResolvedValueOnce({ created: 1, overwrites: ['PO-1'] })
-  await uploadAndPreview()
-  await userEvent.click(screen.getByRole('button', { name: /นำเข้า 1 ออเดอร์/i }))
-
-  expect(await screen.findByText(/มีออเดอร์ซ้ำ/i)).toBeInTheDocument()
-  await userEvent.click(screen.getByRole('button', { name: /ทับของเดิม/i }))
-
-  expect(await screen.findByText(/นำเข้าสำเร็จ 1 ออเดอร์/i)).toBeInTheDocument()
-  expect(commitImport).toHaveBeenNthCalledWith(1, expect.any(String), expect.anything(), { force: false })
-  expect(commitImport).toHaveBeenNthCalledWith(2, expect.any(String), expect.anything(), { force: true })
+test('rejects a file dropped in the wrong slot', async () => {
+  render(<ImportOrders />)
+  parseMakroFile.mockResolvedValueOnce([orderRow]) // order file into the detail slot
+  await userEvent.upload(
+    screen.getByLabelText(/รายการสินค้า/i),
+    new File(['x'], 'wrong.csv', { type: 'text/csv' }),
+  )
+  expect(await screen.findByText(/ไม่ใช่ไฟล์รายการสินค้า/i)).toBeInTheDocument()
 })
 
-test('overwrite guard: cancelling the dialog dismisses it without a second import', async () => {
-  commitImport.mockResolvedValueOnce({ created: 0, overwrites: ['PO-1'] })
-  await uploadAndPreview()
-  await userEvent.click(screen.getByRole('button', { name: /นำเข้า 1 ออเดอร์/i }))
+test('preview shows the payam count and the skip lines', async () => {
+  await uploadBoth()
+  await userEvent.click(await screen.findByRole('button', { name: /ดูตัวอย่าง/i }))
 
-  expect(await screen.findByText(/มีออเดอร์ซ้ำ/i)).toBeInTheDocument()
-  await userEvent.click(screen.getByRole('button', { name: /ยกเลิก/i }))
+  expect(await screen.findByText(/เจอออเดอร์เกาะพยาม 1 เจ้า/i)).toBeInTheDocument()
+  expect(screen.getByText(/ข้าม 1 ออเดอร์ .*P-9/)).toBeInTheDocument()
+  expect(screen.getByText(/ข้ามรายการที่ยกเลิก 2 รายการ/)).toBeInTheDocument()
+  // preview row: #ของขาด = 1
+  expect(screen.getByText('P-1')).toBeInTheDocument()
+})
 
-  expect(screen.queryByText(/มีออเดอร์ซ้ำ/i)).not.toBeInTheDocument()
-  expect(commitImport).toHaveBeenCalledTimes(1)
+test('preview surfaces the shippedAllZero warning', async () => {
+  buildImportMock.mockReturnValue({ ...baseResult, shippedAllZero: true })
+  await uploadBoth()
+  await userEvent.click(await screen.findByRole('button', { name: /ดูตัวอย่าง/i }))
+  expect(await screen.findByText(/ยังไม่มีข้อมูลจัดส่งจากแม็คโคร/i)).toBeInTheDocument()
+})
+
+test('import calls commitImport(shipDate, orders) and reports created/synced', async () => {
+  commitImport.mockResolvedValue({ created: 3, synced: 2 })
+  await uploadBoth()
+  await userEvent.click(await screen.findByRole('button', { name: /ดูตัวอย่าง/i }))
+  await userEvent.click(await screen.findByRole('button', { name: /นำเข้า 1 ออเดอร์/i }))
+
+  expect(commitImport).toHaveBeenCalledWith('2026-09-11', baseResult.orders)
+  expect(await screen.findByText(/นำเข้า 3 ใหม่ · sync 2/i)).toBeInTheDocument()
 })

@@ -22,6 +22,7 @@ vi.mock('../supabase', () => {
             single: () =>
               Promise.resolve({ data: { id: 'new-' + state.inserted.length }, error: null }),
           }),
+          then: (resolve: any) => resolve({ error: null }),
         }
       },
       update: (patch: any) => {
@@ -31,6 +32,10 @@ vi.mock('../supabase', () => {
       delete: () => ({
         in: (_col: string, vals: any[]) => {
           state.deleted.push({ table, vals })
+          return Promise.resolve({ error: null })
+        },
+        eq: (col: string, val: any) => {
+          state.deleted.push({ table, [col]: val })
           return Promise.resolve({ error: null })
         },
       }),
@@ -51,12 +56,26 @@ vi.mock('./backorders', () => ({
 
 vi.mock('./audit', () => ({ logAction: vi.fn() }))
 
-const orders = [
+const parsedOrders = [
   {
     makroOrderNo: 'PO-1',
-    customerNameEn: 'A',
-    totalValue: 100,
-    items: [{ productName: 'x', qtyOrdered: 1, unitPrice: 100, lineNo: 1 }],
+    customerName: 'A',
+    subDistrict: 'เกาะพยาม',
+    shippingAddress: 'x',
+    expectedDate: '2026-10-01',
+    makroOrderStatus: 'Completed',
+    items: [
+      {
+        productName: 'x',
+        orderedQty: 2,
+        shippedQty: 1,
+        shortageQty: 1,
+        itemId: '100001',
+        itemRemark: 'r',
+        lineNo: 1,
+        isShort: true,
+      },
+    ],
   },
 ]
 
@@ -68,26 +87,62 @@ beforeEach(() => {
   state.current = { status: 'imported' }
 })
 
-test('fresh import creates orders + items', async () => {
-  const r = await commitImport('2026-10-01', orders as any)
-  expect(r).toEqual({ created: 1, overwrites: [] })
-  expect(state.inserted.some((i) => i.table === 'orders')).toBe(true)
-  expect(state.inserted.some((i) => i.table === 'order_items')).toBe(true)
+test('fresh import inserts orders + items and counts created', async () => {
+  const r = await commitImport('2026-10-01', parsedOrders as any)
+  expect(r).toEqual({ created: 1, synced: 0 })
+  const ordIns = state.inserted.find((i) => i.table === 'orders')
+  expect(ordIns.rows).toMatchObject({
+    makro_order_no: 'PO-1',
+    customer_name_en: 'A',
+    status: 'imported',
+    sub_district: 'เกาะพยาม',
+    makro_order_status: 'Completed',
+  })
+  expect(ordIns.rows.link_token).toMatch(/^o_[0-9a-f]{32}$/)
+  const itemIns = state.inserted.find((i) => i.table === 'order_items')
+  expect(itemIns.rows[0]).toMatchObject({
+    product_name: 'x',
+    qty_ordered: 2,
+    qty_shipped: 1,
+    shortage_qty: 1,
+    status: 'short',
+    makro_item_id: '100001',
+    item_remark: 'r',
+    line_no: 1,
+  })
 })
 
-test('duplicate without force does not write', async () => {
+test('re-import of an existing order syncs without touching protected columns', async () => {
   state.existing = [{ id: 'old1', makro_order_no: 'PO-1' }]
-  const r = await commitImport('2026-10-01', orders as any)
-  expect(r).toEqual({ created: 0, overwrites: ['PO-1'] })
-  expect(state.inserted.length).toBe(0)
-})
+  const r = await commitImport('2026-10-01', parsedOrders as any)
+  expect(r).toEqual({ created: 0, synced: 1 })
 
-test('duplicate with force deletes the old rows then recreates', async () => {
-  state.existing = [{ id: 'old1', makro_order_no: 'PO-1' }]
-  const r = await commitImport('2026-10-01', orders as any, { force: true })
-  expect(r).toEqual({ created: 1, overwrites: ['PO-1'] })
-  expect(state.deleted).toEqual([{ table: 'orders', vals: ['old1'] }])
-  expect(state.inserted.some((i) => i.table === 'orders')).toBe(true)
+  // orders row is not inserted again
+  expect(state.inserted.some((i) => i.table === 'orders')).toBe(false)
+
+  // only the makro-derived order fields are patched
+  const patch = state.updated.find((u) => u.table === 'orders').patch
+  expect(patch).toEqual({
+    customer_name_en: 'A',
+    sub_district: 'เกาะพยาม',
+    makro_order_status: 'Completed',
+  })
+  for (const k of [
+    'status',
+    'boat_id',
+    'paper_box_count',
+    'foam_box_count',
+    'shipped_at',
+    'packed_at',
+    'link_token',
+  ]) {
+    expect(patch).not.toHaveProperty(k)
+  }
+
+  // order_items are deleted for this order then re-inserted from the file
+  expect(state.deleted).toEqual([{ table: 'order_items', order_id: 'old1' }])
+  const itemIns = state.inserted.find((i) => i.table === 'order_items')
+  expect(itemIns.rows[0]).toMatchObject({ order_id: 'old1', product_name: 'x', status: 'short' })
 })
 
 test('updateOrderStatus rejects an illegal transition', async () => {
