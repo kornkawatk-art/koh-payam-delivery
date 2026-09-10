@@ -10,3 +10,12 @@ password.txt
 *.secret
 creds*.txt
 .playwright-mcp/
+
+# real Makro exports — contain customer PII (phone/email), never commit
+/*.xlsx
+/OrderDetailExport_*
+/OrderExport_*
+
+# stray SDD ledger written under the app dir by subagents (root .superpowers/sdd is the real one)
+koh-payam-delivery/.superpowers/
+scratchpad/
