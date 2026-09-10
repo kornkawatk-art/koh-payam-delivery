@@ -7,29 +7,43 @@ type Props = {
   orderId?: string
   token?: string
   onUploaded: (key: string) => void
+  /** Finite cap on captured photos. Omit (or pass `Infinity`) for no cap. */
   max?: number
+  /** Evidence stage tag, forwarded to the upload-url request. Default 'handoff'. */
+  stage?: 'pack' | 'handoff'
 }
 
 /**
  * Camera / file capture for a handful of photos. Per file it: compresses to a
  * JPEG blob, asks the edge function for a presigned R2 PUT URL, uploads the blob
- * straight to R2, then reports the stored key via `onUploaded`. The input is
- * disabled once `max` (default 3) keys have been uploaded. Errors are shown in
- * Thai and never lose the thumbnails already captured.
+ * straight to R2, then reports the stored key via `onUploaded`. When a finite
+ * `max` is passed the input is disabled once that many keys are uploaded and the
+ * count reads `n / max รูป`; when `max` is omitted the input never locks and the
+ * count reads `n รูป`. Errors are shown in Thai and never lose the thumbnails
+ * already captured.
  */
-export default function PhotoCapture({ scope, orderId, token, onUploaded, max = 3 }: Props) {
+export default function PhotoCapture({
+  scope,
+  orderId,
+  token,
+  onUploaded,
+  max,
+  stage = 'handoff',
+}: Props) {
   const [keys, setKeys] = useState<string[]>([])
   const [thumbs, setThumbs] = useState<string[]>([])
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState('')
 
-  const atMax = keys.length >= max
+  const capped = typeof max === 'number' && Number.isFinite(max)
+  const limit = capped ? (max as number) : Infinity
+  const atMax = keys.length >= limit
 
   async function onPick(e: ChangeEvent<HTMLInputElement>) {
     const el = e.target
     const picked = Array.from(el.files ?? [])
     el.value = ''
-    const files = picked.slice(0, Math.max(0, max - keys.length))
+    const files = picked.slice(0, Math.max(0, limit - keys.length))
     if (files.length === 0) return
 
     setErr('')
@@ -42,7 +56,7 @@ export default function PhotoCapture({ scope, orderId, token, onUploaded, max = 
         const contentType = blob.type || 'image/jpeg'
         const args =
           scope === 'evidence'
-            ? ({ scope: 'evidence', orderId: orderId ?? '', contentType } as const)
+            ? ({ scope: 'evidence', orderId: orderId ?? '', contentType, stage } as const)
             : ({ scope: 'claim', token: token ?? '', contentType } as const)
         const { uploadUrl, key } = await requestUploadUrl(args)
         const put = await fetch(uploadUrl, {
@@ -78,7 +92,7 @@ export default function PhotoCapture({ scope, orderId, token, onUploaded, max = 
         aria-label="ถ่ายรูป / เลือกรูป"
       />
       <p className="text-sm text-ink-soft">
-        {keys.length} / {max} รูป
+        {capped ? `${keys.length} / ${max} รูป` : `${keys.length} รูป`}
       </p>
       {busy && <p className="text-sm text-ink-faint">กำลังอัปโหลด…</p>}
       {err && <p className="text-sm text-danger-ink">{err}</p>}

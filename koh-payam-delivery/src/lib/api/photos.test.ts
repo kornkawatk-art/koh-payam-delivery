@@ -94,19 +94,26 @@ test('requestUploadUrl throws a Thai error carrying the status code on a non-ok 
   ).rejects.toThrow('ขอลิงก์อัปโหลดรูปไม่สำเร็จ (403)')
 })
 
-test('attachEvidencePhoto inserts into evidence_photos with r2_key, note and taken_by = auth uid', async () => {
-  await attachEvidencePhoto('o1', 'evidence/o1/u.jpg', 'หน้ากล่อง')
+test('attachEvidencePhoto inserts into evidence_photos with r2_key, note, taken_by = auth uid and the given stage', async () => {
+  await attachEvidencePhoto('o1', 'evidence/o1/u.jpg', { note: 'หน้ากล่อง', stage: 'pack' })
   expect(state.inserts).toEqual([
     {
       table: 'evidence_photos',
-      row: { order_id: 'o1', r2_key: 'evidence/o1/u.jpg', note: 'หน้ากล่อง', taken_by: 'u1' },
+      row: {
+        order_id: 'o1',
+        r2_key: 'evidence/o1/u.jpg',
+        note: 'หน้ากล่อง',
+        taken_by: 'u1',
+        stage: 'pack',
+      },
     },
   ])
 })
 
-test('attachEvidencePhoto defaults a missing note to null', async () => {
+test('attachEvidencePhoto defaults a missing note to null and stage to "handoff"', async () => {
   await attachEvidencePhoto('o1', 'evidence/o1/u.jpg')
   expect(state.inserts[0].row.note).toBeNull()
+  expect(state.inserts[0].row.stage).toBe('handoff')
 })
 
 test('attachEvidencePhoto throws a Thai error when the insert fails', async () => {
