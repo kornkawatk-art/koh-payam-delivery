@@ -84,7 +84,11 @@ test('"ส่งขึ้นเรือแล้ว" is blocked until a boat is
   expect(ship).toBeDisabled() // boat chosen, still no photo
 
   await userEvent.click(screen.getByRole('button', { name: 'mock-upload' }))
-  await waitFor(() => expect(attachEvidencePhoto).toHaveBeenCalledWith('o1', 'evidence/o1/key-1.jpg'))
+  await waitFor(() =>
+    expect(attachEvidencePhoto).toHaveBeenCalledWith('o1', 'evidence/o1/key-1.jpg', {
+      stage: 'handoff',
+    }),
+  )
   await waitFor(() => expect(ship).toBeEnabled())
 
   await userEvent.click(ship)
