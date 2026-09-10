@@ -1,0 +1,191 @@
+import { useEffect, useState } from 'react'
+import { useNavigate, useParams } from 'react-router-dom'
+import { getClaim, resolveClaim } from '../../lib/api/claims'
+import { supabase } from '../../lib/supabase'
+import { Button } from '../../components/ui/Button'
+import { Spinner } from '../../components/ui/Spinner'
+
+const R2 = import.meta.env.VITE_R2_PUBLIC_BASE_URL as string
+
+export default function ClaimDetail() {
+  const { id } = useParams()
+  const nav = useNavigate()
+  const [c, setC] = useState<any>(null)
+  const [failed, setFailed] = useState(false)
+  const [evi, setEvi] = useState<string[]>([])
+  const [decision, setDecision] = useState<'approved' | 'rejected'>('approved')
+  const [resolution, setResolution] = useState<'refund' | 'resend_next_day'>('refund')
+  const [amount, setAmount] = useState('0')
+  const [note, setNote] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [err, setErr] = useState('')
+
+  useEffect(() => {
+    let active = true
+    getClaim(id!)
+      .then((claim) => {
+        if (!active) return
+        setC(claim)
+        const guess = claim.order_items
+          ? Number(claim.order_items.unit_price ?? 0) * Number(claim.qty)
+          : 0
+        setAmount(String(guess || 0))
+      })
+      .catch(() => {
+        if (active) setFailed(true)
+      })
+    return () => {
+      active = false
+    }
+  }, [id])
+
+  // Team evidence photos load independently: a failure here must never blank
+  // the already-loaded claim, so it stays out of the `failed` state.
+  const orderId = c?.order_id
+  useEffect(() => {
+    if (!orderId) return
+    let active = true
+    ;(async () => {
+      try {
+        const { data, error } = await supabase
+          .from('evidence_photos')
+          .select('r2_key')
+          .eq('order_id', orderId)
+        if (error) throw error
+        if (active) setEvi((data ?? []).map((p: any) => `${R2}/${p.r2_key}`))
+      } catch (e) {
+        console.warn('โหลดรูปหลักฐานของทีมไม่สำเร็จ', e)
+      }
+    })()
+    return () => {
+      active = false
+    }
+  }, [orderId])
+
+  if (failed) return <p className="text-sm text-red-600">โหลดเคลมไม่สำเร็จ</p>
+  if (!c) return <Spinner />
+
+  async function save() {
+    setBusy(true)
+    setErr('')
+    const n = Number(amount)
+    try {
+      await resolveClaim(id!, {
+        decision,
+        resolution: decision === 'approved' ? resolution : undefined,
+        refundAmount:
+          decision === 'approved' && resolution === 'refund'
+            ? Number.isFinite(n) && n >= 0
+              ? n
+              : 0
+            : undefined,
+        note: note || undefined,
+      })
+      nav('/claims')
+    } catch (e) {
+      setErr((e as Error).message)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const item = c.order_items
+
+  return (
+    <div className="flex flex-col gap-3">
+      <h1 className="text-xl font-semibold">
+        เคลม · {c.orders?.makro_order_no} · {c.orders?.customer_name_en}
+      </h1>
+      <p className="text-sm">
+        ประเภท: {c.type} · จำนวน: {c.qty}
+      </p>
+      {item && (
+        <p className="text-sm">
+          รายการ: {item.product_name}
+          {item.unit_price != null && ` · ${item.unit_price} บาท/หน่วย`}
+        </p>
+      )}
+      <p className="whitespace-pre-wrap text-sm">{c.description}</p>
+
+      <p className="text-sm font-medium">รูปจากลูกค้า</p>
+      <div className="flex flex-wrap gap-2">
+        {(c.claim_photos ?? []).map((p: any) => (
+          <img
+            key={p.r2_key}
+            src={`${R2}/${p.r2_key}`}
+            alt="รูปจากลูกค้า"
+            className="h-24 rounded border"
+          />
+        ))}
+      </div>
+
+      <p className="text-sm font-medium">รูปหลักฐานของทีม</p>
+      <div className="flex flex-wrap gap-2">
+        {evi.map((u) => (
+          <img key={u} src={u} alt="รูปหลักฐานของทีม" className="h-24 rounded border" />
+        ))}
+      </div>
+
+      <fieldset className="rounded border p-3 text-sm">
+        <label className="mr-4">
+          <input
+            type="radio"
+            checked={decision === 'approved'}
+            onChange={() => setDecision('approved')}
+          />{' '}
+          อนุมัติ
+        </label>
+        <label>
+          <input
+            type="radio"
+            checked={decision === 'rejected'}
+            onChange={() => setDecision('rejected')}
+          />{' '}
+          ปฏิเสธ
+        </label>
+        {decision === 'approved' && (
+          <div className="mt-2 flex flex-col gap-1">
+            <label>
+              <input
+                type="radio"
+                checked={resolution === 'refund'}
+                onChange={() => setResolution('refund')}
+              />{' '}
+              คืนเงิน
+            </label>
+            {resolution === 'refund' && (
+              <input
+                aria-label="จำนวนเงินคืน"
+                type="number"
+                min="0"
+                step="0.01"
+                className="w-32 rounded border p-1"
+                value={amount}
+                onChange={(e) => setAmount(e.target.value)}
+              />
+            )}
+            <label>
+              <input
+                type="radio"
+                checked={resolution === 'resend_next_day'}
+                onChange={() => setResolution('resend_next_day')}
+              />{' '}
+              ส่งชดเชยวันถัดไป
+            </label>
+          </div>
+        )}
+      </fieldset>
+
+      <textarea
+        className="rounded border p-2 text-sm"
+        placeholder="โน้ต (ไม่บังคับ)"
+        value={note}
+        onChange={(e) => setNote(e.target.value)}
+      />
+      {err && <p className="text-sm text-red-600">{err}</p>}
+      <Button onClick={save} disabled={busy}>
+        บันทึกผล
+      </Button>
+    </div>
+  )
+}

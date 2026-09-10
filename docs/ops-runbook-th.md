@@ -1,15 +1,36 @@
 # คู่มือดูแลระบบ + ตั้งค่าโครงสร้างพื้นฐาน — แอปส่งสินค้าเกาะพยาม
 
-> เอกสารนี้มี 3 ส่วน: (A) ตั้งค่าบัญชีคลาวด์ครั้งแรก — **ทำก่อนเริ่มพัฒนา**, (B) deploy ขึ้น production, (C) backup / กู้คืน / แก้ปัญหาที่พบบ่อย
+> เอกสารนี้มี 3 ส่วน: (A) ตั้งค่าบัญชีคลาวด์ครั้งแรก, (B) deploy ขึ้น production, (C) backup / กู้คืน / เพิ่มสมาชิกทีม / แก้ปัญหาที่พบบ่อย
 >
-> ทำเฉพาะ **ส่วน A** ตอนนี้ แล้วส่งค่าในช่อง "✏️ ค่าที่ได้" กลับมา
+> **สถานะปัจจุบัน (2026-09):** ส่วน A ทำเสร็จแล้ว และ backend บน Supabase (ฐานข้อมูล + Edge Functions + cron) กับ Cloudflare R2 **ขึ้น production แล้ว** เหลือแค่ deploy หน้าเว็บขึ้น Vercel (ส่วน B ขั้นที่ 2) กับตั้ง CORS ของ R2 (ส่วน B ขั้นที่ 3)
 
 ---
 
-## ส่วน A — ตั้งค่าบัญชีคลาวด์ครั้งแรก (ทำครั้งเดียว, ~25–35 นาที)
+## ข้อมูลโปรเจกต์จริง (ใช้อ้างอิงเวลาแก้ปัญหา)
+
+| ค่า | ข้อมูล |
+|---|---|
+| Supabase project | `koh-payam` (org `payam-app`) |
+| Project ref | `kprlqjxwolljkgqyzygf` |
+| Region | `ap-southeast-1` (Singapore) |
+| Supabase URL | `https://kprlqjxwolljkgqyzygf.supabase.co` |
+| Edge Functions | `order-view`, `photo-upload-url`, `submit-claim`, `cleanup` (ทุกตัว `verify_jwt = false`) |
+| R2 bucket | `koh-payam-photos` (Cloudflare) |
+| R2 public base URL | `https://pub-4a2a896c192541cf87225ae05c77fb39.r2.dev` |
+| Migrations ที่ apply แล้ว | `0001`–`0007` (`0007` = team-access gate `is_active` + realtime `orders` + R2-key delete triggers) |
+| pg_cron jobs | `purge-old-orders` (`0 3 * * *`), `r2-cleanup` (`10 3 * * *`) |
+| บัญชีทีมคนแรก (หัวหน้า) | `kornkawat.k@gmail.com` (role = `manager`) |
+
+> ค่าคีย์ลับ (DB password, service_role key, R2 keys, `CLEANUP_SECRET`) **ไม่อยู่ในเอกสารนี้** — เก็บใน `koh-payam-delivery/.env.local` (ไม่ commit) และใน Supabase → Edge Functions → Secrets
+
+---
+
+## ส่วน A — ตั้งค่าบัญชีคลาวด์ครั้งแรก (ทำครั้งเดียว — **ทำเสร็จแล้ว**)
+
+> ส่วนนี้เก็บไว้เป็นบันทึกว่าตั้งค่าอะไรไปบ้าง เผื่อต้องสร้างโปรเจกต์ใหม่ตั้งแต่ต้น (ดูส่วน B ขั้นที่ 4)
 
 ต้องเปิด 2 บริการ: **Supabase** (ฐานข้อมูล + ล็อกอิน) และ **Cloudflare R2** (เก็บรูป)
-Vercel + GitHub ค่อยทำตอน deploy (ส่วน B) ยังไม่ต้องตอนนี้
+Vercel + GitHub ทำในส่วน B
 
 ---
 
@@ -19,25 +40,30 @@ Vercel + GitHub ค่อยทำตอน deploy (ส่วน B) ยังไ
 2. กด **New project**
    - **Name:** `koh-payam`
    - **Database Password:** กด Generate แล้ว **คัดลอกเก็บไว้ให้ดี** (ใช้ตอนรัน migration, หาย = รีเซ็ตใหม่ได้แต่ยุ่ง)
-   - **Region:** เลือก **`Southeast Asia (Singapore)`**
+   - **Region:** เลือก **`Southeast Asia (Singapore)`** (`ap-southeast-1`)
    - **Plan:** Free
 3. กด **Create new project** → รอ ~2 นาทีจนขึ้นเขียว
 
 ### A2. Supabase — คัดลอกคีย์
 
-ไปที่ **Project Settings** (รูปเฟือง ซ้ายล่าง) → **API**
+> Supabase เปลี่ยนรูปแบบ key ใหม่ (ปี 2025+) เป็น `sb_publishable_...` / `sb_secret_...` — ใช้แบบใหม่ได้เลย ไม่ต้องเปิด "Legacy API keys"
+
+ไปที่ **Project Settings** (รูปเฟือง ซ้ายล่าง) → **API Keys** (หรือ **API** / **Data API**)
 
 | ช่องในหน้า Supabase | เอาไปใส่ตัวแปร | ✏️ ค่าที่ได้ |
 |---|---|---|
-| Project URL | `VITE_SUPABASE_URL` และ `SUPABASE_URL` | `https://__________.supabase.co` |
-| Project API keys → `anon` `public` | `VITE_SUPABASE_ANON_KEY` | `eyJ...` (ยาวมาก) |
-| Project API keys → `service_role` `secret` | `SUPABASE_SERVICE_ROLE_KEY` | `eyJ...` (ยาวมาก — **ห้ามหลุด ห้าม commit**) |
+| Project URL | `VITE_SUPABASE_URL` | `https://kprlqjxwolljkgqyzygf.supabase.co` |
+| **Publishable key** (`sb_publishable_...`) | `VITE_SUPABASE_ANON_KEY` | เก็บใน `.env.local` |
+| **Secret key** (`sb_secret_...`) — ถ้ายังไม่มี กด **Create new secret key** ตั้งชื่อ `edge-functions`, คัดลอกตอนโชว์ครั้งเดียว | `SUPABASE_SERVICE_ROLE_KEY` | เก็บใน `.env.local` (**ห้ามหลุด ห้าม commit**) |
 
 ไปที่ **Project Settings → General**
 
 | ช่อง | เอาไปใช้ | ✏️ ค่าที่ได้ |
 |---|---|---|
-| Reference ID | ใช้ตอน `supabase link` | `____________________` |
+| Project ID (= Reference ID) | `SUPABASE_PROJECT_REF` — ใช้ตอน `supabase link` | `kprlqjxwolljkgqyzygf` |
+
+> Database password: รหัสที่ตั้งตอนสร้างโปรเจกต์ → `SUPABASE_DB_PASSWORD` (ลืม = Settings → Database → Reset database password)
+> โค้ดของเราใช้ `@supabase/supabase-js` v2 ซึ่งรองรับ key แบบใหม่ ไม่ต้องแก้อะไร ชื่อ env ยังเป็น `VITE_SUPABASE_ANON_KEY` เหมือนเดิม (แค่ค่าข้างในเป็น publishable key)
 
 ### A3. Supabase — เปิดล็อกอินแบบอีเมล + 2FA
 
@@ -48,112 +74,300 @@ Vercel + GitHub ค่อยทำตอน deploy (ส่วน B) ยังไ
    (Supabase รุ่นใหม่เปิดให้โดยค่าเริ่มต้น — ถ้าเห็นสวิตช์ TOTP ให้เปิด)
 3. **สร้างบัญชีทีมคนแรก (หัวหน้า):** **Authentication → Users → Add user → Create new user**
    - อีเมล + รหัสผ่านของคุณ, ติ๊ก **Auto Confirm User**
-   - ✏️ อีเมลที่ใช้: `____________________`
-   - หลังแอปเสร็จ ผมจะใส่สคริปต์ให้ตั้ง `role = manager` ให้บัญชีนี้ (หรือทำใน Table editor: ตาราง `profiles`)
+   - ✏️ อีเมลที่ใช้: `kornkawat.k@gmail.com`
+   - trigger `handle_new_user` (migration `0005`) จะสร้างแถวใน `profiles` ให้อัตโนมัติที่บทบาท `packer`
+   - จากนั้นเลื่อนขั้นเป็น `manager` ด้วย SQL (ทำครั้งเดียว — ดูวิธีเพิ่ม/เปลี่ยนบทบาทสมาชิกในส่วน C):
+     ```sql
+     update public.profiles
+     set role = 'manager'
+     where id = (select id from auth.users where email = 'kornkawat.k@gmail.com');
+     ```
 
 ### A4. Cloudflare R2 — สร้าง bucket + คีย์
 
-> ⚠️ R2 ฟรี 10GB แต่ Cloudflare **ขอผูกบัตรเครดิต/เดบิตไว้ก่อน** (ไม่ตัดเงินถ้าไม่เกินโควตาฟรี) — ถ้าไม่สะดวกผูกบัตร บอกผม จะสลับไปเก็บรูปใน Supabase Storage แทน (ฟรี 1GB, พอสำหรับช่วงแรกถ้าบีบรูปเข้ม)
+> ⚠️ R2 ฟรี 10GB แต่ Cloudflare **ขอผูกบัตรเครดิต/เดบิตไว้ก่อน** (ไม่ตัดเงินถ้าไม่เกินโควตาฟรี)
 
 1. ไปที่ https://dash.cloudflare.com → สมัคร → ยืนยันอีเมล
 2. เมนูซ้าย **R2 Object Storage** → **Create bucket**
    - **Name:** `koh-payam-photos`
    - **Location:** Automatic (หรือ Asia-Pacific)
 3. หน้า bucket → แท็บ **Settings** → **Public Development URL** → กด **Enable**
-   - จะได้ URL หน้าตา `https://pub-xxxxxxxx.r2.dev`
+   - จะได้ URL หน้าตา `https://pub-xxxxxxxx.r2.dev` → ตอนนี้คือ `https://pub-4a2a896c192541cf87225ae05c77fb39.r2.dev`
 
 | ช่อง | ตัวแปร | ✏️ ค่าที่ได้ |
 |---|---|---|
-| Public Development URL | `R2_PUBLIC_BASE_URL` | `https://pub-________.r2.dev` |
+| Public Development URL | `R2_PUBLIC_BASE_URL` / `VITE_R2_PUBLIC_BASE_URL` | `https://pub-4a2a896c192541cf87225ae05c77fb39.r2.dev` |
 | ชื่อ bucket | `R2_BUCKET` | `koh-payam-photos` |
 
 4. **สร้าง API Token:** กลับหน้า R2 Overview → ขวาบน **{} API** หรือ **Manage R2 API Tokens** → **Create API Token**
    - **Permissions:** `Object Read & Write`
    - **Specify bucket:** เลือก `koh-payam-photos`
    - **TTL:** Forever
-   - กด Create แล้วหน้าถัดไปจะโชว์ค่า **ครั้งเดียว** — คัดลอกทั้งหมด:
+   - กด Create แล้วหน้าถัดไปจะโชว์ค่า **ครั้งเดียว** — คัดลอกทั้งหมดเก็บใน `.env.local`:
 
-| ช่องในหน้า token | ตัวแปร | ✏️ ค่าที่ได้ |
-|---|---|---|
-| Access Key ID | `R2_ACCESS_KEY_ID` | `____________________` |
-| Secret Access Key | `R2_SECRET_ACCESS_KEY` | `____________________` (**ห้ามหลุด**) |
-| ในบรรทัด endpoint `https://<ตรงนี้>.r2.cloudflarestorage.com` | `R2_ACCOUNT_ID` | `____________________` |
+| ช่องในหน้า token | ตัวแปร |
+|---|---|
+| Access Key ID | `R2_ACCESS_KEY_ID` |
+| Secret Access Key | `R2_SECRET_ACCESS_KEY` (**ห้ามหลุด**) |
+| ในบรรทัด endpoint `https://<ตรงนี้>.r2.cloudflarestorage.com` | `R2_ACCOUNT_ID` |
 
-5. **ตั้ง CORS ให้ bucket** (ให้เบราว์เซอร์อัปโหลดรูปตรงได้): bucket → **Settings** → **CORS Policy** → **Add CORS policy** → วาง JSON นี้:
+5. **ตั้ง CORS ให้ bucket** — ⚠️ **ขั้นตอนนี้ยังไม่ได้ทำ ต้องทำเองในหน้า Cloudflare** (ถ้าไม่ตั้ง ลูกค้า/ทีมจะอัปโหลดรูปไม่ได้):
+   bucket `koh-payam-photos` → **Settings** → **CORS Policy** → **Add CORS policy** → วาง JSON นี้:
+
+   ```json
+   [
+     {
+       "AllowedOrigins": ["http://localhost:5173", "https://*.vercel.app"],
+       "AllowedMethods": ["GET", "PUT"],
+       "AllowedHeaders": ["*"],
+       "MaxAgeSeconds": 3600
+     }
+   ]
+   ```
+   หลัง deploy Vercel ได้โดเมนจริงแล้ว ให้เพิ่มโดเมนนั้นใน `AllowedOrigins` ด้วย (ดูส่วน B ขั้นที่ 3)
+
+---
+
+### A5. คีย์ทั้งหมด (บันทึกไว้ใน `.env.local` — ไม่ commit)
+
+ดูรายชื่อตัวแปรครบใน `koh-payam-delivery/.env.example` — ค่าจริงอยู่ใน `.env.local` (gitignored) และใน Supabase → Edge Functions → Secrets
+
+```
+VITE_SUPABASE_URL=
+VITE_SUPABASE_ANON_KEY=
+VITE_R2_PUBLIC_BASE_URL=
+SUPABASE_PROJECT_REF=
+SUPABASE_DB_PASSWORD=
+SUPABASE_SERVICE_ROLE_KEY=
+SUPABASE_ACCESS_TOKEN=
+R2_ACCOUNT_ID=
+R2_ACCESS_KEY_ID=
+R2_SECRET_ACCESS_KEY=
+R2_BUCKET=koh-payam-photos
+R2_PUBLIC_BASE_URL=
+CLEANUP_SECRET=
+```
+
+> **ความปลอดภัย:** `SUPABASE_SERVICE_ROLE_KEY` และ `R2_SECRET_ACCESS_KEY` มีสิทธิ์เต็ม — ถ้ากังวลว่าค่าหลุด rotate ใหม่ได้ (Supabase: Settings → API → Roll; R2: ลบ token เดิมสร้างใหม่) แล้วอัปเดต `.env.local` + `supabase secrets set` ใหม่
+
+---
+
+## ส่วน B — Deploy ขึ้น production
+
+**สรุปสถานะ:** backend (Supabase migrations + Edge Functions + secrets + cron) กับ R2 bucket **ทำเสร็จแล้ว** — เหลือขั้นที่ 1–3 และ 5 ส่วนขั้นที่ 4 เก็บไว้กรณีต้องสร้างโปรเจกต์ใหม่
+
+### ขั้นที่ 1 — โค้ดขึ้น GitHub (repo แบบ private)
+
+1. สร้าง repo ใหม่บน GitHub แบบ **Private** (แอปนี้มีข้อมูลลูกค้า — ห้าม public)
+2. ⚠️ **ประวัติ branch `build/koh-payam-delivery-app` มี commit เก่าที่เคยเผลอ commit ไฟล์ `password.txt`** (คีย์ของโปรเจกต์ Supabase เก่าที่เลิกใช้แล้ว — commit `2af7387`, ถูกเอาออกจาก tracking ที่ `ee1778b` แต่ยังอยู่ในประวัติ)
+   - **วิธีที่แนะนำ:** ให้ controller **squash-merge** branch นี้เข้า `main` แล้ว **push `main` (แบบ squash)** ขึ้น GitHub — ประวัติจะเหลือ commit เดียว ไม่มี `password.txt` ติดไป
+   - **ถ้าจำเป็นต้อง push ทั้ง branch:** ต้อง scrub `password.txt` ออกจากประวัติก่อน เช่น
+     ```
+     git filter-repo --path password.txt --invert-paths
+     ```
+     (หรือ `git filter-branch` / BFG) แล้วค่อย push
+   - ถึงคีย์ในไฟล์นั้นจะเป็นของโปรเจกต์เก่าที่เลิกใช้แล้ว ก็ไม่ควรปล่อยติดไปในประวัติ repo
+
+### ขั้นที่ 2 — Vercel (deploy หน้าเว็บ) — **ยังไม่ได้ทำ**
+
+1. สมัคร https://vercel.com ด้วย GitHub → **Add New… → Project** → เลือก repo ที่ push ไว้
+2. ตั้งค่า import:
+   - **Root Directory:** `koh-payam-delivery`  ← สำคัญ (โค้ดแอปอยู่ในโฟลเดอร์ย่อย ไม่ใช่ราก repo)
+   - **Framework Preset:** `Vite`
+   - Build command / Output ปล่อยค่า default (`npm run build` → `dist`)
+3. **Environment Variables** — ใส่ 3 ตัว (ค่าจาก `.env.local`):
+   - `VITE_SUPABASE_URL`
+   - `VITE_SUPABASE_ANON_KEY`
+   - `VITE_R2_PUBLIC_BASE_URL`
+4. กด **Deploy** → รอจนเขียว → ได้โดเมน `https://<ชื่อ>.vercel.app`
+   - `vercel.json` ในโฟลเดอร์ตั้ง SPA rewrite ไว้แล้ว (ทุก path → `index.html`) เพื่อให้ refresh หน้าลึก ๆ เช่น `/o/<token>` ไม่ 404
+
+### ขั้นที่ 3 — เพิ่มโดเมน Vercel ลง CORS ของ R2 — **ต้องทำหลังขั้นที่ 2**
+
+Cloudflare → R2 → bucket `koh-payam-photos` → **Settings → CORS Policy** → แก้ `AllowedOrigins` ให้มีโดเมนจริง:
 
 ```json
 [
   {
-    "AllowedOrigins": ["http://localhost:5173", "https://*.vercel.app"],
+    "AllowedOrigins": [
+      "http://localhost:5173",
+      "https://*.vercel.app",
+      "https://<โดเมนจริงของคุณ>.vercel.app"
+    ],
     "AllowedMethods": ["GET", "PUT"],
     "AllowedHeaders": ["*"],
     "MaxAgeSeconds": 3600
   }
 ]
 ```
-(ตอน deploy จริงค่อยเพิ่มโดเมนจริงถ้ามี)
 
----
+> `https://*.vercel.app` ครอบคลุม preview deployment ด้วย แต่บาง config ไม่ match wildcard กับ subdomain ซ้อน — ใส่โดเมน production เต็ม ๆ ไว้ด้วยจะชัวร์กว่า
 
-### A5. ส่งค่ากลับมา
+### ขั้นที่ 4 — คำสั่งสร้าง backend ใหม่ตั้งแต่ต้น (อ้างอิง — ปกติ**ไม่ต้องรัน** เพราะทำไปแล้ว)
 
-คัดลอกบล็อกนี้ เติมค่าในช่องว่าง แล้วส่งกลับมาในแชต (ค่าเหล่านี้จะถูกใส่ในไฟล์ `.env.local` ที่ **ไม่ commit** ขึ้น git):
+ใช้เมื่อย้ายไป Supabase project ใหม่ หรือกู้ระบบทั้งหมด รันจากในโฟลเดอร์ `koh-payam-delivery/`:
 
+```bash
+# 1) เชื่อม CLI กับ cloud project (ไม่ใช้ Docker/local — push ตรงขึ้น cloud)
+supabase link --project-ref kprlqjxwolljkgqyzygf
+# (จะถาม DB password — ใส่ค่า SUPABASE_DB_PASSWORD)
+
+# 2) push migrations 0001–0006 ขึ้น cloud DB
+supabase db push
+
+# 3) ตั้ง secrets ของ Edge Functions (ค่าจริงจาก .env.local)
+supabase secrets set \
+  R2_ACCOUNT_ID=... \
+  R2_ACCESS_KEY_ID=... \
+  R2_SECRET_ACCESS_KEY=... \
+  R2_BUCKET=koh-payam-photos \
+  R2_PUBLIC_BASE_URL=https://pub-4a2a896c192541cf87225ae05c77fb39.r2.dev \
+  CLEANUP_SECRET=cs_xxxxxxxxxxxxxxxx        # สุ่มค่าใหม่ยาว ๆ ก็ได้
+
+# 4) deploy Edge Functions ทั้ง 4 ตัว (config.toml ตั้ง verify_jwt=false ไว้แล้ว)
+supabase functions deploy order-view photo-upload-url submit-claim cleanup
 ```
-VITE_SUPABASE_URL=
-VITE_SUPABASE_ANON_KEY=
-SUPABASE_SERVICE_ROLE_KEY=
-SUPABASE_PROJECT_REF=
-SUPABASE_DB_PASSWORD=
-R2_ACCOUNT_ID=
-R2_ACCESS_KEY_ID=
-R2_SECRET_ACCESS_KEY=
-R2_BUCKET=koh-payam-photos
-R2_PUBLIC_BASE_URL=
+
+จากนั้นใน **Supabase Dashboard → SQL Editor** รัน:
+
+```sql
+-- (ก) เลื่อนบัญชีหัวหน้าเป็น manager (trigger handle_new_user สร้าง profile ให้เป็น 'packer' อัตโนมัติ)
+update public.profiles
+set role = 'manager'
+where id = (select id from auth.users where email = 'kornkawat.k@gmail.com');
+
+-- (ข) ต่อ cron job "r2-cleanup" ให้ยิงเข้า Edge Function cleanup ทุกวัน 03:10
+--     (migration 0006 ตั้ง cron "purge-old-orders" 03:00 ให้แล้ว แต่ตัวนี้ต้องต่อ net.http_post เอง
+--      เพราะต้องแนบ secret ใน header — เก็บ secret ไว้ใน vault)
+select vault.create_secret('<ค่า CLEANUP_SECRET ตัวเดียวกับที่ set ใน secrets>', 'cleanup_secret');
+
+select cron.schedule(
+  'r2-cleanup',
+  '10 3 * * *',
+  $$
+  select net.http_post(
+    url := 'https://kprlqjxwolljkgqyzygf.supabase.co/functions/v1/cleanup',
+    headers := jsonb_build_object(
+      'Content-Type', 'application/json',
+      'x-cleanup-secret', (select decrypted_secret from vault.decrypted_secrets where name = 'cleanup_secret')
+    )
+  )
+  $$
+);
 ```
 
-> **ข้อควรระวังเรื่องความปลอดภัย:** `service_role` key และ `R2_SECRET_ACCESS_KEY` มีสิทธิ์เต็ม — หลังใช้เสร็จ ถ้ากังวลว่าค่าไปอยู่ในประวัติแชต สามารถกด rotate/regenerate ใหม่ได้ทั้งคู่ (Supabase: Settings → API → Roll; R2: ลบ token เดิมสร้างใหม่) แล้วผมอัปเดต `.env.local` ให้
+> ลำดับงานของ cron: 03:00 `purge-old-orders` ลบแถวออเดอร์/เคลม/audit ที่เกิน 30 วัน และหย่อน key ของรูปลง `r2_delete_queue` → 03:10 `r2-cleanup` เรียก Edge `cleanup` ให้ไปลบไฟล์จริงบน R2 ตามคิวนั้น
+
+### ขั้นที่ 5 — Smoke test (หลัง deploy Vercel + ตั้ง CORS)
+
+> ⚠️ **ต้องรัน smoke test นี้ให้ครบทุกข้อ *ก่อน* นำเข้าข้อมูลลูกค้าจริงชุดแรก** — unit test (`npx vitest run`) ครอบเฉพาะ logic ล้วน ๆ ที่ mock ทุกอย่างไว้ ขั้นตอนนี้เป็น**ที่เดียว**ที่ทดสอบเส้นทางจริงครบวง: session ใน browser + RLS/`is_team_member()` บน Supabase จริง + realtime (`postgres_changes` ของตาราง `orders`) + R2 CORS ตอนอัปโหลดรูป ถ้าข้ามไป จะไม่รู้ว่าพังจนลูกค้าเจอเอง
+
+1. เปิดโดเมน Vercel → หน้า `/login` → ล็อกอินด้วย `kornkawat.k@gmail.com`
+2. ครั้งแรกจะถูกบังคับ **ตั้ง 2FA** → สแกน QR ด้วยแอป authenticator → กรอกรหัส 6 หลัก
+3. ไปหน้า **นำเข้าออเดอร์** → อัปโหลดไฟล์ CSV ตัวอย่างจากแม็คโคร → ตรวจการจับคู่คอลัมน์ → ดูตัวอย่าง → นำเข้า
+4. เปิดหน้ารายละเอียดออเดอร์ → กด **คัดลอก** ลิงก์ลูกค้า → เปิดใน **หน้าต่างส่วนตัว (incognito)** → ต้องเห็นหน้า `/o/<token>` ของลูกค้า
+5. ในหน้าลูกค้า (หลังออเดอร์ถึงสถานะ "ส่งขึ้นเรือแล้ว") กด **แจ้งปัญหา** → ส่งเคลมทดสอบ + แนบรูป → ต้องอัปโหลดรูปได้ (ถ้าไม่ได้ = R2 CORS ยังไม่ถูก)
+6. กลับฝั่งทีม → หน้า **คิวเคลม** → ต้องเห็นเคลมทดสอบที่เพิ่งส่ง → เปิด → อนุมัติ/ปฏิเสธได้
+7. ลบข้อมูลทดสอบออกก่อนใช้งานจริง (หรือปล่อยให้ cron ลบเองใน 30 วัน)
 
 ---
 
-## ส่วน B — Deploy ขึ้น production (ทำทีหลัง หลังแอปเสร็จ)
-
-1. **โค้ดขึ้น GitHub** (repo แบบ **private** เพราะเป็นแอปข้อมูลลูกค้า)
-2. **Supabase migrations:**
-   ```
-   cd koh-payam-delivery
-   npx supabase link --project-ref <SUPABASE_PROJECT_REF>
-   npx supabase db push
-   npx supabase secrets set R2_ACCOUNT_ID=... R2_ACCESS_KEY_ID=... R2_SECRET_ACCESS_KEY=... R2_BUCKET=... R2_PUBLIC_BASE_URL=...
-   npx supabase functions deploy order-view submit-claim photo-upload-url cleanup
-   ```
-3. **Vercel:** สมัครที่ vercel.com ด้วย GitHub → Import repo → ตั้ง Root Directory = `koh-payam-delivery` → ใส่ Environment Variables: `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`, `VITE_R2_PUBLIC_BASE_URL` → Deploy
-4. เพิ่มโดเมน Vercel (`*.vercel.app`) ลง CORS ของ R2 bucket
-5. **Smoke test:** ล็อกอิน → นำเข้าไฟล์ตัวอย่าง → เปิดลิงก์ `/o/<token>` ในหน้าต่าง incognito
-6. ตั้ง cron ลบข้อมูล 30 วัน: Supabase Dashboard → Database → Cron (หรือใช้ `cron.schedule` ใน migration 0004) + ตั้งให้เรียก Edge `cleanup` วันละครั้ง
-
----
-
-## ส่วน C — Backup / กู้คืน / แก้ปัญหา
+## ส่วน C — Backup / กู้คืน / จัดการทีม / แก้ปัญหา
 
 ### Backup รายสัปดาห์
-- รัน `scripts/weekly-backup.sh` (ตั้ง env `SUPABASE_DB_URL` ก่อน — เอาจาก Supabase → Settings → Database → Connection string → URI)
-- เก็บไฟล์ `.dump` ไว้อย่างน้อย 4 สัปดาห์ (สคริปต์ลบของเก่ากว่า 60 วันให้เอง)
-- ตั้งเตือนใน LINE ทีมทุกวันจันทร์
-- รูปบน R2 ไม่รวมใน backup นี้ (ข้อมูลรูปถูกลบอัตโนมัติใน 30 วันอยู่แล้ว)
+
+- Supabase แพลนฟรี **ไม่มี backup อัตโนมัติ** — ต้องรันเอง
+- ตั้ง env `SUPABASE_DB_URL` (จาก Supabase → **Project Settings → Database → Connection string → URI**; แนะนำ "Session pooler", ใส่ DB password แทน `[YOUR-PASSWORD]`)
+- รัน `scripts/weekly-backup.sh` → ได้ไฟล์ `./backups/db-YYYYMMDD.dump`
+  ```bash
+  SUPABASE_DB_URL="postgresql://postgres.kprlqjxwolljkgqyzygf:<password>@aws-0-ap-southeast-1.pooler.supabase.com:5432/postgres" \
+    ./scripts/weekly-backup.sh
+  ```
+- สคริปต์ลบ dump ที่เก่ากว่า 60 วันให้เอง — เก็บ dump ไว้อย่างน้อย 4 สัปดาห์
+- **ตั้งเตือนใน LINE ทีมทุกวันจันทร์** ให้รันสคริปต์
+- รูปบน R2 **ไม่รวม** ใน backup นี้ (เก็บแยก + ข้อมูลรูปถูกลบอัตโนมัติใน 30 วันอยู่แล้ว) — ถ้าต้องการสำเนารูป ใช้ `rclone sync` bucket `koh-payam-photos` แยกต่างหาก
 
 ### กู้คืน
-```
+
+```bash
 createdb koh_payam_restore
 pg_restore --no-owner --no-privileges -d koh_payam_restore db-YYYYMMDD.dump
 ```
 
+กู้กลับขึ้น Supabase โดยตรง (ระวัง — ทับข้อมูลปัจจุบัน ทำเฉพาะตอนกู้ภัยจริง):
+```bash
+pg_restore --no-owner --no-privileges --clean --if-exists \
+  -d "$SUPABASE_DB_URL" db-YYYYMMDD.dump
+```
+
+### เพิ่ม / ลบ / เปลี่ยนบทบาทสมาชิกทีม
+
+บทบาทมี 3 แบบ (คอลัมน์ `role` ในตาราง `public.profiles`):
+
+| role ในระบบ | เรียกในคู่มือ | เข้าถึงได้ |
+|---|---|---|
+| `packer` | คนแพ็ค | งานวันนี้, นำเข้าออเดอร์, หน้าแพ็ค, ใบเขียนหน้าลัง, หน้ารายละเอียดออเดอร์ |
+| `pier` | คนที่ท่าเรือ | งานวันนี้, ตั้งค่าเรือวันนี้, หน้าท่าเรือ, หน้ารายละเอียดออเดอร์ |
+| `manager` | หัวหน้า | ทุกหน้า + **คิวเคลม / อนุมัติเคลม** (เฉพาะ manager) |
+
+> **ปิดการสมัครสมาชิกเอง (public signup) — ทำแล้ว:** ปิดผ่าน Management API ไปแล้ว (คนนอกกดสมัครเองไม่ได้) และ migration `0007` เพิ่มชั้นกันซ้ำระดับ DB (`profiles.is_active` + RLS ผ่าน `public.is_team_member()`)
+> **วิธีตรวจ:** Supabase → **Authentication → Sign In / Providers → Email** → ช่อง **Allow new users to sign up** ต้องเป็น **OFF**
+
+**เพิ่มสมาชิกใหม่:**
+1. Supabase → **Authentication → Users → Add user → Create new user** → ใส่อีเมล + รหัสผ่านชั่วคราว → ติ๊ก **Auto Confirm User**
+2. trigger `handle_new_user` สร้างแถว `profiles` ให้อัตโนมัติที่บทบาท `packer` และ **`is_active = false`** (ยังใช้งานไม่ได้จนกว่าหัวหน้าจะเปิดให้)
+3. **หัวหน้า** รัน SQL ใน **SQL Editor** เพื่อกำหนดบทบาท **และเปิดใช้งาน** (ต้องมี `is_active = true` ไม่งั้น RLS บล็อกทุกอย่าง):
+   ```sql
+   update public.profiles
+   set role = 'pier',        -- หรือ 'manager' / 'packer'
+       is_active = true
+   where id = (select id from auth.users where email = 'newmember@example.com');
+   ```
+4. สมาชิกล็อกอินครั้งแรก → ระบบบังคับตั้ง 2FA
+
+**ลบ / ระงับสมาชิก (offboarding):**
+
+> ⚠️ กด **Delete user** ตรง ๆ **ไม่ได้** — จะ error เพราะมีแถวประวัติอ้างถึง `profiles` ของคนนั้นอยู่ (`evidence_photos.taken_by`, `claims.resolved_by`, `backorders.fulfilled_by`, `audit_logs.user_id`) และคอลัมน์เหล่านั้นไม่ได้ตั้ง `on delete cascade`
+
+- **Offboarding เฟส 1 (ใช้ตอนนี้):** Supabase → **Authentication → Users** → เลือกผู้ใช้ → **Ban user** (หรือรีเซ็ตรหัสผ่านเป็นค่าที่คนนั้นไม่รู้) แล้วรันใน **SQL Editor**:
+  ```sql
+  update public.profiles set is_active = false where id = '<uuid ของผู้ใช้>';
+  ```
+  แค่นี้คนนั้นจะล็อกอินไม่ได้ และต่อให้ล็อกอินได้ก็อ่าน/เขียนข้อมูลทีมไม่ได้ (RLS ผ่าน `public.is_team_member()` — migration `0007`)
+- **ลบถาวรจริง ๆ (เฟส 2):** ต้องแก้ schema ให้คอลัมน์อ้างอิงเป็น `on delete set null` ก่อน ค่อยลบ auth user — เก็บไว้ทำตอนมีเวลา ไม่ใช่งานเร่งด่วน
+
+**เปลี่ยนบทบาท:** รัน `update public.profiles set role = '...' where id = ...` แบบข้างบน (ผู้ใช้ต้อง refresh หน้า/ล็อกอินใหม่จึงจะเห็นเมนูใหม่)
+
+> หมายเหตุความปลอดภัย: ผู้ใช้ **แก้บทบาทตัวเองไม่ได้** (migration `0004` ตัด self-update policy ทิ้ง) — ต้องแก้ผ่าน SQL Editor / service role เท่านั้น
+
+### ตรวจสอบ cron jobs
+
+ใน **SQL Editor**:
+
+```sql
+-- มี job อะไรบ้าง เปิดอยู่ไหม
+select jobname, schedule, active from cron.job;
+-- คาดหวัง: purge-old-orders (0 3 * * *) และ r2-cleanup (10 3 * * *) ทั้งคู่ active = true
+
+-- ผลการรัน 10 ครั้งล่าสุด (ดู status = 'succeeded' / ข้อความ error)
+select jobid, runid, status, return_message, start_time, end_time
+from cron.job_run_details
+order by start_time desc
+limit 10;
+```
+
+ถ้า `r2-cleanup` fail: เช็กว่า secret ใน vault ยังอยู่ (`select name from vault.secrets;` ต้องมี `cleanup_secret`) และตรงกับ `CLEANUP_SECRET` ใน Edge Function secrets; ดู log ของ function ที่ Supabase → Edge Functions → `cleanup` → Logs
+
 ### ปัญหาที่พบบ่อย
+
 | อาการ | สาเหตุ / วิธีแก้ |
 |---|---|
-| อัปโหลดรูปไม่ขึ้น | CORS ของ R2 bucket ไม่มี origin ปัจจุบัน → เพิ่มใน Settings → CORS Policy |
-| ลูกค้าเปิดลิงก์ไม่ได้ ("not found") | ทีมกด "สร้างลิงก์ใหม่" ไปแล้ว (ลิงก์เก่าใช้ไม่ได้) หรือออเดอร์เกิน 30 วันถูกลบ → ส่งลิงก์ล่าสุดจากหน้ารายละเอียดออเดอร์ |
-| ปุ่มแจ้งเคลมของลูกค้าหาย | เกิน 48 ชม. หลังสถานะ "ส่งที่ท่าเรือแล้ว" — ปิดรับเคลมตามกติกา |
-| ล็อกอินติดหน้า 2FA เข้าไม่ได้ | หัวหน้าเข้า Supabase → Authentication → Users → เลือกผู้ใช้ → ลบ MFA factor → ให้ผู้ใช้ตั้งใหม่ |
-| ลบเรือในหน้าตั้งค่าไม่ได้ | มีออเดอร์ผูกกับเรือนั้นแล้ว — ย้ายออเดอร์ไปเรืออื่นก่อน |
-| นำเข้าไฟล์แล้วคอลัมน์เพี้ยน | กดแก้ "จับคู่คอลัมน์" ใหม่ (ระบบจำค่าล่าสุดไว้ใน browser) |
+| ลูกค้าอัปโหลดรูปเคลมไม่ขึ้น / ทีมถ่ายรูปที่ท่าเรือไม่ขึ้น | **CORS ของ R2 bucket ไม่มี origin ปัจจุบัน** → Cloudflare → R2 → `koh-payam-photos` → Settings → CORS Policy → เพิ่มโดเมนใน `AllowedOrigins` (ต้องมี `PUT` ใน `AllowedMethods`) |
+| ลูกค้าเปิดลิงก์ไม่ได้ ("not found / expired") | ทีมกด "สร้างลิงก์ใหม่" ไปแล้ว (ลิงก์เก่าใช้ไม่ได้ทันที) หรือออเดอร์เกิน 30 วันถูกลบ หรือเลย 48 ชม. หลังส่งขึ้นเรือ (ลิงก์หมดอายุ) → ส่งลิงก์ล่าสุดจากหน้ารายละเอียดออเดอร์ |
+| ปุ่มแจ้งเคลมของลูกค้าหาย | เกิน 48 ชม. หลังสถานะ "ส่งขึ้นเรือแล้ว" — ปิดรับเคลมตามกติกา (ตรวจสอบไม่ได้ = ต้องคุยนอกระบบ) |
+| ล็อกอินติดหน้า 2FA เข้าไม่ได้ (ทำโทรศัพท์หาย/ลบแอป) | หัวหน้าเข้า Supabase → **Authentication → Users** → เลือกผู้ใช้ → แท็บ/ปุ่มลบ **MFA factor** → ให้ผู้ใช้ล็อกอินใหม่แล้วตั้ง 2FA ใหม่ |
+| ลบเรือในหน้าตั้งค่าไม่ได้ ("ลบไม่ได้: มี N ออเดอร์ผูกกับเรือนี้แล้ว") | มีออเดอร์เลือกเรือนั้นไว้แล้ว — เปลี่ยนเรือของออเดอร์เหล่านั้นในหน้าท่าเรือก่อน ค่อยลบ |
+| นำเข้าไฟล์แล้วคอลัมน์เพี้ยน | กดแก้ "จับคู่คอลัมน์" ใหม่ในหน้านำเข้า (ระบบจำค่าล่าสุดไว้ใน browser — key `makro_mapping` ใน localStorage; ล้างได้โดยล้าง site data) |
+| นำเข้าแล้วขึ้นเตือน "มีออเดอร์ซ้ำ" | เลขออเดอร์นั้นเคยนำเข้าแล้ว — ระบบโชว์รายการที่จะถูกเขียนทับ กด "ทับของเดิม" เพื่อยืนยัน (ข้อมูลแพ็ค/เคลมของออเดอร์เดิมจะหาย) |
+| ข้อมูลออเดอร์เก่าหายไปเอง | **ปกติ** — cron `purge-old-orders` รันทุกวัน 03:00 น. **ลบถาวร** ออเดอร์ + รายการ + รูป + เคลม + audit log ที่เกิน 30 วัน (ตามกติกาความปลอดภัย) กู้ได้จาก backup รายสัปดาห์เท่านั้น |
+| รูปเก่ายังค้างบน R2 ทั้งที่ออเดอร์ถูกลบแล้ว | เช็ก cron `r2-cleanup` (03:10) ว่ารันผ่านไหม (ดูหัวข้อ "ตรวจสอบ cron jobs") — ไฟล์ที่ลบไม่สำเร็จจะยังอยู่ในตาราง `r2_delete_queue` |

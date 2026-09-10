@@ -1,0 +1,17 @@
+@media print {
+  body * {
+    visibility: hidden;
+  }
+  .label-sheet,
+  .label-sheet * {
+    visibility: visible;
+  }
+  .label-sheet {
+    position: absolute;
+    inset: 0;
+    padding: 2cm;
+  }
+  .no-print {
+    display: none;
+  }
+}

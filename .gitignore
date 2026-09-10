@@ -4,3 +4,9 @@ dist/
 .env.local
 *.log
 .DS_Store
+
+# local scratch — never commit
+password.txt
+*.secret
+creds*.txt
+.playwright-mcp/
