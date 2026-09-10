@@ -20,7 +20,7 @@ type PierOrder = {
 const ACTIVE = ['packed', 'at_pier']
 
 export default function PierLoad() {
-  const [date] = useState(todayLocalISO())
+  const [date, setDate] = useState(todayLocalISO())
   const [boats, setBoats] = useState<Boat[]>([])
   const [orders, setOrders] = useState<PierOrder[]>([])
   const [sel, setSel] = useState<PierOrder | null>(null)
@@ -80,7 +80,17 @@ export default function PierLoad() {
   if (!sel)
     return (
       <div className="flex flex-col gap-4">
-        <PageHeader title="ที่ท่าเรือ" />
+        <PageHeader
+          title="ที่ท่าเรือ"
+          actions={
+            <input
+              type="date"
+              className="w-auto"
+              value={date}
+              onChange={(e) => setDate(e.target.value)}
+            />
+          }
+        />
         {orders.length === 0 && (
           <p className="muted">ไม่มีออเดอร์ที่พร้อมส่งขึ้นเรือ</p>
         )}
