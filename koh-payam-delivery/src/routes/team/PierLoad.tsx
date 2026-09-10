@@ -155,7 +155,7 @@ export default function PierLoad() {
           max={3}
           onUploaded={async (key) => {
             try {
-              await attachEvidencePhoto(sel.id, key)
+              await attachEvidencePhoto(sel.id, key, { stage: 'handoff' })
               setPhotoCount((c) => c + 1)
             } catch (e) {
               setMsg((e as Error).message)

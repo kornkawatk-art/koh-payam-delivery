@@ -1,5 +1,9 @@
-// POST { scope: 'evidence' | 'claim', contentType, orderId?, token? }
+// POST { scope: 'evidence' | 'claim', contentType, orderId?, token?, stage? }
 //   -> { uploadUrl, key, publicUrl }
+//
+// `stage` ('pack' | 'handoff') only rides along on scope 'evidence'; anything
+// else (including absent) is normalised to 'handoff'. It does NOT change the R2
+// folder (still `evidence/${orderId}/…`) — the DB column is the source of truth.
 //
 // Auth is done here (config.toml sets verify_jwt = false because customers hit
 // the 'claim' path with no Supabase session):
@@ -21,7 +25,13 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { scope, token, orderId, contentType } = await req.json()
+    const { scope, token, orderId, contentType, stage: rawStage } = await req.json()
+
+    // Normalise the optional evidence `stage`: only 'pack' | 'handoff' are valid,
+    // everything else (including absent) falls back to 'handoff'. Kept for
+    // forward-compat / observability — it does not affect the R2 key or response.
+    // deno-lint-ignore no-unused-vars
+    const stage = scope === 'evidence' && rawStage === 'pack' ? 'pack' : 'handoff'
 
     if (!ALLOWED_CONTENT_TYPES.includes(contentType)) {
       return new Response('unsupported content type', { status: 400, headers: cors })

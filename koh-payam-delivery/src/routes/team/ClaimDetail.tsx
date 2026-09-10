@@ -12,7 +12,7 @@ export default function ClaimDetail() {
   const nav = useNavigate()
   const [c, setC] = useState<any>(null)
   const [failed, setFailed] = useState(false)
-  const [evi, setEvi] = useState<string[]>([])
+  const [evi, setEvi] = useState<{ url: string; stage: string }[]>([])
   const [decision, setDecision] = useState<'approved' | 'rejected'>('approved')
   const [resolution, setResolution] = useState<'refund' | 'resend_next_day'>('refund')
   const [amount, setAmount] = useState('')
@@ -45,10 +45,16 @@ export default function ClaimDetail() {
       try {
         const { data, error } = await supabase
           .from('evidence_photos')
-          .select('r2_key')
+          .select('r2_key, stage')
           .eq('order_id', orderId)
         if (error) throw error
-        if (active) setEvi((data ?? []).map((p: any) => `${R2}/${p.r2_key}`))
+        if (active)
+          setEvi(
+            (data ?? []).map((p: any) => ({
+              url: `${R2}/${p.r2_key}`,
+              stage: p.stage ?? 'handoff',
+            })),
+          )
       } catch (e) {
         console.warn('โหลดรูปหลักฐานของทีมไม่สำเร็จ', e)
       }
@@ -115,17 +121,40 @@ export default function ClaimDetail() {
       </section>
 
       <section className="flex flex-col gap-2">
-        <p className="section-title">รูปหลักฐานของทีม</p>
+        <p className="section-title">รูปตอนแพ็ค</p>
         <div className="flex flex-wrap gap-2">
-          {evi.length === 0 && <p className="muted">ไม่มีรูป</p>}
-          {evi.map((u) => (
-            <img
-              key={u}
-              src={u}
-              alt="รูปหลักฐานของทีม"
-              className="h-24 w-24 rounded-lg border border-line object-cover"
-            />
-          ))}
+          {evi.filter((p) => p.stage === 'pack').length === 0 && (
+            <p className="muted">ไม่มีรูป</p>
+          )}
+          {evi
+            .filter((p) => p.stage === 'pack')
+            .map((p) => (
+              <img
+                key={p.url}
+                src={p.url}
+                alt="รูปหลักฐานของทีม"
+                className="h-24 w-24 rounded-lg border border-line object-cover"
+              />
+            ))}
+        </div>
+      </section>
+
+      <section className="flex flex-col gap-2">
+        <p className="section-title">รูปตอนส่งขึ้นเรือ</p>
+        <div className="flex flex-wrap gap-2">
+          {evi.filter((p) => p.stage !== 'pack').length === 0 && (
+            <p className="muted">ไม่มีรูป</p>
+          )}
+          {evi
+            .filter((p) => p.stage !== 'pack')
+            .map((p) => (
+              <img
+                key={p.url}
+                src={p.url}
+                alt="รูปหลักฐานของทีม"
+                className="h-24 w-24 rounded-lg border border-line object-cover"
+              />
+            ))}
         </div>
       </section>
 

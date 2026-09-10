@@ -45,10 +45,14 @@ export default function OrderDetail() {
   const items: any[] = order.order_items ?? []
   const claims: any[] = order.claims ?? []
   const photos: any[] = order.evidence_photos ?? []
+  const packPhotos = photos.filter((p) => p.stage === 'pack')
+  const handoffPhotos = photos.filter((p) => p.stage !== 'pack')
   // I4: moving an order to the pier / onto a boat requires a chosen boat AND at
-  // least one evidence photo — both captured on the "ที่ท่าเรือ" screen.
+  // least one handoff evidence photo — both captured on the "ที่ท่าเรือ" screen.
+  // Pack-stage photos do not satisfy this gate.
   const pierBlocked =
-    (next === 'at_pier' || next === 'shipped') && !(order.boat_id && photos.length >= 1)
+    (next === 'at_pier' || next === 'shipped') &&
+    !(order.boat_id && handoffPhotos.length >= 1)
 
   async function advance() {
     if (!next) return
@@ -180,12 +184,30 @@ export default function OrderDetail() {
       </section>
 
       <section className="text-sm">
-        <p className="section-title">รูปหลักฐาน</p>
-        {photos.length === 0 ? (
+        <p className="section-title">รูปตอนแพ็ค</p>
+        {packPhotos.length === 0 ? (
           <p className="muted mt-1">ไม่มีรูป</p>
         ) : (
           <div className="mt-1 flex flex-wrap gap-2">
-            {photos.map((p) => (
+            {packPhotos.map((p) => (
+              <img
+                key={p.id ?? p.r2_key}
+                src={`${import.meta.env.VITE_R2_PUBLIC_BASE_URL}/${p.r2_key}`}
+                alt="หลักฐาน"
+                className="h-24 w-24 rounded-lg border border-line object-cover"
+              />
+            ))}
+          </div>
+        )}
+      </section>
+
+      <section className="text-sm">
+        <p className="section-title">รูปตอนส่งขึ้นเรือ</p>
+        {handoffPhotos.length === 0 ? (
+          <p className="muted mt-1">ไม่มีรูป</p>
+        ) : (
+          <div className="mt-1 flex flex-wrap gap-2">
+            {handoffPhotos.map((p) => (
               <img
                 key={p.id ?? p.r2_key}
                 src={`${import.meta.env.VITE_R2_PUBLIC_BASE_URL}/${p.r2_key}`}

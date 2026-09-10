@@ -44,7 +44,7 @@ const input = () => screen.getByLabelText('ถ่ายรูป / เลือ�
 
 test('evidence: compresses, requests a URL, PUTs the blob to R2, and reports the key', async () => {
   const onUploaded = vi.fn()
-  render(<PhotoCapture scope="evidence" orderId="o1" onUploaded={onUploaded} />)
+  render(<PhotoCapture scope="evidence" orderId="o1" onUploaded={onUploaded} max={3} />)
 
   await userEvent.upload(input(), pickFile())
 
@@ -54,6 +54,7 @@ test('evidence: compresses, requests a URL, PUTs the blob to R2, and reports the
     scope: 'evidence',
     orderId: 'o1',
     contentType: 'image/jpeg',
+    stage: 'handoff',
   })
   const [url, init] = fetchMock.mock.calls[0]
   expect(url).toBe('https://r2.example/put-1?X-Amz-Signature=s')
@@ -61,6 +62,29 @@ test('evidence: compresses, requests a URL, PUTs the blob to R2, and reports the
   expect(init.headers['content-type']).toBe('image/jpeg')
   expect(init.body).toBeInstanceOf(Blob)
   expect(screen.getByText('1 / 3 รูป')).toBeInTheDocument()
+})
+
+test('evidence: forwards stage="pack" to the upload-url request', async () => {
+  render(<PhotoCapture scope="evidence" orderId="o1" stage="pack" onUploaded={vi.fn()} />)
+  await userEvent.upload(input(), pickFile())
+  await waitFor(() =>
+    expect(requestUploadUrl).toHaveBeenCalledWith({
+      scope: 'evidence',
+      orderId: 'o1',
+      contentType: 'image/jpeg',
+      stage: 'pack',
+    }),
+  )
+})
+
+test('no max: input never locks and the count omits the "/ N"', async () => {
+  render(<PhotoCapture scope="evidence" orderId="o1" onUploaded={vi.fn()} />)
+  await userEvent.upload(input(), pickFile())
+  await waitFor(() => expect(screen.getByText('1 รูป')).toBeInTheDocument())
+  expect(input()).not.toBeDisabled()
+  await userEvent.upload(input(), pickFile())
+  await waitFor(() => expect(screen.getByText('2 รูป')).toBeInTheDocument())
+  expect(input()).not.toBeDisabled()
 })
 
 test('claim: passes the token instead of an orderId', async () => {

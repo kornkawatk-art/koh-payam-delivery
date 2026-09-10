@@ -5,7 +5,7 @@ const FN_BASE = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1`
 export type UploadUrlResponse = { uploadUrl: string; key: string; publicUrl: string }
 
 export type RequestUploadUrlArgs =
-  | { scope: 'evidence'; orderId: string; contentType: string }
+  | { scope: 'evidence'; orderId: string; contentType: string; stage?: 'pack' | 'handoff' }
   | { scope: 'claim'; token: string; contentType: string }
 
 /**
@@ -33,18 +33,23 @@ export async function requestUploadUrl(args: RequestUploadUrlArgs): Promise<Uplo
   return (await res.json()) as UploadUrlResponse
 }
 
-/** Record a team evidence photo (already uploaded to R2) against an order. */
+/**
+ * Record a team evidence photo (already uploaded to R2) against an order.
+ * `stage` marks whether it was taken at the pack step or the pier handoff;
+ * it defaults to 'handoff' when the options object is omitted.
+ */
 export async function attachEvidencePhoto(
   orderId: string,
   key: string,
-  note?: string,
+  opts?: { stage?: 'pack' | 'handoff'; note?: string },
 ): Promise<void> {
   const { data: u } = await supabase.auth.getUser()
   const { error } = await supabase.from('evidence_photos').insert({
     order_id: orderId,
     r2_key: key,
-    note: note ?? null,
+    note: opts?.note ?? null,
     taken_by: u.user?.id ?? null,
+    stage: opts?.stage ?? 'handoff',
   })
   if (error) throw new Error('บันทึกรูปไม่สำเร็จ: ' + error.message)
 }

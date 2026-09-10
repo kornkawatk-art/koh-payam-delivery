@@ -150,6 +150,24 @@ test('a resolveClaim failure shows a Thai error and does not navigate', async ()
   expect(screen.getByRole('button', { name: 'บันทึกผล' })).not.toBeDisabled()
 })
 
+test('splits team evidence photos into pack and handoff blocks by stage', async () => {
+  eviQuery.mockReset().mockResolvedValue({
+    data: [
+      { r2_key: 'evidence/o1/pack.jpg', stage: 'pack' },
+      { r2_key: 'evidence/o1/handoff.jpg', stage: 'handoff' },
+      { r2_key: 'evidence/o1/legacy.jpg', stage: null },
+    ],
+    error: null,
+  })
+  renderPage()
+  await screen.findByLabelText('จำนวนเงินคืน')
+  expect(screen.getByText('รูปตอนแพ็ค')).toBeInTheDocument()
+  expect(screen.getByText('รูปตอนส่งขึ้นเรือ')).toBeInTheDocument()
+  // pack block: 1 image; handoff block: legacy (null stage) + handoff = 2 images
+  const imgs = screen.getAllByAltText('รูปหลักฐานของทีม')
+  expect(imgs).toHaveLength(3)
+})
+
 test('an evidence-photo fetch failure does not blank the loaded claim', async () => {
   const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
   eviQuery.mockReset().mockRejectedValue(new Error('boom'))

@@ -2,11 +2,13 @@ import { useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { getOrder, updateOrderStatus } from '../../lib/api/orders'
 import { savePack } from '../../lib/api/pack'
+import { attachEvidencePhoto } from '../../lib/api/photos'
 import {
   listPendingBackordersForOrder,
   markBackorderFulfilled,
   type BackorderRow,
 } from '../../lib/api/backorders'
+import PhotoCapture from '../../components/PhotoCapture'
 import { Spinner } from '../../components/ui/Spinner'
 import { PageHeader } from '../../components/ui/PageHeader'
 
@@ -26,6 +28,7 @@ export default function PackOrder() {
   const [backorders, setBackorders] = useState<BackorderRow[]>([])
   const [paper, setPaper] = useState(0)
   const [foam, setFoam] = useState(0)
+  const [packPhotoCount, setPackPhotoCount] = useState(0)
   const [msg, setMsg] = useState<string>()
   const [busy, setBusy] = useState(false)
   const [failed, setFailed] = useState(false)
@@ -37,6 +40,9 @@ export default function PackOrder() {
         setItems(o.order_items.map((it: any) => ({ ...it })))
         setPaper(o.paper_box_count)
         setFoam(o.foam_box_count)
+        setPackPhotoCount(
+          (o.evidence_photos ?? []).filter((p: any) => p.stage === 'pack').length,
+        )
       })
       .catch(() => setFailed(true))
     listPendingBackordersForOrder(id!)
@@ -60,6 +66,10 @@ export default function PackOrder() {
       setBusy(false)
     }
   }
+
+  // I: marking an order packed needs at least one "packed box" evidence photo
+  // AND at least one box counted. The plain "บันทึก" save stays ungated.
+  const packGateBlocked = !(packPhotoCount >= 1 && paper + foam >= 1)
 
   async function fulfil(bid: string) {
     try {
@@ -150,14 +160,39 @@ export default function PackOrder() {
             />
           </label>
         </div>
+        <section className="flex flex-col gap-2 border-t border-line pt-4">
+          <p className="section-title">รูปหลักฐานตอนแพ็ค</p>
+          <PhotoCapture
+            scope="evidence"
+            stage="pack"
+            orderId={id}
+            onUploaded={async (key) => {
+              try {
+                await attachEvidencePhoto(id!, key, { stage: 'pack' })
+                setPackPhotoCount((c) => c + 1)
+              } catch (e) {
+                setMsg((e as Error).message)
+              }
+            }}
+          />
+        </section>
         <div className="flex flex-wrap gap-2">
           <button className="btn btn-secondary" onClick={() => save(false)} disabled={busy}>
             บันทึก
           </button>
-          <button className="btn btn-primary" onClick={() => save(true)} disabled={busy}>
+          <button
+            className="btn btn-primary"
+            onClick={() => save(true)}
+            disabled={busy || packGateBlocked}
+          >
             บันทึก + แพ็คเสร็จ
           </button>
         </div>
+        {!busy && packGateBlocked && (
+          <p className="muted text-xs">
+            ต้องถ่ายรูปลังที่แพ็คเสร็จอย่างน้อย 1 รูป และกรอกจำนวนลังอย่างน้อย 1 ลัง
+          </p>
+        )}
         {msg && <p className="muted">{msg}</p>}
       </div>
     </div>
