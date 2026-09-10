@@ -97,6 +97,9 @@ test('buildImport parses order-level fields and expected date', async () => {
   expect(p1.customerName).toBe('PAYAM MINIMART')
   expect(p1.subDistrict).toBe('เกาะพยาม')
   expect(p1.expectedDate).toBe('2026-09-11')
+  expect(p1.makroOrderStatus).toBe('Completed')
+  const p2 = r.orders.find((o) => o.makroOrderNo === 'P-002')!
+  expect(p2.makroOrderStatus).toBe('Partially Shipped')
 })
 
 test('buildImport drops cancelled lines and re-numbers the rest', async () => {

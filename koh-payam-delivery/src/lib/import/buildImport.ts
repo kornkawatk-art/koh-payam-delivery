@@ -19,6 +19,7 @@ export type OrderMapping = {
   subDistrict: string
   shippingAddress: string
   expectedDate: string
+  orderStatus: string
 }
 
 export const DEFAULT_DETAIL_MAPPING: DetailMapping = {
@@ -38,9 +39,10 @@ export const DEFAULT_ORDER_MAPPING: OrderMapping = {
   subDistrict: 'Sub District',
   shippingAddress: 'Shipping Address',
   expectedDate: 'Original Expected Date',
+  orderStatus: 'Order Status',
 }
 
-const DETAIL_LABELS: Record<keyof DetailMapping, string> = {
+export const FIELD_LABELS_DETAIL: Record<keyof DetailMapping, string> = {
   orderNo: 'เลขที่ออเดอร์',
   product: 'ชื่อสินค้า',
   orderedQty: 'จำนวนสั่ง',
@@ -51,12 +53,13 @@ const DETAIL_LABELS: Record<keyof DetailMapping, string> = {
   itemId: 'รหัสสินค้า',
 }
 
-const ORDER_LABELS: Record<keyof OrderMapping, string> = {
+export const FIELD_LABELS_ORDER: Record<keyof OrderMapping, string> = {
   orderNo: 'เลขที่ออเดอร์',
   customer: 'ชื่อลูกค้า',
   subDistrict: 'ตำบล',
   shippingAddress: 'ที่อยู่จัดส่ง',
   expectedDate: 'วันที่คาดว่าจะได้รับ',
+  orderStatus: 'สถานะแม็คโคร',
 }
 
 // คอลัมน์ที่ต้องมีเสมอ (ที่เหลือมี fallback ในโค้ด จึงไม่บังคับ)
@@ -93,6 +96,7 @@ export type ParsedOrder = {
   subDistrict: string
   shippingAddress: string
   expectedDate: string | null
+  makroOrderStatus: string | null
   items: ParsedItem[]
 }
 
@@ -150,7 +154,7 @@ export function validateMapping(
   mapping: DetailMapping | OrderMapping,
 ): string[] {
   const set = new Set(headers.map((h) => String(h).trim()))
-  const labels: Record<string, string> = kind === 'detail' ? DETAIL_LABELS : ORDER_LABELS
+  const labels: Record<string, string> = kind === 'detail' ? FIELD_LABELS_DETAIL : FIELD_LABELS_ORDER
   const required: string[] =
     kind === 'detail' ? (DETAIL_REQUIRED as string[]) : (ORDER_REQUIRED as string[])
   const m = mapping as Record<string, string>
@@ -186,12 +190,14 @@ export function buildImport(
       skippedNotPayam++
       continue
     }
+    const makroOrderStatus = om.orderStatus ? (r[om.orderStatus] ?? '').trim() : ''
     payamOrders.set(orderNo, {
       makroOrderNo: orderNo,
       customerName: (r[om.customer] ?? '').trim(),
       subDistrict,
       shippingAddress,
       expectedDate: parseExpectedDate(om.expectedDate ? (r[om.expectedDate] ?? '') : ''),
+      makroOrderStatus: makroOrderStatus || null,
       items: [],
     })
   }
@@ -210,8 +216,12 @@ export function buildImport(
       continue
     }
     const isShort = shippedQty < orderedQty
-    let shortageQty = dm.shortageQty ? toNum(r[dm.shortageQty]) : 0
-    if (shortageQty <= 0 && isShort) shortageQty = Math.max(0, orderedQty - shippedQty)
+    // A line that is not short carries no shortage, regardless of the file column.
+    let shortageQty = 0
+    if (isShort) {
+      shortageQty = dm.shortageQty ? toNum(r[dm.shortageQty]) : 0
+      if (shortageQty <= 0) shortageQty = Math.max(0, orderedQty - shippedQty)
+    }
     const list = itemsByOrder.get(orderNo) ?? []
     list.push({
       productName: (r[dm.product] ?? '').trim(),
