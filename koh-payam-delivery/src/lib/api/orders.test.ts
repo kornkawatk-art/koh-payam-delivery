@@ -67,6 +67,7 @@ const parsedOrders = [
     paymentMethod: 'Pay On Delivery',
     paymentStatus: 'Unpaid',
     outstandingAmount: 6172.5,
+    customerPhone: '0826289533',
     items: [
       {
         productName: 'x',
@@ -103,6 +104,7 @@ test('fresh import inserts orders + items and counts created', async () => {
     payment_method: 'Pay On Delivery',
     payment_status: 'Unpaid',
     outstanding_amount: 6172.5,
+    customer_phone: '0826289533',
   })
   expect(ordIns.rows.link_token).toMatch(/^o_[0-9a-f]{32}$/)
   const itemIns = state.inserted.find((i) => i.table === 'order_items')
@@ -135,6 +137,7 @@ test('re-import of an existing order syncs without touching protected columns', 
     payment_method: 'Pay On Delivery',
     payment_status: 'Unpaid',
     outstanding_amount: 6172.5,
+    customer_phone: '0826289533',
   })
   for (const k of [
     'status',

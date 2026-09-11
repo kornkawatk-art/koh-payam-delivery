@@ -58,6 +58,7 @@ export async function commitImport(
           payment_method: o.paymentMethod,
           payment_status: o.paymentStatus,
           outstanding_amount: o.outstandingAmount,
+          customer_phone: o.customerPhone,
         })
         .select('id')
         .single()
@@ -76,6 +77,7 @@ export async function commitImport(
           payment_method: o.paymentMethod,
           payment_status: o.paymentStatus,
           outstanding_amount: o.outstandingAmount,
+          customer_phone: o.customerPhone,
         })
         .eq('id', existingId)
       if (eU) throw new Error(`อัปเดตออเดอร์ ${o.makroOrderNo} ไม่สำเร็จ: ${eU.message}`)
