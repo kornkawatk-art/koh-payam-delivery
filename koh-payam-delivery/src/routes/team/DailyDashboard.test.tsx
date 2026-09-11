@@ -112,6 +112,52 @@ test('shows a เก็บเงิน badge only on rows with outstanding_amoun
   expect(within(row3).queryByText('เก็บเงิน')).not.toBeInTheDocument()
 })
 
+test('shows a หลาย PO badge only on rows sharing a customer_phone with another row', async () => {
+  vi.mocked(listOrdersForDay).mockResolvedValueOnce([
+    {
+      id: '1',
+      makro_order_no: 'PO-1',
+      customer_name_en: 'BLUE VIEW',
+      status: 'packed',
+      boat_id: null,
+      paper_box_count: 2,
+      foam_box_count: 0,
+      outstanding_amount: 0,
+      customer_phone: '0826289533',
+    },
+    {
+      id: '2',
+      makro_order_no: 'PO-2',
+      customer_name_en: 'BLUE VIEW ANNEX',
+      status: 'packed',
+      boat_id: null,
+      paper_box_count: 1,
+      foam_box_count: 1,
+      outstanding_amount: 0,
+      customer_phone: '0826289533',
+    },
+    {
+      id: '3',
+      makro_order_no: 'PO-3',
+      customer_name_en: 'SUNSET',
+      status: 'shipped',
+      boat_id: '1',
+      paper_box_count: 3,
+      foam_box_count: 0,
+      outstanding_amount: 0,
+      customer_phone: null,
+    },
+  ])
+  renderPage()
+  await screen.findByText('BLUE VIEW')
+  const row1 = screen.getByText('PO-1').closest('tr')!
+  const row2 = screen.getByText('PO-2').closest('tr')!
+  const row3 = screen.getByText('PO-3').closest('tr')!
+  expect(within(row1).getByText('หลาย PO')).toBeInTheDocument()
+  expect(within(row2).getByText('หลาย PO')).toBeInTheDocument()
+  expect(within(row3).queryByText('หลาย PO')).not.toBeInTheDocument()
+})
+
 test('load fails → Thai error + retry re-invokes the loader', async () => {
   vi.mocked(listOrdersForDay).mockRejectedValueOnce(new Error('nope'))
   renderPage()

@@ -63,6 +63,25 @@ export default function DailyDashboard() {
     }
   }, [rows])
 
+  // Orders that share a non-blank customer_phone with at least one other row
+  // in the same day are "grouped" — the customer split one purchase across
+  // multiple POs that ship together. Derived client-side from `rows`, not
+  // `filtered`, so the grouping badge is unaffected by the search box.
+  const groupedPhones = useMemo(() => {
+    const r = rows ?? []
+    const counts = new Map<string, number>()
+    for (const o of r) {
+      const phone = (o.customer_phone ?? '').trim()
+      if (!phone) continue
+      counts.set(phone, (counts.get(phone) ?? 0) + 1)
+    }
+    return new Set(
+      Array.from(counts.entries())
+        .filter(([, count]) => count > 1)
+        .map(([phone]) => phone),
+    )
+  }, [rows])
+
   const filtered = useMemo(() => {
     const r = rows ?? []
     const s = q.trim().toLowerCase()
@@ -159,6 +178,9 @@ export default function DailyDashboard() {
                     <StatusBadge status={o.status} />
                     {o.outstanding_amount > 0 && (
                       <span className="badge badge-warn ml-1.5">เก็บเงิน</span>
+                    )}
+                    {groupedPhones.has((o.customer_phone ?? '').trim()) && (
+                      <span className="badge badge-neutral ml-1.5">หลาย PO</span>
                     )}
                   </td>
                   <td className="tnum">{o.paper_box_count + o.foam_box_count}</td>

@@ -249,6 +249,82 @@ test('buildImport: file missing payment columns -> paymentMethod/paymentStatus n
   expect(p1.outstandingAmount).toBe(0)
 })
 
+// --- soft-optional customer phone -----------------------------------------
+
+test('validateMapping: order file missing Customer Phone column entirely -> no problems (soft-optional)', () => {
+  // simulate a file that lacks the Customer Phone header at all, unlike the
+  // real fixture (which already has it) — the default mapping still points
+  // at it and must not block import.
+  const problems = validateMapping(
+    'order',
+    ['Order Number', 'Customer Name', 'Sub District', 'Shipping Address', 'Original Expected Date', 'Order Status'],
+    DEFAULT_ORDER_MAPPING,
+  )
+  expect(problems).toEqual([])
+})
+
+test('buildImport: real fixture has a Customer Phone column -> parsed onto customerPhone', async () => {
+  const { detail, order } = await fixtures()
+  const r = buildImport(detail, order, DEFAULT_DETAIL_MAPPING, DEFAULT_ORDER_MAPPING)
+  const p1 = r.orders.find((o) => o.makroOrderNo === 'P-001')!
+  expect(p1.customerPhone).toBe('0800000001')
+})
+
+test('buildImport: parses a real-shaped customer phone number', () => {
+  const detail: RawRow[] = [
+    {
+      'Order Number': 'PH-1',
+      'Item Id': '1',
+      'Product Name': 'a',
+      'Order Quantity': '5',
+      'Shipped Quantity': '5',
+      'Shortage Quantity': '0',
+      'Cancelled Quantity': '0',
+      'Item Remark': '',
+    },
+  ]
+  const order: RawRow[] = [
+    {
+      'Order Number': 'PH-1',
+      'Customer Name': 'Phone Co',
+      'Sub District': 'เกาะพยาม',
+      'Shipping Address': 'x',
+      'Original Expected Date': '',
+      'Customer Phone': '0826289533',
+    },
+  ]
+  const r = buildImport(detail, order, DEFAULT_DETAIL_MAPPING, DEFAULT_ORDER_MAPPING)
+  const p1 = r.orders.find((o) => o.makroOrderNo === 'PH-1')!
+  expect(p1.customerPhone).toBe('0826289533')
+})
+
+test('buildImport: order row missing Customer Phone value -> customerPhone null (not empty string)', () => {
+  const detail: RawRow[] = [
+    {
+      'Order Number': 'PH-2',
+      'Item Id': '1',
+      'Product Name': 'a',
+      'Order Quantity': '5',
+      'Shipped Quantity': '5',
+      'Shortage Quantity': '0',
+      'Cancelled Quantity': '0',
+      'Item Remark': '',
+    },
+  ]
+  const order: RawRow[] = [
+    {
+      'Order Number': 'PH-2',
+      'Customer Name': 'No Phone Co',
+      'Sub District': 'เกาะพยาม',
+      'Shipping Address': 'x',
+      'Original Expected Date': '',
+    },
+  ]
+  const r = buildImport(detail, order, DEFAULT_DETAIL_MAPPING, DEFAULT_ORDER_MAPPING)
+  const p1 = r.orders.find((o) => o.makroOrderNo === 'PH-2')!
+  expect(p1.customerPhone).toBeNull()
+})
+
 test('buildImport: comma-grouped numbers parse, junk numbers become 0', () => {
   const detail: RawRow[] = [
     {

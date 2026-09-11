@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState, type ReactNode } from 'react'
-import { useParams } from 'react-router-dom'
+import { Link, useParams } from 'react-router-dom'
 import { t, type Lang } from './i18n'
 import OrderStatusTimeline from '../../components/OrderStatusTimeline'
 import CustomerClaimForm from './CustomerClaimForm'
@@ -30,6 +30,7 @@ type OrderView = {
   shipDate: string
   status: string
   boatName: string | null
+  siblingOrders: { orderNo: string; status: string; token: string }[]
   paperBoxCount: number
   foamBoxCount: number
   outstandingAmount: number | null
@@ -144,6 +145,29 @@ export default function CustomerOrderView() {
           {t(lang, 'ship_date')}: {formatDate(data.shipDate, lang)}
         </p>
       </header>
+
+      {data.siblingOrders.length > 0 && (
+        <section className="flex flex-col gap-2 text-sm">
+          <h2 className="section-title">
+            {t(lang, 'related_orders_heading', { n: data.siblingOrders.length })}
+          </h2>
+          <ul className="flex flex-col gap-2">
+            {data.siblingOrders.map((sib) => (
+              <li
+                key={sib.orderNo}
+                className="flex items-center justify-between rounded-lg border border-line p-3"
+              >
+                <span>
+                  {sib.orderNo} · {t(lang, `status_${sib.status}`)}
+                </span>
+                <Link className="link" to={`/o/${sib.token}`}>
+                  {t(lang, 'view')}
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
 
       <OrderStatusTimeline status={data.status} lang={lang} />
 
