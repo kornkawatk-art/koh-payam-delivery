@@ -125,6 +125,7 @@ Deno.serve(async (req) => {
     siblingOrders,
     paperBoxCount: o.paper_box_count,
     foamBoxCount: o.foam_box_count,
+    pieceCount: o.piece_count,
     // Amount only — payment_method/payment_status stay internal (Q3a/Q8).
     outstandingAmount: o.outstanding_amount > 0 ? Number(o.outstanding_amount) : null,
     items: items.map((i) => ({

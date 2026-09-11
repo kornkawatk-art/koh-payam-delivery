@@ -33,6 +33,7 @@ type OrderView = {
   siblingOrders: { orderNo: string; status: string; token: string }[]
   paperBoxCount: number
   foamBoxCount: number
+  pieceCount: number
   outstandingAmount: number | null
   items: Item[]
   shortages: { productName: string; orderedQty: number; shippedQty: number }[]
@@ -227,7 +228,7 @@ export default function CustomerOrderView() {
       <section className="flex flex-col gap-1 rounded-lg bg-paper p-3 text-sm text-ink-soft">
         <p>
           {t(lang, 'boxes')}: {t(lang, 'paper')} {data.paperBoxCount} · {t(lang, 'foam')}{' '}
-          {data.foamBoxCount}
+          {data.foamBoxCount} · {t(lang, 'pieces')} {data.pieceCount}
         </p>
         {data.boatName && (
           <p>
