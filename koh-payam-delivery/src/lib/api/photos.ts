@@ -15,7 +15,10 @@ export type RequestUploadUrlArgs =
  * team session's access token for `evidence` when one is present. For `claim`
  * the function validates the order link token and the 48h claim window instead.
  */
-export async function requestUploadUrl(args: RequestUploadUrlArgs): Promise<UploadUrlResponse> {
+export async function requestUploadUrl(
+  args: RequestUploadUrlArgs,
+  signal?: AbortSignal,
+): Promise<UploadUrlResponse> {
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
     Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
@@ -28,6 +31,7 @@ export async function requestUploadUrl(args: RequestUploadUrlArgs): Promise<Uplo
     method: 'POST',
     headers,
     body: JSON.stringify(args),
+    signal,
   })
   if (!res.ok) throw new Error('ขอลิงก์อัปโหลดรูปไม่สำเร็จ (' + res.status + ')')
   return (await res.json()) as UploadUrlResponse

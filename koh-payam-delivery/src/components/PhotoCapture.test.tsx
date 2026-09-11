@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor, fireEvent, act } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import PhotoCapture from './PhotoCapture'
 
@@ -50,12 +50,15 @@ test('evidence: compresses, requests a URL, PUTs the blob to R2, and reports the
 
   await waitFor(() => expect(onUploaded).toHaveBeenCalledWith('evidence/o1/key-1.jpg'))
   expect(compressImage).toHaveBeenCalledWith(expect.any(File))
-  expect(requestUploadUrl).toHaveBeenCalledWith({
-    scope: 'evidence',
-    orderId: 'o1',
-    contentType: 'image/jpeg',
-    stage: 'handoff',
-  })
+  expect(requestUploadUrl).toHaveBeenCalledWith(
+    {
+      scope: 'evidence',
+      orderId: 'o1',
+      contentType: 'image/jpeg',
+      stage: 'handoff',
+    },
+    expect.any(AbortSignal),
+  )
   const [url, init] = fetchMock.mock.calls[0]
   expect(url).toBe('https://r2.example/put-1?X-Amz-Signature=s')
   expect(init.method).toBe('PUT')
@@ -68,12 +71,15 @@ test('evidence: forwards stage="pack" to the upload-url request', async () => {
   render(<PhotoCapture scope="evidence" orderId="o1" stage="pack" onUploaded={vi.fn()} />)
   await userEvent.upload(input(), pickFile())
   await waitFor(() =>
-    expect(requestUploadUrl).toHaveBeenCalledWith({
-      scope: 'evidence',
-      orderId: 'o1',
-      contentType: 'image/jpeg',
-      stage: 'pack',
-    }),
+    expect(requestUploadUrl).toHaveBeenCalledWith(
+      {
+        scope: 'evidence',
+        orderId: 'o1',
+        contentType: 'image/jpeg',
+        stage: 'pack',
+      },
+      expect.any(AbortSignal),
+    ),
   )
 })
 
@@ -91,11 +97,14 @@ test('claim: passes the token instead of an orderId', async () => {
   render(<PhotoCapture scope="claim" token="t-1" onUploaded={vi.fn()} />)
   await userEvent.upload(input(), pickFile())
   await waitFor(() =>
-    expect(requestUploadUrl).toHaveBeenCalledWith({
-      scope: 'claim',
-      token: 't-1',
-      contentType: 'image/jpeg',
-    }),
+    expect(requestUploadUrl).toHaveBeenCalledWith(
+      {
+        scope: 'claim',
+        token: 't-1',
+        contentType: 'image/jpeg',
+      },
+      expect.any(AbortSignal),
+    ),
   )
 })
 
@@ -140,6 +149,37 @@ test('remounts the file input after each pick (Android Chrome repeat-capture wor
   await waitFor(() => expect(screen.getByText('1 รูป')).toBeInTheDocument())
   const second = input()
   expect(second).not.toBe(first)
+})
+
+test('a hung upload (weak signal) times out, aborts, and surfaces a retryable Thai error', async () => {
+  vi.useFakeTimers()
+  try {
+    // Never resolves on its own — only settles if its AbortSignal fires, the
+    // way a real fetch would once the request is aborted.
+    requestUploadUrl.mockReset().mockImplementation(
+      (_args: unknown, signal?: AbortSignal) =>
+        new Promise((_resolve, reject) => {
+          signal?.addEventListener('abort', () =>
+            reject(new DOMException('aborted', 'AbortError')),
+          )
+        }),
+    )
+    render(<PhotoCapture scope="evidence" orderId="o1" onUploaded={vi.fn()} />)
+    const el = input()
+    Object.defineProperty(el, 'files', { value: [pickFile()], configurable: true })
+    fireEvent.change(el)
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(25_000)
+    })
+
+    expect(
+      screen.getByText('อัปโหลดรูปไม่สำเร็จ (สัญญาณอินเทอร์เน็ตช้าหรือขาดหาย) กรุณาลองใหม่อีกครั้ง'),
+    ).toBeInTheDocument()
+    expect(input()).not.toBeDisabled() // busy cleared — the input is retryable, not stuck
+  } finally {
+    vi.useRealTimers()
+  }
 })
 
 test('a failed URL request surfaces its Thai error', async () => {

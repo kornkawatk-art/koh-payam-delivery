@@ -2,6 +2,34 @@ import { useState, type ChangeEvent } from 'react'
 import { compressImage } from '../lib/image'
 import { requestUploadUrl } from '../lib/api/photos'
 
+// Full budget (compress + presign + PUT) for one photo. Weak island cellular
+// signal can otherwise leave the browser's fetch hanging with no error and no
+// timeout of its own — the UI looked permanently "stuck" with nothing to
+// retry. This bounds the wait and turns a hang into a retryable Thai error.
+const UPLOAD_TIMEOUT_MS = 25_000
+
+class UploadTimeoutError extends Error {}
+
+/** Race `work` against a timeout; on timeout, abort `controller` and reject. */
+function withUploadTimeout<T>(work: Promise<T>, controller: AbortController): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(() => {
+      controller.abort()
+      reject(new UploadTimeoutError('upload timed out'))
+    }, UPLOAD_TIMEOUT_MS)
+    work.then(
+      (v) => {
+        clearTimeout(timer)
+        resolve(v)
+      },
+      (e) => {
+        clearTimeout(timer)
+        reject(e)
+      },
+    )
+  })
+}
+
 type Props = {
   scope: 'evidence' | 'claim'
   orderId?: string
@@ -61,25 +89,36 @@ export default function PhotoCapture({
     const doneThumbs: string[] = []
     try {
       for (const file of files) {
-        const blob = await compressImage(file)
-        const contentType = blob.type || 'image/jpeg'
-        const args =
-          scope === 'evidence'
-            ? ({ scope: 'evidence', orderId: orderId ?? '', contentType, stage } as const)
-            : ({ scope: 'claim', token: token ?? '', contentType } as const)
-        const { uploadUrl, key } = await requestUploadUrl(args)
-        const put = await fetch(uploadUrl, {
-          method: 'PUT',
-          body: blob,
-          headers: { 'content-type': contentType },
-        })
-        if (!put.ok) throw new Error('อัปโหลดรูปไม่สำเร็จ (' + put.status + ')')
-        doneKeys.push(key)
-        doneThumbs.push(URL.createObjectURL(blob))
-        onUploaded(key)
+        const controller = new AbortController()
+        await withUploadTimeout(
+          (async () => {
+            const blob = await compressImage(file)
+            const contentType = blob.type || 'image/jpeg'
+            const args =
+              scope === 'evidence'
+                ? ({ scope: 'evidence', orderId: orderId ?? '', contentType, stage } as const)
+                : ({ scope: 'claim', token: token ?? '', contentType } as const)
+            const { uploadUrl, key } = await requestUploadUrl(args, controller.signal)
+            const put = await fetch(uploadUrl, {
+              method: 'PUT',
+              body: blob,
+              headers: { 'content-type': contentType },
+              signal: controller.signal,
+            })
+            if (!put.ok) throw new Error('อัปโหลดรูปไม่สำเร็จ (' + put.status + ')')
+            doneKeys.push(key)
+            doneThumbs.push(URL.createObjectURL(blob))
+            onUploaded(key)
+          })(),
+          controller,
+        )
       }
     } catch (e2) {
-      setErr((e2 as Error).message || 'อัปโหลดรูปไม่สำเร็จ')
+      if (e2 instanceof UploadTimeoutError) {
+        setErr('อัปโหลดรูปไม่สำเร็จ (สัญญาณอินเทอร์เน็ตช้าหรือขาดหาย) กรุณาลองใหม่อีกครั้ง')
+      } else {
+        setErr((e2 as Error).message || 'อัปโหลดรูปไม่สำเร็จ')
+      }
     } finally {
       if (doneKeys.length) {
         setKeys((k) => [...k, ...doneKeys])
