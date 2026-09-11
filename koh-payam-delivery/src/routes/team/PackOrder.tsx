@@ -117,8 +117,8 @@ export default function PackOrder() {
           <table className="data-table">
             <thead>
               <tr>
-                <th>สินค้า</th>
                 <th>รหัสสินค้า</th>
+                <th>สินค้า</th>
                 <th>สั่ง</th>
                 <th>ส่งจริง</th>
                 <th>สถานะ</th>
@@ -128,8 +128,8 @@ export default function PackOrder() {
             <tbody>
               {items.map((it) => (
                 <tr key={it.id}>
-                  <td>{it.product_name}</td>
                   <td className="tnum">{it.makro_item_id}</td>
+                  <td>{it.product_name}</td>
                   <td className="tnum">{it.qty_ordered}</td>
                   <td className="tnum">{it.qty_shipped}</td>
                   <td>

@@ -153,8 +153,8 @@ export default function CustomerOrderView() {
           <table className="data-table">
             <thead>
               <tr>
-                <th>{t(lang, 'col_item')}</th>
                 <th>{t(lang, 'col_item_id')}</th>
+                <th>{t(lang, 'col_item')}</th>
                 <th>{t(lang, 'col_ordered')}</th>
                 <th>{t(lang, 'col_shipped')}</th>
               </tr>
@@ -162,13 +162,13 @@ export default function CustomerOrderView() {
             <tbody>
               {data.items.map((it, i) => (
                 <tr key={`${it.productName}-${i}`} className={it.isShort ? 'bg-warn-soft' : ''}>
+                  <td className="tnum">{it.itemId}</td>
                   <td>
                     {it.productName}
                     {it.isShort && (
                       <span className="badge badge-warn ml-1.5">{t(lang, 'badge_short')}</span>
                     )}
                   </td>
-                  <td className="tnum">{it.itemId}</td>
                   <td className="tnum">{it.orderedQty}</td>
                   <td className="tnum">{it.shippedQty}</td>
                 </tr>
