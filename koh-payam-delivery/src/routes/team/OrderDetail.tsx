@@ -8,6 +8,7 @@ import {
 import { nextStatus, type OrderStatus } from '../../lib/status'
 import { StatusBadge } from '../../components/ui/StatusBadge'
 import { Spinner } from '../../components/ui/Spinner'
+import { formatTHB } from '../../lib/format'
 
 const STATUS_LABEL: Record<OrderStatus, string> = {
   imported: 'นำเข้าแล้ว',
@@ -108,6 +109,12 @@ export default function OrderDetail() {
           </div>
         )}
       </header>
+
+      {order.outstanding_amount != null && order.outstanding_amount > 0 && (
+        <p className="alert alert-warn">
+          เก็บเงินปลายทาง {formatTHB(order.outstanding_amount)} ({order.payment_method})
+        </p>
+      )}
 
       <p className="muted">ส่งที่: {order.sub_district || '—'}</p>
 

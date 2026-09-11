@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
 import DailyDashboard from './DailyDashboard'
@@ -14,6 +14,7 @@ vi.mock('../../lib/api/shipDays', () => ({
       boat_id: null,
       paper_box_count: 2,
       foam_box_count: 0,
+      outstanding_amount: 6172.5,
     },
     {
       id: '2',
@@ -23,6 +24,7 @@ vi.mock('../../lib/api/shipDays', () => ({
       boat_id: null,
       paper_box_count: 1,
       foam_box_count: 1,
+      outstanding_amount: null,
     },
     {
       id: '3',
@@ -32,6 +34,7 @@ vi.mock('../../lib/api/shipDays', () => ({
       boat_id: '1',
       paper_box_count: 3,
       foam_box_count: 0,
+      outstanding_amount: 0,
     },
   ]),
 }))
@@ -96,6 +99,17 @@ test('shows a pending-backorder banner linking to the destination order', async 
   renderPage()
   expect(await screen.findByText('ของค้างส่ง 1 รายการรอส่งวันนี้')).toBeInTheDocument()
   expect(screen.getByRole('link', { name: /rice x2/ })).toHaveAttribute('href', '/order/1')
+})
+
+test('shows a เก็บเงิน badge only on rows with outstanding_amount > 0', async () => {
+  renderPage()
+  await screen.findByText('BLUE VIEW')
+  const row1 = screen.getByText('PO-1').closest('tr')!
+  const row2 = screen.getByText('PO-2').closest('tr')!
+  const row3 = screen.getByText('PO-3').closest('tr')!
+  expect(within(row1).getByText('เก็บเงิน')).toBeInTheDocument()
+  expect(within(row2).queryByText('เก็บเงิน')).not.toBeInTheDocument()
+  expect(within(row3).queryByText('เก็บเงิน')).not.toBeInTheDocument()
 })
 
 test('load fails → Thai error + retry re-invokes the loader', async () => {

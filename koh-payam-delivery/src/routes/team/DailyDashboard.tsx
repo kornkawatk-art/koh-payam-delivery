@@ -157,6 +157,9 @@ export default function DailyDashboard() {
                   <td>{o.customer_name_en}</td>
                   <td>
                     <StatusBadge status={o.status} />
+                    {o.outstanding_amount > 0 && (
+                      <span className="badge badge-warn ml-1.5">เก็บเงิน</span>
+                    )}
                   </td>
                   <td className="tnum">{o.paper_box_count + o.foam_box_count}</td>
                   <td className="whitespace-nowrap">{o.boat_id ?? '—'}</td>
