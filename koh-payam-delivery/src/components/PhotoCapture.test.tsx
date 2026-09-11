@@ -151,6 +151,23 @@ test('remounts the file input after each pick (Android Chrome repeat-capture wor
   expect(second).not.toBe(first)
 })
 
+test('an empty pick (camera cancelled/backgrounded) surfaces a Thai message instead of going silent', async () => {
+  render(<PhotoCapture scope="evidence" orderId="o1" onUploaded={vi.fn()} />)
+  const el = input()
+  Object.defineProperty(el, 'files', { value: [], configurable: true })
+  fireEvent.change(el)
+
+  expect(
+    await screen.findByText('ไม่ได้รับรูปจากกล้อง/คลังภาพ กรุณาลองอีกครั้ง'),
+  ).toBeInTheDocument()
+  expect(requestUploadUrl).not.toHaveBeenCalled()
+})
+
+test('does not use capture="environment" — shows the OS camera-or-gallery chooser instead', () => {
+  render(<PhotoCapture scope="evidence" orderId="o1" onUploaded={vi.fn()} />)
+  expect(input()).not.toHaveAttribute('capture')
+})
+
 test('a hung upload (weak signal) times out, aborts, and surfaces a retryable Thai error', async () => {
   vi.useFakeTimers()
   try {

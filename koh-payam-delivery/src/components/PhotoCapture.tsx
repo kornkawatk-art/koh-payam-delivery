@@ -50,12 +50,22 @@ type Props = {
 }
 
 /**
- * Camera / file capture for a handful of photos. Per file it: compresses to a
- * JPEG blob, asks the edge function for a presigned R2 PUT URL, uploads the blob
- * straight to R2, then reports the stored key via `onUploaded`. When a finite
- * `max` is passed the input is disabled once that many keys are uploaded and the
- * count reads `n / max รูป`; when `max` is omitted the input never locks and the
- * count reads `n รูป`. Errors are shown in Thai and never lose the thumbnails
+ * Camera / file capture for a handful of photos. Deliberately NOT
+ * `capture="environment"`: that shortcut jumps straight to the camera app on
+ * most Android/iOS browsers, but its "hand the photo back to the page" step
+ * was observed silently failing on at least one real device/Chrome build —
+ * camera opens, photo can be taken, nothing ever comes back, no error. The
+ * plain file input (`accept="image/*"` only) shows the OS's standard
+ * camera-or-gallery chooser instead — one extra tap, but it goes through the
+ * same well-tested path every other app on the phone uses to receive a
+ * photo.
+ *
+ * Per file it: compresses to a JPEG blob, asks the edge function for a
+ * presigned R2 PUT URL, uploads the blob straight to R2, then reports the
+ * stored key via `onUploaded`. When a finite `max` is passed the input is
+ * disabled once that many keys are uploaded and the count reads
+ * `n / max รูป`; when `max` is omitted the input never locks and the count
+ * reads `n รูป`. Errors are shown in Thai and never lose the thumbnails
  * already captured.
  */
 export default function PhotoCapture({
@@ -94,6 +104,17 @@ export default function PhotoCapture({
     const picked = Array.from(el.files ?? [])
     el.value = ''
     setInputGen((g) => g + 1)
+
+    // Never go silent: a user who takes a photo and sees *nothing* happen
+    // (no error, no thumbnail, no count change) reasonably concludes the app
+    // is broken. If the browser handed back no file at all — camera app
+    // backgrounded/killed mid-capture, "retake" instead of "use photo", a
+    // cancelled picker — say so instead of quietly no-op'ing.
+    if (picked.length === 0) {
+      setErr('ไม่ได้รับรูปจากกล้อง/คลังภาพ กรุณาลองอีกครั้ง')
+      return
+    }
+
     const files = picked.slice(0, Math.max(0, limit - keys.length))
     if (files.length === 0) return
 
@@ -148,7 +169,6 @@ export default function PhotoCapture({
         key={inputGen}
         type="file"
         accept="image/*"
-        capture="environment"
         multiple
         disabled={atMax || busy}
         onChange={onPick}
