@@ -25,6 +25,7 @@ export default function PierLoad() {
   const [orders, setOrders] = useState<PierOrder[]>([])
   const [sel, setSel] = useState<PierOrder | null>(null)
   const [photoCount, setPhotoCount] = useState(0)
+  const [photoBusy, setPhotoBusy] = useState(false)
   const [failed, setFailed] = useState(false)
   const [msg, setMsg] = useState<string>()
 
@@ -61,6 +62,7 @@ export default function PierLoad() {
       setMsg('ส่งขึ้นเรือแล้ว')
       setSel(null)
       setPhotoCount(0)
+      setPhotoBusy(false)
       load()
     } catch (e) {
       setMsg((e as Error).message)
@@ -102,6 +104,7 @@ export default function PierLoad() {
               onClick={() => {
                 setSel(o)
                 setPhotoCount(0)
+                setPhotoBusy(false)
                 setMsg(undefined)
               }}
             >
@@ -153,6 +156,7 @@ export default function PierLoad() {
           scope="evidence"
           orderId={sel.id}
           max={3}
+          onBusyChange={setPhotoBusy}
           onUploaded={async (key) => {
             try {
               await attachEvidencePhoto(sel.id, key, { stage: 'handoff' })
@@ -167,10 +171,13 @@ export default function PierLoad() {
       <button
         className="btn btn-primary min-h-[3.25rem] w-full text-lg"
         onClick={ship}
-        disabled={!sel.boat_id || photoCount < 1}
+        disabled={!sel.boat_id || photoCount < 1 || photoBusy}
       >
         ส่งขึ้นเรือแล้ว
       </button>
+      {photoBusy && (
+        <p className="muted text-xs">กำลังอัปโหลดรูป กรุณารอสักครู่ก่อนส่งขึ้นเรือ</p>
+      )}
       {msg && <p className="muted">{msg}</p>}
     </div>
   )

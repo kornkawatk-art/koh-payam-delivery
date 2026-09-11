@@ -39,6 +39,14 @@ type Props = {
   max?: number
   /** Evidence stage tag, forwarded to the upload-url request. Default 'handoff'. */
   stage?: 'pack' | 'handoff'
+  /**
+   * Fires whenever a pick starts/finishes processing. A photo can take real
+   * time (compress + presign + PUT) on a slow connection; a parent screen
+   * should use this to hold off save/submit/navigate actions until it's
+   * false, so a user can't act on stale state and leave a photo stranded
+   * mid-upload.
+   */
+  onBusyChange?: (busy: boolean) => void
 }
 
 /**
@@ -57,11 +65,17 @@ export default function PhotoCapture({
   onUploaded,
   max,
   stage = 'handoff',
+  onBusyChange,
 }: Props) {
   const [keys, setKeys] = useState<string[]>([])
   const [thumbs, setThumbs] = useState<string[]>([])
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState('')
+
+  function updateBusy(v: boolean) {
+    setBusy(v)
+    onBusyChange?.(v)
+  }
   // Bumped after every pick to force React to remount the <input> DOM node.
   // Some mobile browsers (observed: Android Chrome) do not reliably fire a
   // second native `change` event on a *reused* file input after a camera
@@ -84,7 +98,7 @@ export default function PhotoCapture({
     if (files.length === 0) return
 
     setErr('')
-    setBusy(true)
+    updateBusy(true)
     const doneKeys: string[] = []
     const doneThumbs: string[] = []
     try {
@@ -124,7 +138,7 @@ export default function PhotoCapture({
         setKeys((k) => [...k, ...doneKeys])
         setThumbs((t) => [...t, ...doneThumbs])
       }
-      setBusy(false)
+      updateBusy(false)
     }
   }
 
@@ -143,7 +157,25 @@ export default function PhotoCapture({
       <p className="text-sm text-ink-soft">
         {capped ? `${keys.length} / ${max} รูป` : `${keys.length} รูป`}
       </p>
-      {busy && <p className="text-sm text-ink-faint">กำลังอัปโหลด…</p>}
+      {busy && (
+        <p className="flex items-center gap-1.5 text-sm font-medium text-brand-ink">
+          <svg
+            className="h-3.5 w-3.5 animate-spin"
+            viewBox="0 0 24 24"
+            fill="none"
+            aria-hidden="true"
+          >
+            <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="3" opacity="0.25" />
+            <path
+              d="M21 12a9 9 0 0 0-9-9"
+              stroke="currentColor"
+              strokeWidth="3"
+              strokeLinecap="round"
+            />
+          </svg>
+          กำลังอัปโหลดรูป กรุณารอสักครู่…
+        </p>
+      )}
       {err && <p className="text-sm text-danger-ink">{err}</p>}
       <div className="flex flex-wrap gap-2">
         {thumbs.map((src, i) => (

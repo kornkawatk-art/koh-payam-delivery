@@ -20,8 +20,18 @@ vi.mock('../../lib/api/photos', () => ({
   attachEvidencePhoto: (...a: unknown[]) => attachEvidencePhoto(...a),
 }))
 vi.mock('../../components/PhotoCapture', () => ({
-  default: ({ onUploaded }: { onUploaded: (k: string) => void }) => (
-    <button onClick={() => onUploaded('evidence/o1/key-1.jpg')}>mock-upload</button>
+  default: ({
+    onUploaded,
+    onBusyChange,
+  }: {
+    onUploaded: (k: string) => void
+    onBusyChange?: (busy: boolean) => void
+  }) => (
+    <>
+      <button onClick={() => onUploaded('evidence/o1/key-1.jpg')}>mock-upload</button>
+      <button onClick={() => onBusyChange?.(true)}>mock-photo-busy</button>
+      <button onClick={() => onBusyChange?.(false)}>mock-photo-idle</button>
+    </>
   ),
 }))
 
@@ -93,6 +103,24 @@ test('"ส่งขึ้นเรือแล้ว" is blocked until a boat is
 
   await userEvent.click(ship)
   expect(updateOrderStatus).toHaveBeenCalledWith('o1', 'shipped')
+})
+
+test('"ส่งขึ้นเรือแล้ว" is also blocked while a photo is still uploading', async () => {
+  render(<PierLoad />)
+  await userEvent.click(await screen.findByRole('button', { name: /PO-1/ }))
+  await userEvent.click(screen.getByRole('button', { name: 'เรือ 2' }))
+  await userEvent.click(screen.getByRole('button', { name: 'mock-upload' }))
+  const ship = screen.getByRole('button', { name: 'ส่งขึ้นเรือแล้ว' })
+  await waitFor(() => expect(ship).toBeEnabled())
+
+  await userEvent.click(screen.getByRole('button', { name: 'mock-photo-busy' }))
+  expect(ship).toBeDisabled()
+  expect(
+    screen.getByText('กำลังอัปโหลดรูป กรุณารอสักครู่ก่อนส่งขึ้นเรือ'),
+  ).toBeInTheDocument()
+
+  await userEvent.click(screen.getByRole('button', { name: 'mock-photo-idle' }))
+  expect(ship).toBeEnabled()
 })
 
 test('shows a Thai error state (not a permanent spinner) when loading fails', async () => {

@@ -29,6 +29,7 @@ export default function PackOrder() {
   const [paper, setPaper] = useState(0)
   const [foam, setFoam] = useState(0)
   const [packPhotoCount, setPackPhotoCount] = useState(0)
+  const [photoBusy, setPhotoBusy] = useState(false)
   const [msg, setMsg] = useState<string>()
   const [busy, setBusy] = useState(false)
   const [failed, setFailed] = useState(false)
@@ -70,6 +71,10 @@ export default function PackOrder() {
   // I: marking an order packed needs at least one "packed box" evidence photo
   // AND at least one box counted. The plain "บันทึก" save stays ungated.
   const packGateBlocked = !(packPhotoCount >= 1 && paper + foam >= 1)
+  // A photo can take real time on a weak connection; block both save actions
+  // while one is still uploading so a user can't navigate away mid-upload and
+  // think it was lost (it wasn't — it just hadn't landed yet).
+  const saveBlocked = busy || photoBusy
 
   async function fulfil(bid: string) {
     try {
@@ -166,6 +171,7 @@ export default function PackOrder() {
             scope="evidence"
             stage="pack"
             orderId={id}
+            onBusyChange={setPhotoBusy}
             onUploaded={async (key) => {
               try {
                 await attachEvidencePhoto(id!, key, { stage: 'pack' })
@@ -177,18 +183,21 @@ export default function PackOrder() {
           />
         </section>
         <div className="flex flex-wrap gap-2">
-          <button className="btn btn-secondary" onClick={() => save(false)} disabled={busy}>
+          <button className="btn btn-secondary" onClick={() => save(false)} disabled={saveBlocked}>
             บันทึก
           </button>
           <button
             className="btn btn-primary"
             onClick={() => save(true)}
-            disabled={busy || packGateBlocked}
+            disabled={saveBlocked || packGateBlocked}
           >
             บันทึก + แพ็คเสร็จ
           </button>
         </div>
-        {!busy && packGateBlocked && (
+        {photoBusy && (
+          <p className="muted text-xs">กำลังอัปโหลดรูป กรุณารอสักครู่ก่อนกดบันทึก</p>
+        )}
+        {!saveBlocked && packGateBlocked && (
           <p className="muted text-xs">
             ต้องถ่ายรูปลังที่แพ็คเสร็จอย่างน้อย 1 รูป และกรอกจำนวนลังอย่างน้อย 1 ลัง
           </p>

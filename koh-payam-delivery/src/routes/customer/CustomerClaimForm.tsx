@@ -28,6 +28,7 @@ export default function CustomerClaimForm({ token, items, lang, onDone }: Props)
   const [description, setDescription] = useState('')
   const [keys, setKeys] = useState<string[]>([])
   const [busy, setBusy] = useState(false)
+  const [photoBusy, setPhotoBusy] = useState(false)
   const [err, setErr] = useState(false)
 
   const needsItem = type !== 'box_lost'
@@ -121,13 +122,16 @@ export default function CustomerClaimForm({ token, items, lang, onDone }: Props)
           scope="claim"
           token={token}
           max={3}
+          onBusyChange={setPhotoBusy}
           onUploaded={(k) => setKeys((ks) => [...ks, k])}
         />
       </div>
 
       {err && <p className="alert alert-danger">{t(lang, 'claim_form_error')}</p>}
 
-      <button type="submit" disabled={busy} className="btn btn-primary w-full">
+      {photoBusy && <p className="muted text-xs">{t(lang, 'claim_form_photo_uploading')}</p>}
+
+      <button type="submit" disabled={busy || photoBusy} className="btn btn-primary w-full">
         {busy ? t(lang, 'claim_form_submitting') : t(lang, 'claim_form_submit')}
       </button>
     </form>

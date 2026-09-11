@@ -4,12 +4,27 @@ import CustomerClaimForm from './CustomerClaimForm'
 
 const fetchMock = vi.fn()
 
-// Stub PhotoCapture: a button that reports one uploaded key.
+// Stub PhotoCapture: a button that reports one uploaded key, plus two buttons
+// to simulate the onBusyChange callback firing while a photo is in flight.
 vi.mock('../../components/PhotoCapture', () => ({
-  default: ({ onUploaded }: { onUploaded: (k: string) => void }) => (
-    <button type="button" onClick={() => onUploaded('k1')}>
-      mock-upload
-    </button>
+  default: ({
+    onUploaded,
+    onBusyChange,
+  }: {
+    onUploaded: (k: string) => void
+    onBusyChange?: (busy: boolean) => void
+  }) => (
+    <>
+      <button type="button" onClick={() => onUploaded('k1')}>
+        mock-upload
+      </button>
+      <button type="button" onClick={() => onBusyChange?.(true)}>
+        mock-photo-busy
+      </button>
+      <button type="button" onClick={() => onBusyChange?.(false)}>
+        mock-photo-idle
+      </button>
+    </>
   ),
 }))
 
@@ -77,6 +92,19 @@ test('box_lost hides the item <select> and sends no orderItemIndex', async () =>
   const body = lastBody()
   expect(body.type).toBe('box_lost')
   expect(body.orderItemIndex == null).toBe(true)
+})
+
+test('submit is blocked while a photo is still uploading, with a hint', async () => {
+  const onDone = vi.fn()
+  render(<CustomerClaimForm token="tok_abc" items={items} lang="en" onDone={onDone} />)
+
+  await userEvent.click(screen.getByRole('button', { name: 'mock-photo-busy' }))
+  expect(screen.getByRole('button', { name: 'Submit' })).toBeDisabled()
+  expect(screen.getByText('Uploading photo, please wait…')).toBeInTheDocument()
+
+  await userEvent.click(screen.getByRole('button', { name: 'mock-photo-idle' }))
+  expect(screen.getByRole('button', { name: 'Submit' })).toBeEnabled()
+  expect(onDone).not.toHaveBeenCalled()
 })
 
 test('a failed submit surfaces a translated error and does not call onDone', async () => {

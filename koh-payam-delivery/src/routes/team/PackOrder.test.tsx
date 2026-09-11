@@ -21,8 +21,18 @@ vi.mock('../../lib/api/photos', () => ({
   attachEvidencePhoto: (...a: unknown[]) => attachEvidencePhoto(...a),
 }))
 vi.mock('../../components/PhotoCapture', () => ({
-  default: ({ onUploaded }: { onUploaded: (k: string) => void }) => (
-    <button onClick={() => onUploaded('evidence/ord1/key-1.jpg')}>mock-upload</button>
+  default: ({
+    onUploaded,
+    onBusyChange,
+  }: {
+    onUploaded: (k: string) => void
+    onBusyChange?: (busy: boolean) => void
+  }) => (
+    <>
+      <button onClick={() => onUploaded('evidence/ord1/key-1.jpg')}>mock-upload</button>
+      <button onClick={() => onBusyChange?.(true)}>mock-photo-busy</button>
+      <button onClick={() => onBusyChange?.(false)}>mock-photo-idle</button>
+    </>
   ),
 }))
 vi.mock('../../lib/api/backorders', () => ({
@@ -167,6 +177,25 @@ test('"บันทึก + แพ็คเสร็จ" saves first, then marks
   expect(savePack.mock.invocationCallOrder[0]).toBeLessThan(
     updateOrderStatus.mock.invocationCallOrder[0],
   )
+})
+
+test('blocks both save buttons while a photo is still uploading, with a Thai hint', async () => {
+  renderPage()
+  await screen.findByText('rice')
+
+  await userEvent.click(screen.getByRole('button', { name: 'mock-photo-busy' }))
+
+  expect(screen.getByRole('button', { name: 'บันทึก' })).toBeDisabled()
+  expect(screen.getByRole('button', { name: 'บันทึก + แพ็คเสร็จ' })).toBeDisabled()
+  expect(
+    screen.getByText('กำลังอัปโหลดรูป กรุณารอสักครู่ก่อนกดบันทึก'),
+  ).toBeInTheDocument()
+
+  await userEvent.click(screen.getByRole('button', { name: 'mock-photo-idle' }))
+  expect(screen.getByRole('button', { name: 'บันทึก' })).toBeEnabled()
+  expect(
+    screen.queryByText('กำลังอัปโหลดรูป กรุณารอสักครู่ก่อนกดบันทึก'),
+  ).not.toBeInTheDocument()
 })
 
 test('shows carry-over backorders and fulfils one on "ส่งแล้ว"', async () => {
