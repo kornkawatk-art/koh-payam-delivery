@@ -11,6 +11,7 @@ const payload = {
   shipDate: '2026-09-10',
   status: 'shipped',
   boatName: 'เรือ 2',
+  siblingOrders: [],
   paperBoxCount: 3,
   foamBoxCount: 1,
   items: [
@@ -103,6 +104,31 @@ test('a 404 shows a friendly not-found message, not a spinner', async () => {
     await screen.findByText('This order link was not found or has expired.'),
   ).toBeInTheDocument()
   expect(screen.queryByText('Loading…')).not.toBeInTheDocument()
+})
+
+test('shows the related-orders section with translated status and a link when there are siblings', async () => {
+  fetchMock.mockReset().mockResolvedValue(
+    ok({
+      ...payload,
+      siblingOrders: [
+        { orderNo: 'PO-1002', status: 'packed', token: 'tok_sib1' },
+        { orderNo: 'PO-1003', status: 'at_pier', token: 'tok_sib2' },
+      ],
+    }),
+  )
+  renderAt()
+  expect(await screen.findByText('You have 2 more order(s) today')).toBeInTheDocument()
+  expect(screen.getByText('PO-1002 · Packed')).toBeInTheDocument()
+  expect(screen.getByText('PO-1003 · At the pier')).toBeInTheDocument()
+  const links = screen.getAllByRole('link', { name: 'View' })
+  expect(links[0]).toHaveAttribute('href', '/o/tok_sib1')
+  expect(links[1]).toHaveAttribute('href', '/o/tok_sib2')
+})
+
+test('hides the related-orders section when there are no siblings', async () => {
+  renderAt()
+  await screen.findByText(/PO-1001/)
+  expect(screen.queryByText(/more order\(s\) today/)).not.toBeInTheDocument()
 })
 
 test('opens the claim form stub when report-a-problem is clicked', async () => {
