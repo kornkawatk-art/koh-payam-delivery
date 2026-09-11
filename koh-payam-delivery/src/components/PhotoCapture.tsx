@@ -50,20 +50,16 @@ type Props = {
 }
 
 /**
- * Camera / file capture for a handful of photos. Renders TWO file inputs on
- * purpose, not one:
- *   - "ถ่ายรูป" (`capture="environment"`) jumps straight to the camera —
- *     fast, the normal path.
- *   - "เลือกจากคลังภาพ" (no `capture`) opens the OS's plain picker — no
- *     camera shortcut on some Android versions/skins (their photo picker is
- *     gallery-only), but it's the fallback if the camera-capture handoff
- *     ever fails to return a file on a given device (observed: real device,
- *     `capture="environment"` alone — camera opens, photo taken, nothing
- *     ever comes back to the page, no error).
- * A single `capture`-only input was tried and dropped: on the device where
- * the handoff failed, dropping `capture` entirely traded that bug for a
- * worse one (no way to take a *new* photo at all, gallery-only). Two inputs
- * keep the fast path and guarantee a working path.
+ * File capture for a handful of photos. Deliberately NOT
+ * `capture="environment"` (direct camera launch) — confirmed, on a real
+ * device, to silently never hand the photo back to the page: camera opens,
+ * a photo can be taken, and nothing happens after, with no error, on every
+ * attempt. A two-input version (direct camera + this plain picker as a
+ * fallback) was tried and the direct-camera one still failed the same way —
+ * the bug is in the browser/OS's capture→page handoff itself, not anything
+ * fixable here. The workflow is now: take the photo with the phone's own
+ * camera app first, then use this picker to attach it — the plain OS file
+ * chooser, the one path confirmed to work end-to-end.
  *
  * Per file it: compresses to a JPEG blob, asks the edge function for a
  * presigned R2 PUT URL, uploads the blob straight to R2, then reports the
@@ -91,12 +87,11 @@ export default function PhotoCapture({
     setBusy(v)
     onBusyChange?.(v)
   }
-  // Bumped after every pick to force React to remount both <input> DOM
-  // nodes. Some mobile browsers (observed: Android Chrome) do not reliably
-  // fire a second native `change` event on a *reused* file input after a
-  // camera capture. Resetting `.value` alone does not fix it; fresh input
-  // elements (new `key`) do, and it costs nothing since neither input
-  // carries state of its own.
+  // Bumped after every pick to force React to remount the <input> DOM node.
+  // Belt-and-suspenders alongside dropping capture="environment": resetting
+  // `.value` alone was not enough to make some mobile browsers fire a
+  // second native `change` event on a *reused* file input. A fresh input
+  // element (new `key`) costs nothing since it carries no state of its own.
   const [inputGen, setInputGen] = useState(0)
 
   const capped = typeof max === 'number' && Number.isFinite(max)
@@ -109,13 +104,12 @@ export default function PhotoCapture({
     el.value = ''
     setInputGen((g) => g + 1)
 
-    // Never go silent: a user who takes a photo and sees *nothing* happen
+    // Never go silent: a user who picks a photo and sees *nothing* happen
     // (no error, no thumbnail, no count change) reasonably concludes the app
-    // is broken. If the browser handed back no file at all — camera app
-    // backgrounded/killed mid-capture, "retake" instead of "use photo", a
-    // cancelled picker — say so instead of quietly no-op'ing.
+    // is broken. If the browser handed back no file at all — a cancelled
+    // picker — say so instead of quietly no-op'ing.
     if (picked.length === 0) {
-      setErr('ไม่ได้รับรูปจากกล้อง/คลังภาพ กรุณาลองอีกครั้ง')
+      setErr('ไม่ได้เลือกรูป กรุณาลองอีกครั้ง')
       return
     }
 
@@ -169,33 +163,18 @@ export default function PhotoCapture({
 
   return (
     <div className="flex flex-col gap-2">
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-start">
-        <label className="field flex-1">
-          <span className="text-xs font-medium text-ink-soft">ถ่ายรูป</span>
-          <input
-            key={`camera-${inputGen}`}
-            type="file"
-            accept="image/*"
-            capture="environment"
-            multiple
-            disabled={atMax || busy}
-            onChange={onPick}
-            aria-label="ถ่ายรูป"
-          />
-        </label>
-        <label className="field flex-1">
-          <span className="text-xs font-medium text-ink-soft">หรือเลือกจากคลังภาพ</span>
-          <input
-            key={`gallery-${inputGen}`}
-            type="file"
-            accept="image/*"
-            multiple
-            disabled={atMax || busy}
-            onChange={onPick}
-            aria-label="เลือกรูปจากคลังภาพ"
-          />
-        </label>
-      </div>
+      <p className="text-xs text-ink-faint">
+        ถ่ายรูปด้วยกล้องมือถือก่อน แล้วกดปุ่มด้านล่างเพื่อแนบรูปที่ถ่ายไว้
+      </p>
+      <input
+        key={inputGen}
+        type="file"
+        accept="image/*"
+        multiple
+        disabled={atMax || busy}
+        onChange={onPick}
+        aria-label="แนบรูป"
+      />
       <p className="text-sm text-ink-soft">
         {capped ? `${keys.length} / ${max} รูป` : `${keys.length} รูป`}
       </p>
