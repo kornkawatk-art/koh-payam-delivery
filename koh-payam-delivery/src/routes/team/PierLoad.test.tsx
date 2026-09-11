@@ -44,6 +44,7 @@ const orders = [
     boat_id: null,
     paper_box_count: 2,
     foam_box_count: 1,
+    piece_count: 0,
     outstanding_amount: null,
     payment_method: null,
   },
@@ -55,6 +56,7 @@ const orders = [
     boat_id: null,
     paper_box_count: 0,
     foam_box_count: 0,
+    piece_count: 0,
     outstanding_amount: null,
     payment_method: null,
   },
@@ -78,6 +80,14 @@ test('lists only packed / at_pier orders for the day', async () => {
   render(<PierLoad />)
   expect(await screen.findByRole('button', { name: /PO-1/ })).toBeInTheDocument()
   expect(screen.queryByRole('button', { name: /PO-2/ })).not.toBeInTheDocument()
+})
+
+test('the order-list badge sums paper + foam + piece counts as "รวม"', async () => {
+  listOrdersForDay.mockReset().mockResolvedValue([
+    { ...orders[0], paper_box_count: 2, foam_box_count: 1, piece_count: 4 },
+  ])
+  render(<PierLoad />)
+  expect(await screen.findByText('7 รวม')).toBeInTheDocument()
 })
 
 test('selects an order then picks เรือ 2 -> calls setOrderBoat(orderId, "2")', async () => {

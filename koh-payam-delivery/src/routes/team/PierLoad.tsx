@@ -15,6 +15,7 @@ type PierOrder = {
   boat_id: string | null
   paper_box_count: number
   foam_box_count: number
+  piece_count: number
   outstanding_amount: number | null
   payment_method: string | null
 }
@@ -114,7 +115,7 @@ export default function PierLoad() {
                 {o.makro_order_no} · {o.customer_name_en}
               </span>
               <span className="badge badge-neutral">
-                {o.paper_box_count + o.foam_box_count} ลัง
+                {o.paper_box_count + o.foam_box_count + o.piece_count} รวม
               </span>
             </button>
           ))}

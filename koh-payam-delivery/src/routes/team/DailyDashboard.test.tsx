@@ -14,6 +14,7 @@ vi.mock('../../lib/api/shipDays', () => ({
       boat_id: null,
       paper_box_count: 2,
       foam_box_count: 0,
+      piece_count: 0,
       outstanding_amount: 6172.5,
     },
     {
@@ -24,6 +25,7 @@ vi.mock('../../lib/api/shipDays', () => ({
       boat_id: null,
       paper_box_count: 1,
       foam_box_count: 1,
+      piece_count: 0,
       outstanding_amount: null,
     },
     {
@@ -34,6 +36,7 @@ vi.mock('../../lib/api/shipDays', () => ({
       boat_id: '1',
       paper_box_count: 3,
       foam_box_count: 0,
+      piece_count: 0,
       outstanding_amount: 0,
     },
   ]),
@@ -101,6 +104,27 @@ test('shows a pending-backorder banner linking to the destination order', async 
   expect(screen.getByRole('link', { name: /rice x2/ })).toHaveAttribute('href', '/order/1')
 })
 
+test('the "รวม" column sums paper + foam + piece counts', async () => {
+  vi.mocked(listOrdersForDay).mockResolvedValueOnce([
+    {
+      id: '1',
+      makro_order_no: 'PO-1',
+      customer_name_en: 'BLUE VIEW',
+      status: 'packed',
+      boat_id: null,
+      paper_box_count: 2,
+      foam_box_count: 1,
+      piece_count: 4,
+      outstanding_amount: 0,
+    },
+  ])
+  renderPage()
+  await screen.findByText('BLUE VIEW')
+  expect(screen.getByRole('columnheader', { name: 'รวม' })).toBeInTheDocument()
+  const row1 = screen.getByText('PO-1').closest('tr')!
+  expect(within(row1).getByText('7')).toBeInTheDocument()
+})
+
 test('shows a เก็บเงิน badge only on rows with outstanding_amount > 0', async () => {
   renderPage()
   await screen.findByText('BLUE VIEW')
@@ -122,6 +146,7 @@ test('shows a หลาย PO badge only on rows sharing a customer_phone with a
       boat_id: null,
       paper_box_count: 2,
       foam_box_count: 0,
+      piece_count: 0,
       outstanding_amount: 0,
       customer_phone: '0826289533',
     },
@@ -133,6 +158,7 @@ test('shows a หลาย PO badge only on rows sharing a customer_phone with a
       boat_id: null,
       paper_box_count: 1,
       foam_box_count: 1,
+      piece_count: 0,
       outstanding_amount: 0,
       customer_phone: '0826289533',
     },
@@ -144,6 +170,7 @@ test('shows a หลาย PO badge only on rows sharing a customer_phone with a
       boat_id: '1',
       paper_box_count: 3,
       foam_box_count: 0,
+      piece_count: 0,
       outstanding_amount: 0,
       customer_phone: null,
     },
