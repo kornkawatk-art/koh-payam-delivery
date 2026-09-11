@@ -23,6 +23,7 @@ export type OrderMapping = {
   paymentMethod: string
   paymentStatus: string
   outstandingAmount: string
+  customerPhone: string
 }
 
 export const DEFAULT_DETAIL_MAPPING: DetailMapping = {
@@ -46,6 +47,7 @@ export const DEFAULT_ORDER_MAPPING: OrderMapping = {
   paymentMethod: 'Payment Method',
   paymentStatus: 'Payment Status',
   outstandingAmount: 'Outstanding Amount',
+  customerPhone: 'Customer Phone',
 }
 
 export const FIELD_LABELS_DETAIL: Record<keyof DetailMapping, string> = {
@@ -69,6 +71,7 @@ export const FIELD_LABELS_ORDER: Record<keyof OrderMapping, string> = {
   paymentMethod: 'วิธีชำระเงิน',
   paymentStatus: 'สถานะการชำระเงิน',
   outstandingAmount: 'ยอดค้างชำระ',
+  customerPhone: 'เบอร์โทรลูกค้า',
 }
 
 // คอลัมน์ที่ต้องมีเสมอ (ที่เหลือมี fallback ในโค้ด จึงไม่บังคับ)
@@ -87,7 +90,12 @@ const ORDER_REQUIRED: (keyof OrderMapping)[] = [
 ]
 // คอลัมน์ "soft-optional": มีในไฟล์จริง (Makro OrderExport) แต่ไม่บังคับต้องมี —
 // ห้ามบล็อกการนำเข้าไม่ว่าจะเว้นว่างหรือแมปไปยังคอลัมน์ที่ไม่พบในไฟล์
-const ORDER_SOFT: (keyof OrderMapping)[] = ['paymentMethod', 'paymentStatus', 'outstandingAmount']
+const ORDER_SOFT: (keyof OrderMapping)[] = [
+  'paymentMethod',
+  'paymentStatus',
+  'outstandingAmount',
+  'customerPhone',
+]
 
 // --- Parsed shapes ------------------------------------------------------------
 
@@ -112,6 +120,7 @@ export type ParsedOrder = {
   paymentMethod: string | null
   paymentStatus: string | null
   outstandingAmount: number
+  customerPhone: string | null
   items: ParsedItem[]
 }
 
@@ -209,6 +218,7 @@ export function buildImport(
     const makroOrderStatus = om.orderStatus ? (r[om.orderStatus] ?? '').trim() : ''
     const paymentMethod = om.paymentMethod ? (r[om.paymentMethod] ?? '').trim() : ''
     const paymentStatus = om.paymentStatus ? (r[om.paymentStatus] ?? '').trim() : ''
+    const customerPhone = om.customerPhone ? (r[om.customerPhone] ?? '').trim() : ''
     payamOrders.set(orderNo, {
       makroOrderNo: orderNo,
       customerName: (r[om.customer] ?? '').trim(),
@@ -219,6 +229,7 @@ export function buildImport(
       paymentMethod: paymentMethod || null,
       paymentStatus: paymentStatus || null,
       outstandingAmount: om.outstandingAmount ? toNum(r[om.outstandingAmount]) : 0,
+      customerPhone: customerPhone || null,
       items: [],
     })
   }
