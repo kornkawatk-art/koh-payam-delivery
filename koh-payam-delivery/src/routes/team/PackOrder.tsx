@@ -29,6 +29,7 @@ export default function PackOrder() {
   const [backorders, setBackorders] = useState<BackorderRow[]>([])
   const [paper, setPaper] = useState(0)
   const [foam, setFoam] = useState(0)
+  const [piece, setPiece] = useState(0)
   const [packPhotoCount, setPackPhotoCount] = useState(0)
   const [photoBusy, setPhotoBusy] = useState(false)
   const [msg, setMsg] = useState<string>()
@@ -42,6 +43,7 @@ export default function PackOrder() {
         setItems(o.order_items.map((it: any) => ({ ...it })))
         setPaper(o.paper_box_count)
         setFoam(o.foam_box_count)
+        setPiece(o.piece_count)
         setPackPhotoCount(
           (o.evidence_photos ?? []).filter((p: any) => p.stage === 'pack').length,
         )
@@ -59,7 +61,7 @@ export default function PackOrder() {
     setBusy(true)
     setMsg(undefined)
     try {
-      await savePack({ orderId: id!, paperCount: paper, foamCount: foam })
+      await savePack({ orderId: id!, paperCount: paper, foamCount: foam, pieceCount: piece })
       if (markPacked) await updateOrderStatus(id!, 'packed')
       setMsg(markPacked ? 'บันทึกและทำเครื่องหมายแพ็คเสร็จแล้ว' : 'บันทึกแล้ว')
     } catch (e) {
@@ -155,6 +157,7 @@ export default function PackOrder() {
               className="w-24"
               value={paper}
               onChange={(e) => setPaper(+e.target.value)}
+              onFocus={(e) => e.target.select()}
             />
           </label>
           <label className="field">
@@ -165,9 +168,24 @@ export default function PackOrder() {
               className="w-24"
               value={foam}
               onChange={(e) => setFoam(+e.target.value)}
+              onFocus={(e) => e.target.select()}
+            />
+          </label>
+          <label className="field">
+            <span className="field-label">จำนวนชิ้น</span>
+            <input
+              type="number"
+              min={0}
+              className="w-24"
+              value={piece}
+              onChange={(e) => setPiece(+e.target.value)}
+              onFocus={(e) => e.target.select()}
             />
           </label>
         </div>
+        <p className="muted">
+          ลังกระดาษ {paper} · ลังโฟม {foam} · ชิ้น {piece} · รวม {paper + foam + piece}
+        </p>
         <section className="flex flex-col gap-2 border-t border-line pt-4">
           <p className="section-title">รูปหลักฐานตอนแพ็ค</p>
           <PhotoCapture

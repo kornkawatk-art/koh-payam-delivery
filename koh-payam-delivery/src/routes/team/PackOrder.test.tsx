@@ -46,6 +46,7 @@ const order = {
   customer_name_en: 'BLUE VIEW',
   paper_box_count: 0,
   foam_box_count: 0,
+  piece_count: 0,
   order_items: [
     {
       id: 'i1',
@@ -112,8 +113,65 @@ test('"บันทึก" records the box count via savePack', async () => {
   await userEvent.click(screen.getByRole('button', { name: 'บันทึก' }))
 
   expect(savePack).toHaveBeenCalledTimes(1)
-  expect(savePack.mock.calls[0][0]).toEqual({ orderId: 'ord1', paperCount: 3, foamCount: 0 })
+  expect(savePack.mock.calls[0][0]).toEqual({
+    orderId: 'ord1',
+    paperCount: 3,
+    foamCount: 0,
+    pieceCount: 0,
+  })
   expect(updateOrderStatus).not.toHaveBeenCalled()
+})
+
+test('typing into all three count fields passes the right pieceCount to savePack', async () => {
+  renderPage()
+  await screen.findByText('rice')
+  const paper = screen.getByLabelText(/ลังกระดาษ/)
+  const foam = screen.getByLabelText(/ลังโฟม/)
+  const piece = screen.getByLabelText(/จำนวนชิ้น/)
+  await userEvent.clear(paper)
+  await userEvent.type(paper, '2')
+  await userEvent.clear(foam)
+  await userEvent.type(foam, '1')
+  await userEvent.clear(piece)
+  await userEvent.type(piece, '5')
+  await userEvent.click(screen.getByRole('button', { name: 'บันทึก' }))
+
+  expect(savePack).toHaveBeenCalledTimes(1)
+  expect(savePack.mock.calls[0][0]).toEqual({
+    orderId: 'ord1',
+    paperCount: 2,
+    foamCount: 1,
+    pieceCount: 5,
+  })
+
+  // the read-only total line reflects all three
+  expect(
+    screen.getByText('ลังกระดาษ 2 · ลังโฟม 1 · ชิ้น 5 · รวม 8'),
+  ).toBeInTheDocument()
+})
+
+test('focusing any of the three count fields selects its current value', async () => {
+  // jsdom does not expose selectionStart/selectionEnd for type="number"
+  // inputs (matches real-browser behaviour, where .select() cannot be
+  // verified via selection range either) — so the reliable way to assert
+  // "focus selects the value" here is to spy on HTMLInputElement.select()
+  // itself and confirm the onFocus handler invokes it.
+  const selectSpy = vi.spyOn(HTMLInputElement.prototype, 'select')
+  renderPage()
+  await screen.findByText('rice')
+
+  const paper = screen.getByLabelText(/ลังกระดาษ/)
+  const foam = screen.getByLabelText(/ลังโฟม/)
+  const piece = screen.getByLabelText(/จำนวนชิ้น/)
+
+  await userEvent.click(paper)
+  expect(selectSpy).toHaveBeenCalledTimes(1)
+  await userEvent.click(foam)
+  expect(selectSpy).toHaveBeenCalledTimes(2)
+  await userEvent.click(piece)
+  expect(selectSpy).toHaveBeenCalledTimes(3)
+
+  selectSpy.mockRestore()
 })
 
 const satisfyPackGate = async () => {
