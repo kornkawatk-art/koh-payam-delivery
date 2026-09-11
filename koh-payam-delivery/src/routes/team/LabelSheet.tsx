@@ -23,6 +23,7 @@ export default function LabelSheet() {
 
   const paper = order.paper_box_count ?? 0
   const foam = order.foam_box_count ?? 0
+  const piece = order.piece_count ?? 0
 
   return (
     <div className="flex flex-col gap-4">
@@ -64,6 +65,23 @@ export default function LabelSheet() {
                 <span>—</span>
               ) : (
                 seqLines(foam).map((s) => (
+                  <span
+                    key={s}
+                    className="rounded-md border border-line px-2 py-0.5 tnum"
+                  >
+                    {s}
+                  </span>
+                ))
+              )}
+            </div>
+          </div>
+          <div>
+            <p className="font-semibold">เขียนหน้าลัง · ชิ้น ({piece})</p>
+            <div className="mt-1.5 flex flex-wrap gap-2">
+              {piece === 0 ? (
+                <span>—</span>
+              ) : (
+                seqLines(piece).map((s) => (
                   <span
                     key={s}
                     className="rounded-md border border-line px-2 py-0.5 tnum"
