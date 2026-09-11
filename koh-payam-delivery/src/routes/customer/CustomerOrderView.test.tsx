@@ -14,8 +14,8 @@ const payload = {
   paperBoxCount: 3,
   foamBoxCount: 1,
   items: [
-    { productName: 'Rice 5kg', orderedQty: 10, shippedQty: 10, isShort: false },
-    { productName: 'Fish sauce', orderedQty: 4, shippedQty: 2, isShort: true },
+    { productName: 'Rice 5kg', itemId: '100001', orderedQty: 10, shippedQty: 10, isShort: false },
+    { productName: 'Fish sauce', itemId: '100002', orderedQty: 4, shippedQty: 2, isShort: true },
   ],
   shortages: [{ productName: 'Fish sauce', orderedQty: 4, shippedQty: 2 }],
   evidencePhotos: ['https://pub.example/evidence/a.jpg'],
@@ -67,6 +67,13 @@ test('renders the shortage line and the report-a-problem button', async () => {
   renderAt()
   expect(await screen.findByText(/shipped 2 of 4/)).toBeInTheDocument()
   expect(screen.getByRole('button', { name: 'Report a problem' })).toBeInTheDocument()
+})
+
+test('shows the makro item code per line item', async () => {
+  renderAt()
+  await screen.findByText('Rice 5kg')
+  expect(screen.getByText('100001')).toBeInTheDocument()
+  expect(screen.getByText('100002')).toBeInTheDocument()
 })
 
 test('language toggle switches the header text to Thai and persists', async () => {

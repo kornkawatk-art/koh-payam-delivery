@@ -15,6 +15,7 @@ import { PageHeader } from '../../components/ui/PageHeader'
 type ItemState = {
   id: string
   product_name: string
+  makro_item_id: string | null
   qty_ordered: number
   qty_shipped: number
   item_remark: string | null
@@ -117,6 +118,7 @@ export default function PackOrder() {
             <thead>
               <tr>
                 <th>สินค้า</th>
+                <th>รหัสสินค้า</th>
                 <th>สั่ง</th>
                 <th>ส่งจริง</th>
                 <th>สถานะ</th>
@@ -127,6 +129,7 @@ export default function PackOrder() {
               {items.map((it) => (
                 <tr key={it.id}>
                   <td>{it.product_name}</td>
+                  <td className="tnum">{it.makro_item_id}</td>
                   <td className="tnum">{it.qty_ordered}</td>
                   <td className="tnum">{it.qty_shipped}</td>
                   <td>

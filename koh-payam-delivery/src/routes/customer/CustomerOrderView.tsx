@@ -8,7 +8,13 @@ import { formatDate, formatDateTime, formatTHB } from '../../lib/format'
 const FN = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/order-view`
 const ANON = import.meta.env.VITE_SUPABASE_ANON_KEY as string
 
-type Item = { productName: string; orderedQty: number; shippedQty: number; isShort: boolean }
+type Item = {
+  productName: string
+  itemId: string | null
+  orderedQty: number
+  shippedQty: number
+  isShort: boolean
+}
 type Claim = {
   id: string
   type: string
@@ -148,6 +154,7 @@ export default function CustomerOrderView() {
             <thead>
               <tr>
                 <th>{t(lang, 'col_item')}</th>
+                <th>{t(lang, 'col_item_id')}</th>
                 <th>{t(lang, 'col_ordered')}</th>
                 <th>{t(lang, 'col_shipped')}</th>
               </tr>
@@ -161,6 +168,7 @@ export default function CustomerOrderView() {
                       <span className="badge badge-warn ml-1.5">{t(lang, 'badge_short')}</span>
                     )}
                   </td>
+                  <td className="tnum">{it.itemId}</td>
                   <td className="tnum">{it.orderedQty}</td>
                   <td className="tnum">{it.shippedQty}</td>
                 </tr>

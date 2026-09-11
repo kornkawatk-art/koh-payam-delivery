@@ -54,7 +54,7 @@ Deno.serve(async (req) => {
   const { data: o, error } = await admin
     .from('orders')
     .select(
-      '*, order_items(product_name,qty_ordered,qty_shipped,shortage_qty,status,line_no), evidence_photos(r2_key,taken_at), claims(id,type,qty,description,status,resolution,created_at,refund_amount), ship_days(boats)',
+      '*, order_items(product_name,makro_item_id,qty_ordered,qty_shipped,shortage_qty,status,line_no), evidence_photos(r2_key,taken_at), claims(id,type,qty,description,status,resolution,created_at,refund_amount), ship_days(boats)',
     )
     .eq('link_token', token)
     .single()
@@ -95,6 +95,7 @@ Deno.serve(async (req) => {
     outstandingAmount: o.outstanding_amount > 0 ? Number(o.outstanding_amount) : null,
     items: items.map((i) => ({
       productName: i.product_name,
+      itemId: i.makro_item_id ?? null,
       orderedQty: Number(i.qty_ordered),
       shippedQty: Number(i.qty_shipped),
       isShort: i.status === 'short',

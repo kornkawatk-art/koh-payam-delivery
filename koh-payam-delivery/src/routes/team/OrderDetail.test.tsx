@@ -29,6 +29,7 @@ const order = {
     {
       id: 'i1',
       product_name: 'rice',
+      makro_item_id: '100001',
       qty_ordered: 2,
       qty_shipped: 2,
       status: 'ok',
@@ -66,6 +67,12 @@ test('shows the customer link and copies it to the clipboard', async () => {
   expect(await screen.findByText(link)).toBeInTheDocument()
   await userEvent.click(screen.getByRole('button', { name: 'คัดลอก' }))
   expect(navigator.clipboard.writeText).toHaveBeenCalledWith(link)
+})
+
+test('shows the makro item code per line item', async () => {
+  renderPage()
+  expect(await screen.findByText('rice')).toBeInTheDocument()
+  expect(screen.getByText('100001')).toBeInTheDocument()
 })
 
 test('"สร้างลิงก์ใหม่" regenerates the token then refetches', async () => {

@@ -150,6 +150,7 @@ export default function OrderDetail() {
             <thead>
               <tr>
                 <th>สินค้า</th>
+                <th>รหัสสินค้า</th>
                 <th>สั่ง</th>
                 <th>ส่งจริง</th>
                 <th />
@@ -160,6 +161,7 @@ export default function OrderDetail() {
               {items.map((it) => (
                 <tr key={it.id}>
                   <td>{it.product_name}</td>
+                  <td className="tnum">{it.makro_item_id}</td>
                   <td className="tnum">{it.qty_ordered}</td>
                   <td className="tnum">{it.qty_shipped}</td>
                   <td>

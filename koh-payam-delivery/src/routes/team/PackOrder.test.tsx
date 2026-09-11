@@ -50,6 +50,7 @@ const order = {
     {
       id: 'i1',
       product_name: 'rice',
+      makro_item_id: '100001',
       qty_ordered: 2,
       qty_shipped: 1.5,
       item_remark: 'แยกถุง',
@@ -95,6 +96,8 @@ test('renders the makro items read-only (ordered / shipped / short badge / remar
   // short line carries the "ขาด" badge, ok line does not
   expect(screen.getByText('ขาด')).toBeInTheDocument()
   expect(screen.getByText('แยกถุง')).toBeInTheDocument()
+  // makro item code shown per line
+  expect(screen.getByText('100001')).toBeInTheDocument()
   // no per-item editing controls
   expect(screen.queryByRole('checkbox')).not.toBeInTheDocument()
   expect(screen.queryByLabelText(/ของขาด/)).not.toBeInTheDocument()
