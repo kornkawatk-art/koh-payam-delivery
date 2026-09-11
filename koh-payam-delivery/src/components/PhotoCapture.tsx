@@ -50,15 +50,20 @@ type Props = {
 }
 
 /**
- * Camera / file capture for a handful of photos. Deliberately NOT
- * `capture="environment"`: that shortcut jumps straight to the camera app on
- * most Android/iOS browsers, but its "hand the photo back to the page" step
- * was observed silently failing on at least one real device/Chrome build —
- * camera opens, photo can be taken, nothing ever comes back, no error. The
- * plain file input (`accept="image/*"` only) shows the OS's standard
- * camera-or-gallery chooser instead — one extra tap, but it goes through the
- * same well-tested path every other app on the phone uses to receive a
- * photo.
+ * Camera / file capture for a handful of photos. Renders TWO file inputs on
+ * purpose, not one:
+ *   - "ถ่ายรูป" (`capture="environment"`) jumps straight to the camera —
+ *     fast, the normal path.
+ *   - "เลือกจากคลังภาพ" (no `capture`) opens the OS's plain picker — no
+ *     camera shortcut on some Android versions/skins (their photo picker is
+ *     gallery-only), but it's the fallback if the camera-capture handoff
+ *     ever fails to return a file on a given device (observed: real device,
+ *     `capture="environment"` alone — camera opens, photo taken, nothing
+ *     ever comes back to the page, no error).
+ * A single `capture`-only input was tried and dropped: on the device where
+ * the handoff failed, dropping `capture` entirely traded that bug for a
+ * worse one (no way to take a *new* photo at all, gallery-only). Two inputs
+ * keep the fast path and guarantee a working path.
  *
  * Per file it: compresses to a JPEG blob, asks the edge function for a
  * presigned R2 PUT URL, uploads the blob straight to R2, then reports the
@@ -86,13 +91,12 @@ export default function PhotoCapture({
     setBusy(v)
     onBusyChange?.(v)
   }
-  // Bumped after every pick to force React to remount the <input> DOM node.
-  // Some mobile browsers (observed: Android Chrome) do not reliably fire a
-  // second native `change` event on a *reused* file input after a camera
-  // capture — the camera opens and a photo can be taken, but nothing comes
-  // back. Resetting `.value` alone does not fix it; a fresh input element
-  // (new `key`) does, and it costs nothing since the input carries no state
-  // of its own.
+  // Bumped after every pick to force React to remount both <input> DOM
+  // nodes. Some mobile browsers (observed: Android Chrome) do not reliably
+  // fire a second native `change` event on a *reused* file input after a
+  // camera capture. Resetting `.value` alone does not fix it; fresh input
+  // elements (new `key`) do, and it costs nothing since neither input
+  // carries state of its own.
   const [inputGen, setInputGen] = useState(0)
 
   const capped = typeof max === 'number' && Number.isFinite(max)
@@ -165,15 +169,33 @@ export default function PhotoCapture({
 
   return (
     <div className="flex flex-col gap-2">
-      <input
-        key={inputGen}
-        type="file"
-        accept="image/*"
-        multiple
-        disabled={atMax || busy}
-        onChange={onPick}
-        aria-label="ถ่ายรูป / เลือกรูป"
-      />
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-start">
+        <label className="field flex-1">
+          <span className="text-xs font-medium text-ink-soft">ถ่ายรูป</span>
+          <input
+            key={`camera-${inputGen}`}
+            type="file"
+            accept="image/*"
+            capture="environment"
+            multiple
+            disabled={atMax || busy}
+            onChange={onPick}
+            aria-label="ถ่ายรูป"
+          />
+        </label>
+        <label className="field flex-1">
+          <span className="text-xs font-medium text-ink-soft">หรือเลือกจากคลังภาพ</span>
+          <input
+            key={`gallery-${inputGen}`}
+            type="file"
+            accept="image/*"
+            multiple
+            disabled={atMax || busy}
+            onChange={onPick}
+            aria-label="เลือกรูปจากคลังภาพ"
+          />
+        </label>
+      </div>
       <p className="text-sm text-ink-soft">
         {capped ? `${keys.length} / ${max} รูป` : `${keys.length} รูป`}
       </p>

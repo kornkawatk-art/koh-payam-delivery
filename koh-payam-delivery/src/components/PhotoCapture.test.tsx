@@ -40,7 +40,8 @@ afterEach(() => {
   vi.unstubAllGlobals()
 })
 
-const input = () => screen.getByLabelText('ถ่ายรูป / เลือกรูป') as HTMLInputElement
+const input = () => screen.getByLabelText('ถ่ายรูป') as HTMLInputElement
+const galleryInput = () => screen.getByLabelText('เลือกรูปจากคลังภาพ') as HTMLInputElement
 
 test('evidence: compresses, requests a URL, PUTs the blob to R2, and reports the key', async () => {
   const onUploaded = vi.fn()
@@ -114,12 +115,22 @@ test('renders one thumbnail per uploaded photo', async () => {
   await waitFor(() => expect(screen.getAllByRole('img')).toHaveLength(1))
 })
 
-test('disables the input once max is reached', async () => {
+test('disables both inputs once max is reached', async () => {
   render(<PhotoCapture scope="evidence" orderId="o1" onUploaded={vi.fn()} max={1} />)
   expect(input()).not.toBeDisabled()
+  expect(galleryInput()).not.toBeDisabled()
   await userEvent.upload(input(), pickFile())
   await waitFor(() => expect(input()).toBeDisabled())
+  expect(galleryInput()).toBeDisabled()
   expect(screen.getByText('1 / 1 รูป')).toBeInTheDocument()
+})
+
+test('the gallery fallback input uploads through the same pipeline', async () => {
+  const onUploaded = vi.fn()
+  render(<PhotoCapture scope="evidence" orderId="o1" onUploaded={onUploaded} />)
+  await userEvent.upload(galleryInput(), pickFile())
+  await waitFor(() => expect(onUploaded).toHaveBeenCalledWith('evidence/o1/key-1.jpg'))
+  expect(screen.getByText('1 รูป')).toBeInTheDocument()
 })
 
 test('a multi-file selection only consumes the remaining slots', async () => {
@@ -139,16 +150,17 @@ test('a failed R2 PUT surfaces a Thai error and does not report a key', async ()
   expect(onUploaded).not.toHaveBeenCalled()
 })
 
-test('remounts the file input after each pick (Android Chrome repeat-capture workaround)', async () => {
+test('remounts both file inputs after each pick (Android Chrome repeat-capture workaround)', async () => {
   // Some mobile browsers don't reliably fire a second native `change` event on
-  // a *reused* file input after a camera capture. We force a fresh DOM node
+  // a *reused* file input after a camera capture. We force fresh DOM nodes
   // (new `key`) after every pick instead of relying on `.value = ''` alone.
   render(<PhotoCapture scope="evidence" orderId="o1" onUploaded={vi.fn()} />)
-  const first = input()
-  await userEvent.upload(first, pickFile())
+  const firstCamera = input()
+  const firstGallery = galleryInput()
+  await userEvent.upload(firstCamera, pickFile())
   await waitFor(() => expect(screen.getByText('1 รูป')).toBeInTheDocument())
-  const second = input()
-  expect(second).not.toBe(first)
+  expect(input()).not.toBe(firstCamera)
+  expect(galleryInput()).not.toBe(firstGallery)
 })
 
 test('an empty pick (camera cancelled/backgrounded) surfaces a Thai message instead of going silent', async () => {
@@ -163,9 +175,10 @@ test('an empty pick (camera cancelled/backgrounded) surfaces a Thai message inst
   expect(requestUploadUrl).not.toHaveBeenCalled()
 })
 
-test('does not use capture="environment" — shows the OS camera-or-gallery chooser instead', () => {
+test('the camera input jumps straight to the camera; the gallery one does not', () => {
   render(<PhotoCapture scope="evidence" orderId="o1" onUploaded={vi.fn()} />)
-  expect(input()).not.toHaveAttribute('capture')
+  expect(input()).toHaveAttribute('capture', 'environment')
+  expect(galleryInput()).not.toHaveAttribute('capture')
 })
 
 test('a hung upload (weak signal) times out, aborts, and surfaces a retryable Thai error', async () => {
