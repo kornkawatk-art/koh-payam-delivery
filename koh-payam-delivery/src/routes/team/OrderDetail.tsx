@@ -117,6 +117,11 @@ export default function OrderDetail() {
       )}
 
       <p className="muted">ส่งที่: {order.sub_district || '—'}</p>
+      <p className="muted">
+        ลังกระดาษ {order.paper_box_count} · ลังโฟม {order.foam_box_count} · ชิ้น{' '}
+        {order.piece_count} · รวม{' '}
+        {order.paper_box_count + order.foam_box_count + order.piece_count}
+      </p>
 
       <div className="flex gap-4 text-sm">
         <Link className="link" to={`/order/${id}/pack`}>

@@ -161,7 +161,7 @@ export default function DailyDashboard() {
                 <th>เลขออเดอร์</th>
                 <th>ลูกค้า</th>
                 <th>สถานะ</th>
-                <th>ลัง</th>
+                <th>รวม</th>
                 <th>เรือ</th>
               </tr>
             </thead>
@@ -183,7 +183,9 @@ export default function DailyDashboard() {
                       <span className="badge badge-neutral ml-1.5">หลาย PO</span>
                     )}
                   </td>
-                  <td className="tnum">{o.paper_box_count + o.foam_box_count}</td>
+                  <td className="tnum">
+                    {o.paper_box_count + o.foam_box_count + o.piece_count}
+                  </td>
                   <td className="whitespace-nowrap">{o.boat_id ?? '—'}</td>
                 </tr>
               ))}

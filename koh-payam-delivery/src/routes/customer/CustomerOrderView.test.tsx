@@ -14,6 +14,7 @@ const payload = {
   siblingOrders: [],
   paperBoxCount: 3,
   foamBoxCount: 1,
+  pieceCount: 2,
   items: [
     { productName: 'Rice 5kg', itemId: '100001', orderedQty: 10, shippedQty: 10, isShort: false },
     { productName: 'Fish sauce', itemId: '100002', orderedQty: 4, shippedQty: 2, isShort: true },
@@ -83,6 +84,13 @@ test('language toggle switches the header text to Thai and persists', async () =
   await userEvent.click(screen.getByRole('button', { name: 'ไทย' }))
   expect(await screen.findByText(/ออเดอร์ · PO-1001/)).toBeInTheDocument()
   expect(localStorage.getItem('cust_lang')).toBe('th')
+})
+
+test('shows the box/piece counts line, including pieces', async () => {
+  renderAt()
+  expect(
+    await screen.findByText('Boxes: Paper boxes 3 · Foam boxes 1 · Pieces 2'),
+  ).toBeInTheDocument()
 })
 
 test('shows the amount-due line when outstandingAmount is positive', async () => {

@@ -6,6 +6,7 @@ export type PackInput = {
   orderId: string
   paperCount: number
   foamCount: number
+  pieceCount: number
 }
 
 // Shortages now come from the makro import, not a manual tick, so the pack step
@@ -15,7 +16,11 @@ export async function savePack(input: PackInput): Promise<void> {
   // still persist, so this update is NOT status-gated.
   const { error: eBoxes } = await supabase
     .from('orders')
-    .update({ paper_box_count: input.paperCount, foam_box_count: input.foamCount })
+    .update({
+      paper_box_count: input.paperCount,
+      foam_box_count: input.foamCount,
+      piece_count: input.pieceCount,
+    })
     .eq('id', input.orderId)
   if (eBoxes) throw new Error('บันทึกจำนวนลังไม่สำเร็จ: ' + eBoxes.message)
 
@@ -23,5 +28,6 @@ export async function savePack(input: PackInput): Promise<void> {
   await logAction('pack_saved', 'order', input.orderId, {
     paperCount: input.paperCount,
     foamCount: input.foamCount,
+    pieceCount: input.pieceCount,
   })
 }

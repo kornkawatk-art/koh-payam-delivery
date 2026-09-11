@@ -25,6 +25,9 @@ const order = {
   status: 'imported',
   link_token: 'o_test123',
   sub_district: 'เกาะพยาม',
+  paper_box_count: 2,
+  foam_box_count: 1,
+  piece_count: 3,
   order_items: [
     {
       id: 'i1',
@@ -67,6 +70,13 @@ test('shows the customer link and copies it to the clipboard', async () => {
   expect(await screen.findByText(link)).toBeInTheDocument()
   await userEvent.click(screen.getByRole('button', { name: 'คัดลอก' }))
   expect(navigator.clipboard.writeText).toHaveBeenCalledWith(link)
+})
+
+test('shows the box/piece count summary line', async () => {
+  renderPage()
+  expect(
+    await screen.findByText('ลังกระดาษ 2 · ลังโฟม 1 · ชิ้น 3 · รวม 6'),
+  ).toBeInTheDocument()
 })
 
 test('shows the makro item code per line item', async () => {
