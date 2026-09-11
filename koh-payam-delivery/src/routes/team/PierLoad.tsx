@@ -4,7 +4,7 @@ import { setOrderBoat, updateOrderStatus } from '../../lib/api/orders'
 import { attachEvidencePhoto } from '../../lib/api/photos'
 import PhotoCapture from '../../components/PhotoCapture'
 import { PageHeader } from '../../components/ui/PageHeader'
-import { todayLocalISO } from '../../lib/format'
+import { todayLocalISO, formatTHB } from '../../lib/format'
 
 type Boat = { id: string; name: string }
 type PierOrder = {
@@ -15,6 +15,8 @@ type PierOrder = {
   boat_id: string | null
   paper_box_count: number
   foam_box_count: number
+  outstanding_amount: number | null
+  payment_method: string | null
 }
 
 const ACTIVE = ['packed', 'at_pier']
@@ -129,6 +131,12 @@ export default function PierLoad() {
       <h1 className="page-title">
         {sel.makro_order_no} · {sel.customer_name_en}
       </h1>
+
+      {sel.outstanding_amount != null && sel.outstanding_amount > 0 && (
+        <p className="alert alert-warn">
+          เก็บเงินปลายทาง {formatTHB(sel.outstanding_amount)} ({sel.payment_method})
+        </p>
+      )}
 
       <section>
         <p className="section-title mb-2">เลือกเรือ</p>

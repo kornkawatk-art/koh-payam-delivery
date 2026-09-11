@@ -44,6 +44,8 @@ const orders = [
     boat_id: null,
     paper_box_count: 2,
     foam_box_count: 1,
+    outstanding_amount: null,
+    payment_method: null,
   },
   {
     id: 'o2',
@@ -53,6 +55,8 @@ const orders = [
     boat_id: null,
     paper_box_count: 0,
     foam_box_count: 0,
+    outstanding_amount: null,
+    payment_method: null,
   },
 ]
 
@@ -121,6 +125,24 @@ test('"ส่งขึ้นเรือแล้ว" is also blocked while a ph
 
   await userEvent.click(screen.getByRole('button', { name: 'mock-photo-idle' }))
   expect(ship).toBeEnabled()
+})
+
+test('shows the collect-cash alert when outstanding_amount > 0', async () => {
+  listOrdersForDay.mockReset().mockResolvedValue([
+    { ...orders[0], outstanding_amount: 6172.5, payment_method: 'Pay On Delivery' },
+  ])
+  render(<PierLoad />)
+  await userEvent.click(await screen.findByRole('button', { name: /PO-1/ }))
+  expect(
+    await screen.findByText('เก็บเงินปลายทาง ฿6,172.50 (Pay On Delivery)'),
+  ).toBeInTheDocument()
+})
+
+test('hides the collect-cash alert when outstanding_amount is 0 or null', async () => {
+  listOrdersForDay.mockReset().mockResolvedValue([orders[0]])
+  render(<PierLoad />)
+  await userEvent.click(await screen.findByRole('button', { name: /PO-1/ }))
+  expect(screen.queryByText(/เก็บเงินปลายทาง/)).not.toBeInTheDocument()
 })
 
 test('shows a Thai error state (not a permanent spinner) when loading fails', async () => {

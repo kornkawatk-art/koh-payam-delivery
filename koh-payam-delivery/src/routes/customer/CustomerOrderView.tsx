@@ -3,7 +3,7 @@ import { useParams } from 'react-router-dom'
 import { t, type Lang } from './i18n'
 import OrderStatusTimeline from '../../components/OrderStatusTimeline'
 import CustomerClaimForm from './CustomerClaimForm'
-import { formatDate, formatDateTime } from '../../lib/format'
+import { formatDate, formatDateTime, formatTHB } from '../../lib/format'
 
 const FN = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/order-view`
 const ANON = import.meta.env.VITE_SUPABASE_ANON_KEY as string
@@ -26,6 +26,7 @@ type OrderView = {
   boatName: string | null
   paperBoxCount: number
   foamBoxCount: number
+  outstandingAmount: number | null
   items: Item[]
   shortages: { productName: string; orderedQty: number; shippedQty: number }[]
   evidencePhotos: string[]
@@ -199,6 +200,11 @@ export default function CustomerOrderView() {
         {data.boatName && (
           <p>
             {t(lang, 'boat')}: {data.boatName}
+          </p>
+        )}
+        {data.outstandingAmount != null && data.outstandingAmount > 0 && (
+          <p>
+            {t(lang, 'outstanding_amount_label')}: {formatTHB(data.outstandingAmount)}
           </p>
         )}
       </section>

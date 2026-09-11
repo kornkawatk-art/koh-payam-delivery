@@ -20,6 +20,9 @@ export type OrderMapping = {
   shippingAddress: string
   expectedDate: string
   orderStatus: string
+  paymentMethod: string
+  paymentStatus: string
+  outstandingAmount: string
 }
 
 export const DEFAULT_DETAIL_MAPPING: DetailMapping = {
@@ -40,6 +43,9 @@ export const DEFAULT_ORDER_MAPPING: OrderMapping = {
   shippingAddress: 'Shipping Address',
   expectedDate: 'Original Expected Date',
   orderStatus: 'Order Status',
+  paymentMethod: 'Payment Method',
+  paymentStatus: 'Payment Status',
+  outstandingAmount: 'Outstanding Amount',
 }
 
 export const FIELD_LABELS_DETAIL: Record<keyof DetailMapping, string> = {
@@ -60,6 +66,9 @@ export const FIELD_LABELS_ORDER: Record<keyof OrderMapping, string> = {
   shippingAddress: 'ที่อยู่จัดส่ง',
   expectedDate: 'วันที่คาดว่าจะได้รับ',
   orderStatus: 'สถานะแม็คโคร',
+  paymentMethod: 'วิธีชำระเงิน',
+  paymentStatus: 'สถานะการชำระเงิน',
+  outstandingAmount: 'ยอดค้างชำระ',
 }
 
 // คอลัมน์ที่ต้องมีเสมอ (ที่เหลือมี fallback ในโค้ด จึงไม่บังคับ)
@@ -76,6 +85,9 @@ const ORDER_REQUIRED: (keyof OrderMapping)[] = [
   'subDistrict',
   'shippingAddress',
 ]
+// คอลัมน์ "soft-optional": มีในไฟล์จริง (Makro OrderExport) แต่ไม่บังคับต้องมี —
+// ห้ามบล็อกการนำเข้าไม่ว่าจะเว้นว่างหรือแมปไปยังคอลัมน์ที่ไม่พบในไฟล์
+const ORDER_SOFT: (keyof OrderMapping)[] = ['paymentMethod', 'paymentStatus', 'outstandingAmount']
 
 // --- Parsed shapes ------------------------------------------------------------
 
@@ -97,6 +109,9 @@ export type ParsedOrder = {
   shippingAddress: string
   expectedDate: string | null
   makroOrderStatus: string | null
+  paymentMethod: string | null
+  paymentStatus: string | null
+  outstandingAmount: number
   items: ParsedItem[]
 }
 
@@ -160,6 +175,7 @@ export function validateMapping(
   const m = mapping as Record<string, string>
   const problems: string[] = []
   for (const key of Object.keys(labels)) {
+    if (kind === 'order' && (ORDER_SOFT as string[]).includes(key)) continue
     const col = (m[key] ?? '').trim()
     if (!col) {
       if (required.includes(key)) problems.push(`ยังไม่ได้เลือกคอลัมน์สำหรับ "${labels[key]}"`)
@@ -191,6 +207,8 @@ export function buildImport(
       continue
     }
     const makroOrderStatus = om.orderStatus ? (r[om.orderStatus] ?? '').trim() : ''
+    const paymentMethod = om.paymentMethod ? (r[om.paymentMethod] ?? '').trim() : ''
+    const paymentStatus = om.paymentStatus ? (r[om.paymentStatus] ?? '').trim() : ''
     payamOrders.set(orderNo, {
       makroOrderNo: orderNo,
       customerName: (r[om.customer] ?? '').trim(),
@@ -198,6 +216,9 @@ export function buildImport(
       shippingAddress,
       expectedDate: parseExpectedDate(om.expectedDate ? (r[om.expectedDate] ?? '') : ''),
       makroOrderStatus: makroOrderStatus || null,
+      paymentMethod: paymentMethod || null,
+      paymentStatus: paymentStatus || null,
+      outstandingAmount: om.outstandingAmount ? toNum(r[om.outstandingAmount]) : 0,
       items: [],
     })
   }

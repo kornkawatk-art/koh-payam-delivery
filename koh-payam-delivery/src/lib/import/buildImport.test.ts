@@ -175,6 +175,80 @@ test('buildImport: shippedAllZero true when every shipped qty is 0', () => {
   expect(r.orders[0].items.every((i) => i.isShort)).toBe(true)
 })
 
+// --- soft-optional payment columns -----------------------------------------
+
+test('validateMapping: order file missing payment columns entirely -> no problems (soft-optional)', async () => {
+  const { order } = await fixtures()
+  // order-export-sample.csv has no Payment Method / Payment Status / Outstanding
+  // Amount columns at all, yet the default mapping still points at them.
+  expect(validateMapping('order', Object.keys(order[0]), DEFAULT_ORDER_MAPPING)).toEqual([])
+})
+
+test('buildImport: parses payment method/status/outstanding amount when present', () => {
+  const detail: RawRow[] = [
+    {
+      'Order Number': 'PAY-1',
+      'Item Id': '1',
+      'Product Name': 'a',
+      'Order Quantity': '5',
+      'Shipped Quantity': '5',
+      'Shortage Quantity': '0',
+      'Cancelled Quantity': '0',
+      'Item Remark': '',
+    },
+    {
+      'Order Number': 'PAY-2',
+      'Item Id': '2',
+      'Product Name': 'b',
+      'Order Quantity': '3',
+      'Shipped Quantity': '3',
+      'Shortage Quantity': '0',
+      'Cancelled Quantity': '0',
+      'Item Remark': '',
+    },
+  ]
+  const order: RawRow[] = [
+    {
+      'Order Number': 'PAY-1',
+      'Customer Name': 'Cash On Delivery Co',
+      'Sub District': 'เกาะพยาม',
+      'Shipping Address': 'x',
+      'Original Expected Date': '',
+      'Payment Method': 'Pay On Delivery',
+      'Payment Status': 'Unpaid',
+      'Outstanding Amount': '6172.5',
+    },
+    {
+      'Order Number': 'PAY-2',
+      'Customer Name': 'Paid Already Co',
+      'Sub District': 'เกาะพยาม',
+      'Shipping Address': 'x',
+      'Original Expected Date': '',
+      'Payment Method': 'QR_CODE',
+      'Payment Status': 'Paid',
+      'Outstanding Amount': '0',
+    },
+  ]
+  const r = buildImport(detail, order, DEFAULT_DETAIL_MAPPING, DEFAULT_ORDER_MAPPING)
+  const p1 = r.orders.find((o) => o.makroOrderNo === 'PAY-1')!
+  expect(p1.paymentMethod).toBe('Pay On Delivery')
+  expect(p1.paymentStatus).toBe('Unpaid')
+  expect(p1.outstandingAmount).toBe(6172.5)
+  const p2 = r.orders.find((o) => o.makroOrderNo === 'PAY-2')!
+  expect(p2.paymentMethod).toBe('QR_CODE')
+  expect(p2.paymentStatus).toBe('Paid')
+  expect(p2.outstandingAmount).toBe(0)
+})
+
+test('buildImport: file missing payment columns -> paymentMethod/paymentStatus null, outstandingAmount 0', async () => {
+  const { detail, order } = await fixtures()
+  const r = buildImport(detail, order, DEFAULT_DETAIL_MAPPING, DEFAULT_ORDER_MAPPING)
+  const p1 = r.orders.find((o) => o.makroOrderNo === 'P-001')!
+  expect(p1.paymentMethod).toBeNull()
+  expect(p1.paymentStatus).toBeNull()
+  expect(p1.outstandingAmount).toBe(0)
+})
+
 test('buildImport: comma-grouped numbers parse, junk numbers become 0', () => {
   const detail: RawRow[] = [
     {

@@ -55,6 +55,9 @@ export async function commitImport(
           link_token: makeLinkToken(),
           sub_district: o.subDistrict,
           makro_order_status: o.makroOrderStatus,
+          payment_method: o.paymentMethod,
+          payment_status: o.paymentStatus,
+          outstanding_amount: o.outstandingAmount,
         })
         .select('id')
         .single()
@@ -70,6 +73,9 @@ export async function commitImport(
           customer_name_en: o.customerName,
           sub_district: o.subDistrict,
           makro_order_status: o.makroOrderStatus,
+          payment_method: o.paymentMethod,
+          payment_status: o.paymentStatus,
+          outstanding_amount: o.outstandingAmount,
         })
         .eq('id', existingId)
       if (eU) throw new Error(`อัปเดตออเดอร์ ${o.makroOrderNo} ไม่สำเร็จ: ${eU.message}`)

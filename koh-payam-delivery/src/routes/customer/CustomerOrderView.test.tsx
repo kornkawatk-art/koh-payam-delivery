@@ -22,6 +22,7 @@ const payload = {
   claimDeadlineAt: '2026-09-12T09:00:00.000Z',
   canClaim: true,
   claims: [],
+  outstandingAmount: null,
 }
 
 const ok = (body: unknown) => ({ ok: true, status: 200, json: () => Promise.resolve(body) })
@@ -74,6 +75,18 @@ test('language toggle switches the header text to Thai and persists', async () =
   await userEvent.click(screen.getByRole('button', { name: 'ไทย' }))
   expect(await screen.findByText(/ออเดอร์ · PO-1001/)).toBeInTheDocument()
   expect(localStorage.getItem('cust_lang')).toBe('th')
+})
+
+test('shows the amount-due line when outstandingAmount is positive', async () => {
+  fetchMock.mockReset().mockResolvedValue(ok({ ...payload, outstandingAmount: 6172.5 }))
+  renderAt()
+  expect(await screen.findByText('Amount due on delivery: ฿6,172.50')).toBeInTheDocument()
+})
+
+test('hides the amount-due line when outstandingAmount is null', async () => {
+  renderAt()
+  await screen.findByText(/PO-1001/)
+  expect(screen.queryByText(/Amount due on delivery/)).not.toBeInTheDocument()
 })
 
 test('a 404 shows a friendly not-found message, not a spinner', async () => {

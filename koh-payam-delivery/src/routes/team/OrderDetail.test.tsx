@@ -110,6 +110,25 @@ test('allows the pier transition once a boat and handoff photo are present', asy
   ).not.toBeInTheDocument()
 })
 
+test('shows the collect-cash alert when outstanding_amount > 0', async () => {
+  getOrder.mockReset().mockResolvedValue({
+    ...order,
+    outstanding_amount: 6172.5,
+    payment_method: 'Pay On Delivery',
+  })
+  renderPage()
+  expect(
+    await screen.findByText('เก็บเงินปลายทาง ฿6,172.50 (Pay On Delivery)'),
+  ).toBeInTheDocument()
+})
+
+test('hides the collect-cash alert when outstanding_amount is 0 or null', async () => {
+  getOrder.mockReset().mockResolvedValue({ ...order, outstanding_amount: 0, payment_method: null })
+  renderPage()
+  await screen.findByText(order.customer_name_en, { exact: false })
+  expect(screen.queryByText(/เก็บเงินปลายทาง/)).not.toBeInTheDocument()
+})
+
 test('a pack-stage photo alone does NOT open the pier gate', async () => {
   getOrder.mockReset().mockResolvedValue({
     ...order,

@@ -64,6 +64,9 @@ const parsedOrders = [
     shippingAddress: 'x',
     expectedDate: '2026-10-01',
     makroOrderStatus: 'Completed',
+    paymentMethod: 'Pay On Delivery',
+    paymentStatus: 'Unpaid',
+    outstandingAmount: 6172.5,
     items: [
       {
         productName: 'x',
@@ -97,6 +100,9 @@ test('fresh import inserts orders + items and counts created', async () => {
     status: 'imported',
     sub_district: 'เกาะพยาม',
     makro_order_status: 'Completed',
+    payment_method: 'Pay On Delivery',
+    payment_status: 'Unpaid',
+    outstanding_amount: 6172.5,
   })
   expect(ordIns.rows.link_token).toMatch(/^o_[0-9a-f]{32}$/)
   const itemIns = state.inserted.find((i) => i.table === 'order_items')
@@ -126,6 +132,9 @@ test('re-import of an existing order syncs without touching protected columns', 
     customer_name_en: 'A',
     sub_district: 'เกาะพยาม',
     makro_order_status: 'Completed',
+    payment_method: 'Pay On Delivery',
+    payment_status: 'Unpaid',
+    outstanding_amount: 6172.5,
   })
   for (const k of [
     'status',
