@@ -34,6 +34,14 @@ export default function PhotoCapture({
   const [thumbs, setThumbs] = useState<string[]>([])
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState('')
+  // Bumped after every pick to force React to remount the <input> DOM node.
+  // Some mobile browsers (observed: Android Chrome) do not reliably fire a
+  // second native `change` event on a *reused* file input after a camera
+  // capture — the camera opens and a photo can be taken, but nothing comes
+  // back. Resetting `.value` alone does not fix it; a fresh input element
+  // (new `key`) does, and it costs nothing since the input carries no state
+  // of its own.
+  const [inputGen, setInputGen] = useState(0)
 
   const capped = typeof max === 'number' && Number.isFinite(max)
   const limit = capped ? (max as number) : Infinity
@@ -43,6 +51,7 @@ export default function PhotoCapture({
     const el = e.target
     const picked = Array.from(el.files ?? [])
     el.value = ''
+    setInputGen((g) => g + 1)
     const files = picked.slice(0, Math.max(0, limit - keys.length))
     if (files.length === 0) return
 
@@ -83,6 +92,7 @@ export default function PhotoCapture({
   return (
     <div className="flex flex-col gap-2">
       <input
+        key={inputGen}
         type="file"
         accept="image/*"
         capture="environment"

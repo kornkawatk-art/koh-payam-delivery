@@ -130,6 +130,18 @@ test('a failed R2 PUT surfaces a Thai error and does not report a key', async ()
   expect(onUploaded).not.toHaveBeenCalled()
 })
 
+test('remounts the file input after each pick (Android Chrome repeat-capture workaround)', async () => {
+  // Some mobile browsers don't reliably fire a second native `change` event on
+  // a *reused* file input after a camera capture. We force a fresh DOM node
+  // (new `key`) after every pick instead of relying on `.value = ''` alone.
+  render(<PhotoCapture scope="evidence" orderId="o1" onUploaded={vi.fn()} />)
+  const first = input()
+  await userEvent.upload(first, pickFile())
+  await waitFor(() => expect(screen.getByText('1 รูป')).toBeInTheDocument())
+  const second = input()
+  expect(second).not.toBe(first)
+})
+
 test('a failed URL request surfaces its Thai error', async () => {
   requestUploadUrl.mockReset().mockRejectedValue(new Error('ขอลิงก์อัปโหลดรูปไม่สำเร็จ (403)'))
   render(<PhotoCapture scope="claim" token="t-1" onUploaded={vi.fn()} />)
