@@ -11,6 +11,18 @@ export type BackorderRow = {
   status: 'pending' | 'fulfilled'
 }
 
+// A pending backorder that hasn't been tied to any destination order yet —
+// shown on the manager's "unmatched backorders" view (ClaimsQueue.tsx) so it
+// doesn't stay invisible until (or unless) a matching order ever shows up.
+export type UnmatchedBackorderRow = {
+  id: string
+  customerName: string | undefined
+  productName: string
+  qty: number
+  reason: 'shortage' | 'claim_resend'
+  createdAt: string
+}
+
 // Rebuild this order's shortage backorders: drop the pending shortage rows it
 // already owns, then create one fresh pending row per still-short order item.
 export async function syncShortageBackorders(orderId: string): Promise<void> {
@@ -86,21 +98,28 @@ export async function createResendBackorder(claimId: string): Promise<void> {
 export async function linkBackordersToDay(shipDate: string): Promise<number> {
   const { data: orders, error: ordErr } = await supabase
     .from('orders')
-    .select('id,customer_name_en')
+    .select('id,customer_name_en,customer_phone')
     .eq('ship_date', shipDate)
   if (ordErr) throw new Error('โหลดออเดอร์ประจำวันไม่สำเร็จ: ' + ordErr.message)
   const { data: pend, error: pendErr } = await supabase
     .from('backorders')
     .select(
-      'id,source_order_id,target_ship_date, orders!backorders_source_order_id_fkey(customer_name_en)',
+      'id,source_order_id,target_ship_date, orders!backorders_source_order_id_fkey(customer_name_en,customer_phone)',
     )
     .eq('status', 'pending')
   if (pendErr) throw new Error('โหลดรายการค้างส่งไม่สำเร็จ: ' + pendErr.message)
   let linked = 0
   for (const b of pend ?? []) {
     if ((b as any).target_ship_date && (b as any).target_ship_date !== shipDate) continue
-    const cust = (b as any).orders?.customer_name_en
-    const match = (orders ?? []).find((o: any) => o.customer_name_en === cust)
+    const custPhone = (b as any).orders?.customer_phone
+    const custName = (b as any).orders?.customer_name_en
+    // Phone first: same-day order sharing the source order's phone number.
+    // Fall back to the exact name match when the phone doesn't apply (empty
+    // source phone) or didn't find anything among that day's orders.
+    let match = custPhone
+      ? (orders ?? []).find((o: any) => o.customer_phone === custPhone)
+      : undefined
+    if (!match) match = (orders ?? []).find((o: any) => o.customer_name_en === custName)
     if (!match) continue
     const { error } = await supabase
       .from('backorders')
@@ -109,6 +128,28 @@ export async function linkBackordersToDay(shipDate: string): Promise<number> {
     if (!error) linked++
   }
   return linked
+}
+
+// Every pending-or-not backorder that has never been matched to a destination
+// order — invisible everywhere else until (or unless) linkBackordersToDay
+// finds it a home. Surfaced read-only on the manager's ClaimsQueue page.
+export async function listUnmatchedBackorders(): Promise<UnmatchedBackorderRow[]> {
+  const { data, error } = await supabase
+    .from('backorders')
+    .select(
+      'id,reason,product_name,qty,created_at,orders!backorders_source_order_id_fkey(customer_name_en)',
+    )
+    .is('target_order_id', null)
+    .order('created_at', { ascending: true })
+  if (error) throw new Error('โหลดรายการค้างส่งที่ยังจับคู่ไม่สำเร็จ: ' + error.message)
+  return (data ?? []).map((b: any) => ({
+    id: b.id,
+    customerName: b.orders?.customer_name_en,
+    productName: b.product_name,
+    qty: b.qty,
+    reason: b.reason,
+    createdAt: b.created_at,
+  }))
 }
 
 export async function listBackordersForDay(shipDate: string): Promise<BackorderRow[]> {
