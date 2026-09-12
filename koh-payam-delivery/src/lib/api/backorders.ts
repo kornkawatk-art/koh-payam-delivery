@@ -63,6 +63,11 @@ export async function createResendBackorder(claimId: string): Promise<void> {
     qty: number
     order_items: { product_name?: string } | null
   }>
+  // A box_lost claim (or any claim that somehow has zero claim_items) has
+  // nothing to loop over — silently succeeding here would report the claim
+  // resolved while queuing no compensating shipment at all. Fail loudly
+  // instead so resolveClaim's existing catch surfaces it to the manager.
+  if (!items.length) throw new Error('เคลมนี้ไม่มีรายการสินค้า จึงสร้างรายการส่งชดเชยไม่ได้')
   const rows = items.map((it) => ({
     source_order_id: orderId,
     reason: 'claim_resend',
@@ -71,7 +76,6 @@ export async function createResendBackorder(claimId: string): Promise<void> {
     status: 'pending',
     target_ship_date: null,
   }))
-  if (!rows.length) return
   const { error } = await supabase.from('backorders').insert(rows)
   if (error) throw new Error('สร้างรายการส่งชดเชยไม่สำเร็จ: ' + error.message)
 }

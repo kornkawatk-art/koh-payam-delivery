@@ -211,9 +211,15 @@ export default function ClaimDetail() {
                 type="radio"
                 checked={resolution === 'resend_next_day'}
                 onChange={() => setResolution('resend_next_day')}
+                disabled={claimItems.length === 0}
               />
               ส่งชดเชยวันถัดไป
             </label>
+            {claimItems.length === 0 && (
+              <p className="muted text-xs">
+                เคลมนี้ไม่มีรายการสินค้า จึงส่งชดเชยไม่ได้ — เลือกคืนเงินแทน
+              </p>
+            )}
           </div>
         )}
       </fieldset>

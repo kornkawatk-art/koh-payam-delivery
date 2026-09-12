@@ -84,6 +84,25 @@ test('renders no item list for a box_lost claim (zero claim_items)', async () =>
   expect(screen.queryByText(/×/)).not.toBeInTheDocument()
 })
 
+test('disables "ส่งชดเชยวันถัดไป" when the claim has zero claim_items (box_lost)', async () => {
+  getClaim.mockReset().mockResolvedValue({ ...claim, type: 'box_lost', claim_items: [] })
+  renderPage()
+  await screen.findByLabelText('จำนวนเงินคืน')
+  expect(screen.getByLabelText('ส่งชดเชยวันถัดไป')).toBeDisabled()
+  expect(
+    screen.getByText('เคลมนี้ไม่มีรายการสินค้า จึงส่งชดเชยไม่ได้ — เลือกคืนเงินแทน'),
+  ).toBeInTheDocument()
+})
+
+test('keeps "ส่งชดเชยวันถัดไป" enabled when the claim has at least one item', async () => {
+  renderPage()
+  await screen.findByLabelText('จำนวนเงินคืน')
+  expect(screen.getByLabelText('ส่งชดเชยวันถัดไป')).not.toBeDisabled()
+  expect(
+    screen.queryByText('เคลมนี้ไม่มีรายการสินค้า จึงส่งชดเชยไม่ได้ — เลือกคืนเงินแทน'),
+  ).not.toBeInTheDocument()
+})
+
 test('switching to resend hides the amount field and resolves without a refund', async () => {
   renderPage()
   await screen.findByLabelText('จำนวนเงินคืน')
