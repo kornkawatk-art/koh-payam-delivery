@@ -141,7 +141,7 @@ test('renders every unmatched backorder row with customer/product/qty/reason lab
   expect(screen.getByText('ของขาด')).toBeInTheDocument()
   expect(screen.getByText('REEF LODGE')).toBeInTheDocument()
   expect(screen.getByText('fish sauce x1')).toBeInTheDocument()
-  expect(screen.getByText('ชดเชยจากเคลม')).toBeInTheDocument()
+  expect(screen.getByText('ส่งชดเชยวันถัดไป')).toBeInTheDocument()
 })
 
 test('highlights an unmatched backorder waiting more than 7 days, not one waiting less', async () => {

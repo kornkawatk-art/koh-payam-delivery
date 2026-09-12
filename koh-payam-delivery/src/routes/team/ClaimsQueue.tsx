@@ -22,11 +22,14 @@ const STATUS_TONE: Record<string, string> = {
   closed: 'badge-neutral',
 }
 
-// Same Thai wording this codebase already uses for these two backorder
-// reasons elsewhere (PackOrder.tsx / customer i18n) -- not invented here.
+// Same Thai wording this codebase already uses for these backorder reasons
+// elsewhere -- not invented here. `shortage` matches customer/i18n.ts's
+// item_short/shortages* keys. `claim_resend` reuses ClaimDetail.tsx's
+// `resend_next_day` resolution option's exact label verbatim, so a manager
+// reading both screens recognizes it as the same concept in the same words.
 const REASON_LABEL: Record<string, string> = {
   shortage: 'ของขาด',
-  claim_resend: 'ชดเชยจากเคลม',
+  claim_resend: 'ส่งชดเชยวันถัดไป',
 }
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000
