@@ -5,7 +5,9 @@ import PierLoad from './PierLoad'
 const getOrCreateShipDay = vi.fn()
 const listOrdersForDay = vi.fn()
 const setOrderBoat = vi.fn().mockResolvedValue(undefined)
+const setOrderPierName = vi.fn().mockResolvedValue(undefined)
 const updateOrderStatus = vi.fn().mockResolvedValue(undefined)
+const listDistinctPierNames = vi.fn().mockResolvedValue([])
 const attachEvidencePhoto = vi.fn().mockResolvedValue(undefined)
 
 vi.mock('../../lib/api/shipDays', () => ({
@@ -14,7 +16,9 @@ vi.mock('../../lib/api/shipDays', () => ({
 }))
 vi.mock('../../lib/api/orders', () => ({
   setOrderBoat: (...a: unknown[]) => setOrderBoat(...a),
+  setOrderPierName: (...a: unknown[]) => setOrderPierName(...a),
   updateOrderStatus: (...a: unknown[]) => updateOrderStatus(...a),
+  listDistinctPierNames: (...a: unknown[]) => listDistinctPierNames(...a),
 }))
 vi.mock('../../lib/api/photos', () => ({
   attachEvidencePhoto: (...a: unknown[]) => attachEvidencePhoto(...a),
@@ -47,6 +51,8 @@ const orders = [
     piece_count: 0,
     outstanding_amount: null,
     payment_method: null,
+    packer_name: null,
+    pier_name: null,
   },
   {
     id: 'o2',
@@ -59,6 +65,8 @@ const orders = [
     piece_count: 0,
     outstanding_amount: null,
     payment_method: null,
+    packer_name: null,
+    pier_name: null,
   },
 ]
 
@@ -72,8 +80,10 @@ beforeEach(() => {
   })
   listOrdersForDay.mockReset().mockResolvedValue(orders)
   setOrderBoat.mockClear()
+  setOrderPierName.mockClear()
   updateOrderStatus.mockClear()
   attachEvidencePhoto.mockClear()
+  listDistinctPierNames.mockReset().mockResolvedValue([])
 })
 
 test('lists only packed / at_pier orders for the day', async () => {
@@ -117,6 +127,38 @@ test('"ส่งขึ้นเรือแล้ว" is blocked until a boat is
 
   await userEvent.click(ship)
   expect(updateOrderStatus).toHaveBeenCalledWith('o1', 'shipped')
+})
+
+test('typing a pier name and shipping calls setOrderPierName then updateOrderStatus("shipped") in that order', async () => {
+  render(<PierLoad />)
+  await userEvent.click(await screen.findByRole('button', { name: /PO-1/ }))
+  await userEvent.click(screen.getByRole('button', { name: 'เรือ 2' }))
+  await userEvent.type(screen.getByLabelText('ชื่อคนลงเรือ'), 'สมหญิง')
+  await userEvent.click(screen.getByRole('button', { name: 'mock-upload' }))
+  const ship = screen.getByRole('button', { name: 'ส่งขึ้นเรือแล้ว' })
+  await waitFor(() => expect(ship).toBeEnabled())
+
+  await userEvent.click(ship)
+
+  expect(setOrderPierName).toHaveBeenCalledWith('o1', 'สมหญิง')
+  expect(updateOrderStatus).toHaveBeenCalledWith('o1', 'shipped')
+  expect(setOrderPierName.mock.invocationCallOrder[0]).toBeLessThan(
+    updateOrderStatus.mock.invocationCallOrder[0],
+  )
+})
+
+test('the packer-name subtitle renders on the picker list when present and is absent when null', async () => {
+  listOrdersForDay.mockReset().mockResolvedValue([
+    { ...orders[0], packer_name: 'สมชาย' },
+  ])
+  render(<PierLoad />)
+  expect(await screen.findByText('คนแพ็ค: สมชาย')).toBeInTheDocument()
+})
+
+test('the packer-name subtitle is omitted entirely when packer_name is null', async () => {
+  render(<PierLoad />)
+  await screen.findByRole('button', { name: /PO-1/ })
+  expect(screen.queryByText(/คนแพ็ค/)).not.toBeInTheDocument()
 })
 
 test('"ส่งขึ้นเรือแล้ว" is also blocked while a photo is still uploading', async () => {

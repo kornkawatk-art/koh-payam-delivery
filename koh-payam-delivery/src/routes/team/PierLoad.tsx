@@ -1,6 +1,11 @@
 import { useCallback, useEffect, useState } from 'react'
 import { getOrCreateShipDay, listOrdersForDay } from '../../lib/api/shipDays'
-import { setOrderBoat, updateOrderStatus } from '../../lib/api/orders'
+import {
+  setOrderBoat,
+  setOrderPierName,
+  updateOrderStatus,
+  listDistinctPierNames,
+} from '../../lib/api/orders'
 import { attachEvidencePhoto } from '../../lib/api/photos'
 import PhotoCapture from '../../components/PhotoCapture'
 import { PageHeader } from '../../components/ui/PageHeader'
@@ -18,6 +23,8 @@ type PierOrder = {
   piece_count: number
   outstanding_amount: number | null
   payment_method: string | null
+  packer_name: string | null
+  pier_name: string | null
 }
 
 const ACTIVE = ['packed', 'at_pier']
@@ -29,6 +36,8 @@ export default function PierLoad() {
   const [sel, setSel] = useState<PierOrder | null>(null)
   const [photoCount, setPhotoCount] = useState(0)
   const [photoBusy, setPhotoBusy] = useState(false)
+  const [pierName, setPierName] = useState('')
+  const [pierNames, setPierNames] = useState<string[]>([])
   const [failed, setFailed] = useState(false)
   const [msg, setMsg] = useState<string>()
 
@@ -46,6 +55,12 @@ export default function PierLoad() {
     load()
   }, [load])
 
+  useEffect(() => {
+    listDistinctPierNames()
+      .then(setPierNames)
+      .catch(() => setPierNames([]))
+  }, [])
+
   async function chooseBoat(boatId: string) {
     if (!sel) return
     setMsg(undefined)
@@ -61,6 +76,7 @@ export default function PierLoad() {
     if (!sel) return
     setMsg(undefined)
     try {
+      await setOrderPierName(sel.id, pierName)
       await updateOrderStatus(sel.id, 'shipped')
       setMsg('ส่งขึ้นเรือแล้ว')
       setSel(null)
@@ -108,11 +124,17 @@ export default function PierLoad() {
                 setSel(o)
                 setPhotoCount(0)
                 setPhotoBusy(false)
+                setPierName(o.pier_name ?? '')
                 setMsg(undefined)
               }}
             >
-              <span className="font-medium">
-                {o.makro_order_no} · {o.customer_name_en}
+              <span className="flex flex-col items-start">
+                <span className="font-medium">
+                  {o.makro_order_no} · {o.customer_name_en}
+                </span>
+                {o.packer_name && (
+                  <span className="muted text-xs">คนแพ็ค: {o.packer_name}</span>
+                )}
               </span>
               <span className="badge badge-neutral">
                 {o.paper_box_count + o.foam_box_count + o.piece_count} รวม
@@ -158,6 +180,21 @@ export default function PierLoad() {
           ))}
         </div>
       </section>
+
+      <label className="field">
+        <span className="field-label">ชื่อคนลงเรือ</span>
+        <input
+          list="pier-name-options"
+          className="w-56"
+          value={pierName}
+          onChange={(e) => setPierName(e.target.value)}
+        />
+        <datalist id="pier-name-options">
+          {pierNames.map((n) => (
+            <option key={n} value={n} />
+          ))}
+        </datalist>
+      </label>
 
       <section>
         <p className="section-title mb-2">รูปหลักฐาน (สูงสุด 3)</p>
