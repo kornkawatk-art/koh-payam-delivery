@@ -1,6 +1,7 @@
 import {
   syncShortageBackorders,
   linkBackordersToDay,
+  listUnmatchedBackorders,
   listBackordersForDay,
   listPendingBackordersForOrder,
   listRelatedBackordersForOrder,
@@ -15,6 +16,7 @@ let pending: any[] = []
 let dayList: any[] = []
 let orderList: any[] = []
 let relatedList: any[] = []
+let unmatchedList: any[] = []
 let claimRow: any = null
 
 vi.mock('../supabase', () => {
@@ -47,6 +49,15 @@ vi.mock('../supabase', () => {
                     : pending,
               )
             return res([])
+          },
+          is: (col: string, val: any) => {
+            calls.push(['is', t, sel, col, val])
+            const chain: any = Promise.resolve({ data: unmatchedList, error: null })
+            chain.order = (ocol: string, opts: any) => {
+              calls.push(['order', t, ocol, opts])
+              return Promise.resolve({ data: unmatchedList, error: null })
+            }
+            return chain
           },
         }),
         delete: () => {
@@ -82,6 +93,7 @@ beforeEach(() => {
   dayList = []
   orderList = []
   relatedList = []
+  unmatchedList = []
   claimRow = null
 })
 
@@ -150,6 +162,105 @@ test('linkBackordersToDay binds only matching customers not already tied to anot
   expect(updates.map((u) => u[4]).sort()).toEqual(['b1', 'b4'])
   expect(updates[0][2]).toMatchObject({ target_ship_date: '2026-10-01' })
   expect(updates.find((u) => u[4] === 'b1')[2].target_order_id).toBe('o-blue')
+})
+
+test('linkBackordersToDay matches by phone first, even when an available order has a different name', async () => {
+  dayOrders = [
+    // Same phone as the backorder's source customer, but a differently
+    // spelled name -- proves phone is tried before name.
+    { id: 'o-real', customer_name_en: 'BLUEVIEW RESORT', customer_phone: '0812345678' },
+    { id: 'o-decoy', customer_name_en: 'BLUE VIEW', customer_phone: '0899999999' },
+  ]
+  pending = [
+    {
+      id: 'b1',
+      source_order_id: 's1',
+      target_ship_date: null,
+      orders: { customer_name_en: 'BLUE VIEW', customer_phone: '0812345678' },
+    },
+  ]
+  const n = await linkBackordersToDay('2026-10-01')
+  expect(n).toBe(1)
+  const update = calls.find((c) => c[0] === 'update')
+  expect(update[2].target_order_id).toBe('o-real')
+})
+
+test('linkBackordersToDay falls back to name match when the source order has no phone', async () => {
+  dayOrders = [{ id: 'o-sun', customer_name_en: 'SUNSET', customer_phone: '0811111111' }]
+  pending = [
+    {
+      id: 'b1',
+      source_order_id: 's1',
+      target_ship_date: null,
+      orders: { customer_name_en: 'SUNSET', customer_phone: '' },
+    },
+  ]
+  const n = await linkBackordersToDay('2026-10-01')
+  expect(n).toBe(1)
+  const update = calls.find((c) => c[0] === 'update')
+  expect(update[2].target_order_id).toBe('o-sun')
+})
+
+test('linkBackordersToDay falls back to name match when no same-day order shares the phone', async () => {
+  dayOrders = [{ id: 'o-sun', customer_name_en: 'SUNSET', customer_phone: '0822222222' }]
+  pending = [
+    {
+      id: 'b1',
+      source_order_id: 's1',
+      target_ship_date: null,
+      orders: { customer_name_en: 'SUNSET', customer_phone: '0899999999' },
+    },
+  ]
+  const n = await linkBackordersToDay('2026-10-01')
+  expect(n).toBe(1)
+  const update = calls.find((c) => c[0] === 'update')
+  expect(update[2].target_order_id).toBe('o-sun')
+})
+
+test('listUnmatchedBackorders selects unmatched rows ordered oldest-first and flattens customer name', async () => {
+  unmatchedList = [
+    {
+      id: 'b1',
+      reason: 'shortage',
+      product_name: 'rice',
+      qty: 2,
+      created_at: '2026-09-01T00:00:00.000Z',
+      orders: { customer_name_en: 'BLUE VIEW' },
+    },
+    {
+      id: 'b2',
+      reason: 'claim_resend',
+      product_name: 'fish sauce',
+      qty: 1,
+      created_at: '2026-09-05T00:00:00.000Z',
+      orders: { customer_name_en: 'SUNSET' },
+    },
+  ]
+  const rows = await listUnmatchedBackorders()
+  expect(rows).toEqual([
+    {
+      id: 'b1',
+      customerName: 'BLUE VIEW',
+      productName: 'rice',
+      qty: 2,
+      reason: 'shortage',
+      createdAt: '2026-09-01T00:00:00.000Z',
+    },
+    {
+      id: 'b2',
+      customerName: 'SUNSET',
+      productName: 'fish sauce',
+      qty: 1,
+      reason: 'claim_resend',
+      createdAt: '2026-09-05T00:00:00.000Z',
+    },
+  ])
+  const isCall = calls.find((c) => c[0] === 'is' && c[1] === 'backorders')
+  expect(isCall[3]).toBe('target_order_id')
+  expect(isCall[4]).toBe(null)
+  const orderCall = calls.find((c) => c[0] === 'order' && c[1] === 'backorders')
+  expect(orderCall[2]).toBe('created_at')
+  expect(orderCall[3]).toEqual({ ascending: true })
 })
 
 test('listBackordersForDay filters by target day and pending status', async () => {

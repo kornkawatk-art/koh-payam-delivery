@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { listClaims, type ClaimRow } from '../../lib/api/claims'
+import { listUnmatchedBackorders, type UnmatchedBackorderRow } from '../../lib/api/backorders'
 import { Spinner } from '../../components/ui/Spinner'
 import { PageHeader } from '../../components/ui/PageHeader'
 import { formatDateTimeTH } from '../../lib/format'
@@ -20,6 +21,18 @@ const STATUS_TONE: Record<string, string> = {
   rejected: 'badge-neutral',
   closed: 'badge-neutral',
 }
+
+// Same Thai wording this codebase already uses for these backorder reasons
+// elsewhere -- not invented here. `shortage` matches customer/i18n.ts's
+// item_short/shortages* keys. `claim_resend` reuses ClaimDetail.tsx's
+// `resend_next_day` resolution option's exact label verbatim, so a manager
+// reading both screens recognizes it as the same concept in the same words.
+const REASON_LABEL: Record<string, string> = {
+  shortage: 'ของขาด',
+  claim_resend: 'ส่งชดเชยวันถัดไป',
+}
+
+const MS_PER_DAY = 24 * 60 * 60 * 1000
 
 export default function ClaimsQueue() {
   const [filter, setFilter] = useState<Filter>('all')
@@ -41,6 +54,27 @@ export default function ClaimsQueue() {
       active = false
     }
   }, [filter])
+
+  // Unmatched backorders load independently of the claims queue above: a
+  // failure here must never blank the already-loaded claims table (and vice
+  // versa), same as ClaimDetail.tsx keeps its claim and evidence-photos
+  // fetches from stepping on each other.
+  const [backorders, setBackorders] = useState<UnmatchedBackorderRow[] | null>(null)
+  const [backordersFailed, setBackordersFailed] = useState(false)
+
+  useEffect(() => {
+    let active = true
+    listUnmatchedBackorders()
+      .then((r) => {
+        if (active) setBackorders(r)
+      })
+      .catch(() => {
+        if (active) setBackordersFailed(true)
+      })
+    return () => {
+      active = false
+    }
+  }, [])
 
   const now = Date.now()
 
@@ -108,6 +142,46 @@ export default function ClaimsQueue() {
           </table>
         </div>
       )}
+
+      <section className="flex flex-col gap-2">
+        <p className="section-title">ค้างส่งที่ยังจับคู่ไม่สำเร็จ</p>
+        {backordersFailed ? (
+          <p className="alert alert-danger">โหลดรายการค้างส่งที่ยังจับคู่ไม่สำเร็จ</p>
+        ) : !backorders ? (
+          <Spinner />
+        ) : backorders.length === 0 ? (
+          <p className="muted">ไม่มีรายการค้างส่งที่ยังจับคู่ไม่สำเร็จ</p>
+        ) : (
+          <div className="table-wrap">
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th>ลูกค้า</th>
+                  <th>สินค้า</th>
+                  <th>ที่มา</th>
+                  <th>ค้างมาแล้ว</th>
+                </tr>
+              </thead>
+              <tbody>
+                {backorders.map((b) => {
+                  const daysWaiting = Math.floor((now - new Date(b.createdAt).getTime()) / MS_PER_DAY)
+                  const stale = daysWaiting > 7
+                  return (
+                    <tr key={b.id} className={stale ? 'bg-red-50' : undefined}>
+                      <td>{b.customerName}</td>
+                      <td>
+                        {b.productName} x{b.qty}
+                      </td>
+                      <td>{REASON_LABEL[b.reason] ?? b.reason}</td>
+                      <td className="tnum">{daysWaiting} วัน</td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
     </div>
   )
 }
