@@ -7,6 +7,7 @@ const state = {
   updated: [] as any[],
   current: { status: 'imported' } as any,
   deleteError: null as null | { message: string },
+  deleteData: [{ id: 'o1' }] as any[],
 }
 
 vi.mock('../supabase', () => {
@@ -37,7 +38,14 @@ vi.mock('../supabase', () => {
         },
         eq: (col: string, val: any) => {
           state.deleted.push({ table, [col]: val })
-          return Promise.resolve({ error: state.deleteError })
+          return {
+            select: () =>
+              Promise.resolve({
+                data: state.deleteError ? null : state.deleteData,
+                error: state.deleteError,
+              }),
+            then: (resolve: any) => resolve({ error: state.deleteError }),
+          }
         },
       }),
     }
@@ -92,6 +100,7 @@ beforeEach(() => {
   state.updated = []
   state.current = { status: 'imported' }
   state.deleteError = null
+  state.deleteData = [{ id: 'o1' }]
   logAction.mockClear()
 })
 
@@ -200,5 +209,19 @@ test('deleteOrder throws a Thai error and does not log when the delete fails', a
     shipDate: '2026-10-01',
   }
   await expect(deleteOrder('o1', snapshot)).rejects.toThrow(/ลบออเดอร์ไม่สำเร็จ/)
+  expect(logAction).not.toHaveBeenCalled()
+})
+
+test('deleteOrder throws a Thai error and does not log when RLS silently denies the delete (zero rows)', async () => {
+  state.deleteData = []
+  const snapshot = {
+    makroOrderNo: 'PO-1',
+    customerNameEn: 'A',
+    status: 'imported',
+    shipDate: '2026-10-01',
+  }
+  await expect(deleteOrder('o1', snapshot)).rejects.toThrow(
+    /ลบออเดอร์ไม่สำเร็จ \(ไม่มีสิทธิ์ หรือออเดอร์ถูกลบไปแล้ว\)/,
+  )
   expect(logAction).not.toHaveBeenCalled()
 })

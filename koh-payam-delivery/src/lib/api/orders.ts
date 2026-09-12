@@ -155,7 +155,9 @@ export async function deleteOrder(
     shipDate: string
   },
 ): Promise<void> {
-  const { error } = await supabase.from('orders').delete().eq('id', orderId)
+  const { data, error } = await supabase.from('orders').delete().eq('id', orderId).select('id')
   if (error) throw new Error('ลบออเดอร์ไม่สำเร็จ: ' + error.message)
+  if (!data || data.length === 0)
+    throw new Error('ลบออเดอร์ไม่สำเร็จ (ไม่มีสิทธิ์ หรือออเดอร์ถูกลบไปแล้ว)')
   await logAction('order_deleted', 'order', orderId, snapshot)
 }
