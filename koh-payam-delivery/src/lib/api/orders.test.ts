@@ -1,6 +1,7 @@
 import {
   commitImport,
   deleteOrder,
+  findOrdersByMakroOrderNo,
   regenTokenLink,
   setOrderPierName,
   updateOrderStatus,
@@ -16,13 +17,23 @@ const state = {
   deleteData: [{ id: 'o1' }] as any[],
   updateError: null as null | { message: string },
   updateData: [{ id: 'o1' }] as any[],
+  searchResult: [] as any[],
+  searchError: null as null | { message: string },
 }
 
 vi.mock('../supabase', () => {
   const builder = (table: string) => {
     const b: any = {
       select: () => b,
-      eq: () => b,
+      eq: (col: string) => {
+        // findOrdersByMakroOrderNo awaits select(...).eq('makro_order_no', ...)
+        // directly with no further chain call, unlike every other eq() usage
+        // in this file (which is always followed by .in()/.single()/etc.).
+        if (col === 'makro_order_no') {
+          return Promise.resolve({ data: state.searchResult, error: state.searchError })
+        }
+        return b
+      },
       in: () => Promise.resolve({ data: state.existing, error: null }),
       single: () => Promise.resolve({ data: state.current, error: null }),
       insert: (rows: any) => {
@@ -120,6 +131,8 @@ beforeEach(() => {
   state.deleteData = [{ id: 'o1' }]
   state.updateError = null
   state.updateData = [{ id: 'o1' }]
+  state.searchResult = []
+  state.searchError = null
   logAction.mockClear()
 })
 
@@ -264,4 +277,36 @@ test('setOrderPierName throws a Thai error and does not log when RLS silently de
     /บันทึกชื่อคนลงเรือไม่สำเร็จ \(ออเดอร์อาจถูกส่งไปแล้ว\)/,
   )
   expect(logAction).not.toHaveBeenCalled()
+})
+
+test('findOrdersByMakroOrderNo returns the matching row(s) for a known order number', async () => {
+  state.searchResult = [{ id: 'o1', customer_name_en: 'BLUE VIEW', ship_date: '2026-10-01' }]
+  const rows = await findOrdersByMakroOrderNo('PO-1')
+  expect(rows).toEqual([{ id: 'o1', customer_name_en: 'BLUE VIEW', ship_date: '2026-10-01' }])
+})
+
+test('findOrdersByMakroOrderNo trims the input before querying', async () => {
+  state.searchResult = [{ id: 'o1', customer_name_en: 'BLUE VIEW', ship_date: '2026-10-01' }]
+  const rows = await findOrdersByMakroOrderNo('  PO-1  ')
+  expect(rows.length).toBe(1)
+})
+
+test('findOrdersByMakroOrderNo returns multiple rows as-is when several orders share the number', async () => {
+  state.searchResult = [
+    { id: 'o1', customer_name_en: 'BLUE VIEW', ship_date: '2026-10-01' },
+    { id: 'o2', customer_name_en: 'PAYAM CAFE', ship_date: '2026-10-02' },
+  ]
+  const rows = await findOrdersByMakroOrderNo('PO-1')
+  expect(rows).toHaveLength(2)
+})
+
+test('findOrdersByMakroOrderNo returns [] (not an error) when nothing matches', async () => {
+  state.searchResult = []
+  const rows = await findOrdersByMakroOrderNo('PO-404')
+  expect(rows).toEqual([])
+})
+
+test('findOrdersByMakroOrderNo throws a Thai error on a real Supabase error', async () => {
+  state.searchError = { message: 'boom' }
+  await expect(findOrdersByMakroOrderNo('PO-1')).rejects.toThrow(/ค้นหาออเดอร์ไม่สำเร็จ/)
 })
