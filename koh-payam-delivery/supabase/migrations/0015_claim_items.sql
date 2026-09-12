@@ -47,3 +47,12 @@ begin
   return v_claim_id;
 end;
 $$;
+
+-- Supabase auto-grants EXECUTE on new public functions to anon/authenticated/
+-- service_role. create_claim does no authorization or business-rule checks of
+-- its own (token lookup, 48h window, item-count-per-type validation all live
+-- in submit-claim's TS) — lock the grant down to service_role only so it can
+-- only be reached through the edge function, never called directly with the
+-- anon/authenticated key.
+revoke execute on function public.create_claim(uuid, text, text, timestamptz, jsonb) from public, anon, authenticated;
+grant execute on function public.create_claim(uuid, text, text, timestamptz, jsonb) to service_role;
