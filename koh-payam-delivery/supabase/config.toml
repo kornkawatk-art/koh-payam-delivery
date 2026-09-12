@@ -407,6 +407,13 @@ verify_jwt = false
 [functions.cleanup]
 verify_jwt = false
 
+# send-order-links is called by an *authenticated team session* (from
+# BoatSetup.tsx after saving the day's boat list), not a customer link — it
+# deliberately has NO [functions.send-order-links] entry here, unlike every
+# function above. That absence, not an oversight, is what keeps verify_jwt at
+# its default `true`: the gateway rejects the call before the function's own
+# code runs unless the bearer is a real, valid Supabase session.
+
 [analytics]
 enabled = true
 port = 54327
