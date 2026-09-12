@@ -1,4 +1,10 @@
-import { commitImport, deleteOrder, regenTokenLink, updateOrderStatus } from './orders'
+import {
+  commitImport,
+  deleteOrder,
+  regenTokenLink,
+  setOrderPierName,
+  updateOrderStatus,
+} from './orders'
 
 const state = {
   existing: [] as any[],
@@ -8,6 +14,8 @@ const state = {
   current: { status: 'imported' } as any,
   deleteError: null as null | { message: string },
   deleteData: [{ id: 'o1' }] as any[],
+  updateError: null as null | { message: string },
+  updateData: [{ id: 'o1' }] as any[],
 }
 
 vi.mock('../supabase', () => {
@@ -29,7 +37,16 @@ vi.mock('../supabase', () => {
       },
       update: (patch: any) => {
         state.updated.push({ table, patch })
-        return { eq: () => Promise.resolve({ error: null }) }
+        return {
+          eq: () => ({
+            select: () =>
+              Promise.resolve({
+                data: state.updateError ? null : state.updateData,
+                error: state.updateError,
+              }),
+            then: (resolve: any) => resolve({ error: state.updateError }),
+          }),
+        }
       },
       delete: () => ({
         in: (_col: string, vals: any[]) => {
@@ -101,6 +118,8 @@ beforeEach(() => {
   state.current = { status: 'imported' }
   state.deleteError = null
   state.deleteData = [{ id: 'o1' }]
+  state.updateError = null
+  state.updateData = [{ id: 'o1' }]
   logAction.mockClear()
 })
 
@@ -222,6 +241,27 @@ test('deleteOrder throws a Thai error and does not log when RLS silently denies 
   }
   await expect(deleteOrder('o1', snapshot)).rejects.toThrow(
     /ลบออเดอร์ไม่สำเร็จ \(ไม่มีสิทธิ์ หรือออเดอร์ถูกลบไปแล้ว\)/,
+  )
+  expect(logAction).not.toHaveBeenCalled()
+})
+
+test('setOrderPierName writes the trimmed pier name and logs the raw value', async () => {
+  await setOrderPierName('o1', '  ท่าเรือ 1  ')
+  expect(state.updated).toEqual([{ table: 'orders', patch: { pier_name: 'ท่าเรือ 1' } }])
+  expect(logAction).toHaveBeenCalledWith('pier_name_set', 'order', 'o1', {
+    pierName: '  ท่าเรือ 1  ',
+  })
+})
+
+test('setOrderPierName writes null when only whitespace is given', async () => {
+  await setOrderPierName('o1', '   ')
+  expect(state.updated).toEqual([{ table: 'orders', patch: { pier_name: null } }])
+})
+
+test('setOrderPierName throws a Thai error and does not log when RLS silently denies the update (zero rows)', async () => {
+  state.updateData = []
+  await expect(setOrderPierName('o1', 'ท่าเรือ 1')).rejects.toThrow(
+    /บันทึกชื่อคนลงเรือไม่สำเร็จ \(ออเดอร์อาจถูกส่งไปแล้ว\)/,
   )
   expect(logAction).not.toHaveBeenCalled()
 })

@@ -39,6 +39,7 @@ export default function LabelSheet() {
         <p className="mt-2 text-lg text-ink-soft">
           ออเดอร์ {order.makro_order_no} · ส่ง {formatDateTH(order.ship_date)}
         </p>
+        <p className="text-lg text-ink-soft">คนแพ็ค: {order.packer_name || '—'}</p>
 
         <div className="mt-6 flex flex-col gap-5 text-xl">
           <div>

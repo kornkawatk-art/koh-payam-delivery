@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { getOrder, updateOrderStatus } from '../../lib/api/orders'
-import { savePack } from '../../lib/api/pack'
+import { savePack, listDistinctPackerNames } from '../../lib/api/pack'
 import { attachEvidencePhoto } from '../../lib/api/photos'
 import {
   listPendingBackordersForOrder,
@@ -30,6 +30,8 @@ export default function PackOrder() {
   const [paper, setPaper] = useState(0)
   const [foam, setFoam] = useState(0)
   const [piece, setPiece] = useState(0)
+  const [packerName, setPackerName] = useState('')
+  const [packerNames, setPackerNames] = useState<string[]>([])
   const [packPhotoCount, setPackPhotoCount] = useState(0)
   const [photoBusy, setPhotoBusy] = useState(false)
   const [msg, setMsg] = useState<string>()
@@ -44,6 +46,7 @@ export default function PackOrder() {
         setPaper(o.paper_box_count)
         setFoam(o.foam_box_count)
         setPiece(o.piece_count)
+        setPackerName(o.packer_name ?? '')
         setPackPhotoCount(
           (o.evidence_photos ?? []).filter((p: any) => p.stage === 'pack').length,
         )
@@ -52,6 +55,9 @@ export default function PackOrder() {
     listPendingBackordersForOrder(id!)
       .then(setBackorders)
       .catch(() => setBackorders([]))
+    listDistinctPackerNames()
+      .then(setPackerNames)
+      .catch(() => setPackerNames([]))
   }, [id])
 
   if (failed) return <p className="alert alert-danger">โหลดออเดอร์ไม่สำเร็จ</p>
@@ -61,7 +67,13 @@ export default function PackOrder() {
     setBusy(true)
     setMsg(undefined)
     try {
-      await savePack({ orderId: id!, paperCount: paper, foamCount: foam, pieceCount: piece })
+      await savePack({
+        orderId: id!,
+        paperCount: paper,
+        foamCount: foam,
+        pieceCount: piece,
+        packerName,
+      })
       if (markPacked) await updateOrderStatus(id!, 'packed')
       setMsg(markPacked ? 'บันทึกและทำเครื่องหมายแพ็คเสร็จแล้ว' : 'บันทึกแล้ว')
     } catch (e) {
@@ -183,6 +195,20 @@ export default function PackOrder() {
             />
           </label>
         </div>
+        <label className="field">
+          <span className="field-label">ชื่อคนแพ็ค</span>
+          <input
+            list="packer-name-options"
+            className="w-56"
+            value={packerName}
+            onChange={(e) => setPackerName(e.target.value)}
+          />
+          <datalist id="packer-name-options">
+            {packerNames.map((n) => (
+              <option key={n} value={n} />
+            ))}
+          </datalist>
+        </label>
         <p className="muted">
           ลังกระดาษ {paper} · ลังโฟม {foam} · ชิ้น {piece} · รวม {paper + foam + piece}
         </p>

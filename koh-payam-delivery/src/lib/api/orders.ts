@@ -134,6 +134,34 @@ export async function setOrderBoat(orderId: string, boatId: string) {
   await logAction('boat_set', 'order', orderId, { boatId })
 }
 
+export async function setOrderPierName(orderId: string, pierName: string): Promise<void> {
+  const { data, error } = await supabase
+    .from('orders')
+    .update({ pier_name: pierName.trim() || null })
+    .eq('id', orderId)
+    .select('id')
+  if (error) throw new Error('บันทึกชื่อคนลงเรือไม่สำเร็จ: ' + error.message)
+  if (!data || data.length === 0)
+    throw new Error('บันทึกชื่อคนลงเรือไม่สำเร็จ (ออเดอร์อาจถูกส่งไปแล้ว)')
+  await logAction('pier_name_set', 'order', orderId, { pierName })
+}
+
+// Autocomplete source for the "ชื่อคนลงเรือ" field on the pier screen — distinct
+// pier names already used on other orders, read straight off `orders` rather
+// than a separate roster table.
+export async function listDistinctPierNames(): Promise<string[]> {
+  const { data, error } = await supabase
+    .from('orders')
+    .select('pier_name')
+    .not('pier_name', 'is', null)
+  if (error) return []
+  const names = new Set<string>()
+  for (const row of (data ?? []) as { pier_name: string | null }[]) {
+    if (row.pier_name) names.add(row.pier_name)
+  }
+  return Array.from(names).sort()
+}
+
 export async function regenTokenLink(orderId: string): Promise<string> {
   const token = makeLinkToken()
   const { error } = await supabase.from('orders').update({ link_token: token }).eq('id', orderId)
