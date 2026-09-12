@@ -1,4 +1,4 @@
-import { commitImport, regenTokenLink, updateOrderStatus } from './orders'
+import { commitImport, deleteOrder, regenTokenLink, updateOrderStatus } from './orders'
 
 const state = {
   existing: [] as any[],
@@ -6,6 +6,7 @@ const state = {
   deleted: [] as any[],
   updated: [] as any[],
   current: { status: 'imported' } as any,
+  deleteError: null as null | { message: string },
 }
 
 vi.mock('../supabase', () => {
@@ -36,7 +37,7 @@ vi.mock('../supabase', () => {
         },
         eq: (col: string, val: any) => {
           state.deleted.push({ table, [col]: val })
-          return Promise.resolve({ error: null })
+          return Promise.resolve({ error: state.deleteError })
         },
       }),
     }
@@ -54,7 +55,8 @@ vi.mock('./backorders', () => ({
   syncShortageBackorders: vi.fn().mockResolvedValue(undefined),
 }))
 
-vi.mock('./audit', () => ({ logAction: vi.fn() }))
+const logAction = vi.fn().mockResolvedValue(undefined)
+vi.mock('./audit', () => ({ logAction: (...a: unknown[]) => logAction(...a) }))
 
 const parsedOrders = [
   {
@@ -89,6 +91,8 @@ beforeEach(() => {
   state.deleted = []
   state.updated = []
   state.current = { status: 'imported' }
+  state.deleteError = null
+  logAction.mockClear()
 })
 
 test('fresh import inserts orders + items and counts created', async () => {
@@ -173,4 +177,28 @@ test('regenTokenLink returns a fresh token and persists it', async () => {
   const token = await regenTokenLink('o1')
   expect(token).toMatch(/^o_[0-9a-f]{32}$/)
   expect(state.updated).toEqual([{ table: 'orders', patch: { link_token: token } }])
+})
+
+test('deleteOrder deletes the row by id and logs the snapshot', async () => {
+  const snapshot = {
+    makroOrderNo: 'PO-1',
+    customerNameEn: 'A',
+    status: 'imported',
+    shipDate: '2026-10-01',
+  }
+  await deleteOrder('o1', snapshot)
+  expect(state.deleted).toEqual([{ table: 'orders', id: 'o1' }])
+  expect(logAction).toHaveBeenCalledWith('order_deleted', 'order', 'o1', snapshot)
+})
+
+test('deleteOrder throws a Thai error and does not log when the delete fails', async () => {
+  state.deleteError = { message: 'boom' }
+  const snapshot = {
+    makroOrderNo: 'PO-1',
+    customerNameEn: 'A',
+    status: 'imported',
+    shipDate: '2026-10-01',
+  }
+  await expect(deleteOrder('o1', snapshot)).rejects.toThrow(/ลบออเดอร์ไม่สำเร็จ/)
+  expect(logAction).not.toHaveBeenCalled()
 })

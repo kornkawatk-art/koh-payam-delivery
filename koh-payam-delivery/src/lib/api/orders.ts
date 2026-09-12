@@ -141,3 +141,21 @@ export async function regenTokenLink(orderId: string): Promise<string> {
   await logAction('regen_link', 'order', orderId)
   return token
 }
+
+// Manager-only, one-at-a-time hard delete of a wrongly-imported/cancelled order.
+// RLS's manager_delete policy is the real gate; this is just the client call.
+// The 4-field snapshot is passed in by the caller because there is nothing left
+// in the DB to read it back from once the row (and its cascaded children) is gone.
+export async function deleteOrder(
+  orderId: string,
+  snapshot: {
+    makroOrderNo: string
+    customerNameEn: string
+    status: string
+    shipDate: string
+  },
+): Promise<void> {
+  const { error } = await supabase.from('orders').delete().eq('id', orderId)
+  if (error) throw new Error('ลบออเดอร์ไม่สำเร็จ: ' + error.message)
+  await logAction('order_deleted', 'order', orderId, snapshot)
+}
