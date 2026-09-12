@@ -8,6 +8,7 @@ import {
 import { nextStatus, type OrderStatus } from '../../lib/status'
 import { StatusBadge } from '../../components/ui/StatusBadge'
 import { Spinner } from '../../components/ui/Spinner'
+import { ZoomableImage } from '../../components/ui/ZoomableImage'
 import { formatTHB } from '../../lib/format'
 import { useAuth } from '../../lib/auth'
 
@@ -134,7 +135,7 @@ export default function OrderDetail() {
       </header>
 
       {order.outstanding_amount != null && order.outstanding_amount > 0 && (
-        <p className="alert alert-warn">
+        <p className="alert alert-danger">
           เก็บเงินปลายทาง {formatTHB(order.outstanding_amount)} ({order.payment_method})
         </p>
       )}
@@ -230,11 +231,10 @@ export default function OrderDetail() {
         ) : (
           <div className="mt-1 flex flex-wrap gap-2">
             {packPhotos.map((p) => (
-              <img
+              <ZoomableImage
                 key={p.id ?? p.r2_key}
                 src={`${import.meta.env.VITE_R2_PUBLIC_BASE_URL}/${p.r2_key}`}
                 alt="หลักฐาน"
-                className="h-24 w-24 rounded-lg border border-line object-cover"
               />
             ))}
           </div>
@@ -248,11 +248,10 @@ export default function OrderDetail() {
         ) : (
           <div className="mt-1 flex flex-wrap gap-2">
             {handoffPhotos.map((p) => (
-              <img
+              <ZoomableImage
                 key={p.id ?? p.r2_key}
                 src={`${import.meta.env.VITE_R2_PUBLIC_BASE_URL}/${p.r2_key}`}
                 alt="หลักฐาน"
-                className="h-24 w-24 rounded-lg border border-line object-cover"
               />
             ))}
           </div>
