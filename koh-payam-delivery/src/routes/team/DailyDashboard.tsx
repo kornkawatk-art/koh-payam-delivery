@@ -1,19 +1,22 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { listOrdersForDay } from '../../lib/api/shipDays'
 import { listBackordersForDay, type BackorderRow } from '../../lib/api/backorders'
 import { supabase } from '../../lib/supabase'
 import { StatusBadge } from '../../components/ui/StatusBadge'
 import { Spinner } from '../../components/ui/Spinner'
 import { PageHeader } from '../../components/ui/PageHeader'
+import QrOrderScanner from '../../components/QrOrderScanner'
 import { todayLocalISO } from '../../lib/format'
 
 export default function DailyDashboard() {
+  const navigate = useNavigate()
   const [date, setDate] = useState(todayLocalISO())
   const [rows, setRows] = useState<any[] | null>(null)
   const [failed, setFailed] = useState(false)
   const [backorders, setBackorders] = useState<BackorderRow[]>([])
   const [q, setQ] = useState('')
+  const [scanOpen, setScanOpen] = useState(false)
 
   const load = useCallback(async () => {
     setFailed(false)
@@ -145,11 +148,44 @@ export default function DailyDashboard() {
         </div>
       )}
 
-      <input
-        placeholder="ค้นหาชื่อลูกค้า / เลขออเดอร์"
-        value={q}
-        onChange={(e) => setQ(e.target.value)}
-      />
+      <div className="flex items-center gap-2">
+        <input
+          placeholder="ค้นหาชื่อลูกค้า / เลขออเดอร์"
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+        />
+        <button
+          type="button"
+          className="btn btn-secondary btn-sm"
+          aria-label="สแกน QR ออเดอร์"
+          onClick={() => setScanOpen((v) => !v)}
+        >
+          <svg
+            className="h-4 w-4"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            aria-hidden="true"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              d="M4 8V6a2 2 0 0 1 2-2h2M4 16v2a2 2 0 0 0 2 2h2M20 8V6a2 2 0 0 0-2-2h-2M20 16v2a2 2 0 0 1-2 2h-2M4 12h16"
+            />
+          </svg>
+        </button>
+      </div>
+
+      {scanOpen && (
+        <QrOrderScanner
+          onFound={(order) => {
+            setScanOpen(false)
+            navigate(`/order/${order.id}`)
+          }}
+          onClose={() => setScanOpen(false)}
+        />
+      )}
 
       {filtered.length === 0 ? (
         <p className="muted">ไม่มีออเดอร์</p>
