@@ -18,7 +18,7 @@ type Item = {
 type Claim = {
   id: string
   type: string
-  qty: number
+  items: { productName: string | null; qty: number }[]
   description: string
   status: string
   resolution: string | null
@@ -264,9 +264,18 @@ export default function CustomerOrderView() {
           <ul className="flex flex-col gap-2">
             {data.claims.map((c) => (
               <li key={c.id} className="rounded-lg border border-line p-3">
-                {t(lang, `claim_type_${c.type}`)} × {c.qty} ·{' '}
-                {t(lang, `claim_status_${c.status}`)}
+                {t(lang, `claim_type_${c.type}`)} · {t(lang, `claim_status_${c.status}`)}
                 {c.resolution ? ` · ${t(lang, `claim_resolution_${c.resolution}`)}` : ''}
+                {c.items.length > 0 && (
+                  <span className="mt-1 block">
+                    {c.items.map((it, i) => (
+                      <span key={i}>
+                        {i > 0 ? ', ' : ''}
+                        {it.productName} × {it.qty}
+                      </span>
+                    ))}
+                  </span>
+                )}
                 <span className="mt-1 block text-ink-faint">
                   {formatDateTime(c.createdAt, lang)}
                 </span>

@@ -20,31 +20,60 @@ type Props = {
  * inside its 48h claim window. Photos go straight to R2 via `PhotoCapture`
  * (scope="claim"); the form POSTs the collected keys to the `submit-claim`
  * edge function, which does its own token + window auth.
+ *
+ * Item selection depends on the claim type:
+ *  - box_lost references no item at all.
+ *  - damaged references exactly one item (a single <select> + qty).
+ *  - missing_in_box can reference several items at once — a checkbox per
+ *    item, each with its own qty once checked.
  */
 export default function CustomerClaimForm({ token, items, lang, onDone }: Props) {
   const [type, setType] = useState<ClaimType>('missing_in_box')
   const [itemIndex, setItemIndex] = useState(0)
   const [qty, setQty] = useState(1)
+  const [missingItems, setMissingItems] = useState<Record<number, number>>({})
   const [description, setDescription] = useState('')
   const [keys, setKeys] = useState<string[]>([])
   const [busy, setBusy] = useState(false)
   const [photoBusy, setPhotoBusy] = useState(false)
   const [err, setErr] = useState(false)
 
-  const needsItem = type !== 'box_lost'
+  const missingCount = Object.keys(missingItems).length
+  const canSubmit = type !== 'missing_in_box' || missingCount > 0
+
+  function toggleMissingItem(idx: number, checked: boolean) {
+    setMissingItems((prev) => {
+      const next = { ...prev }
+      if (checked) next[idx] = next[idx] ?? 1
+      else delete next[idx]
+      return next
+    })
+  }
+
+  function setMissingItemQty(idx: number, q: number) {
+    setMissingItems((prev) => ({ ...prev, [idx]: q }))
+  }
 
   async function submit() {
     setBusy(true)
     setErr(false)
     try {
+      const claimItems =
+        type === 'box_lost'
+          ? []
+          : type === 'damaged'
+            ? [{ orderItemIndex: itemIndex, qty }]
+            : Object.entries(missingItems).map(([idx, q]) => ({
+                orderItemIndex: Number(idx),
+                qty: q,
+              }))
       const res = await fetch(FN, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${ANON}` },
         body: JSON.stringify({
           token,
           type,
-          orderItemIndex: needsItem ? itemIndex : null,
-          qty,
+          items: claimItems,
           description,
           photoKeys: keys,
         }),
@@ -82,7 +111,7 @@ export default function CustomerClaimForm({ token, items, lang, onDone }: Props)
         ))}
       </fieldset>
 
-      {needsItem && (
+      {type === 'damaged' && (
         <label className="field text-sm">
           <span className="field-label">{t(lang, 'claim_form_item')}</span>
           <select value={itemIndex} onChange={(e) => setItemIndex(Number(e.target.value))}>
@@ -95,17 +124,55 @@ export default function CustomerClaimForm({ token, items, lang, onDone }: Props)
         </label>
       )}
 
-      <label className="field text-sm">
-        <span className="field-label">{t(lang, 'claim_form_qty')}</span>
-        <input
-          type="number"
-          min={1}
-          inputMode="numeric"
-          value={qty}
-          onChange={(e) => setQty(Math.max(1, Math.floor(Number(e.target.value)) || 1))}
-          className="w-28"
-        />
-      </label>
+      {type === 'damaged' && (
+        <label className="field text-sm">
+          <span className="field-label">{t(lang, 'claim_form_qty')}</span>
+          <input
+            type="number"
+            min={1}
+            inputMode="numeric"
+            value={qty}
+            onChange={(e) => setQty(Math.max(1, Math.floor(Number(e.target.value)) || 1))}
+            onFocus={(e) => e.target.select()}
+            className="w-28"
+          />
+        </label>
+      )}
+
+      {type === 'missing_in_box' && (
+        <fieldset className="flex flex-col gap-2">
+          <legend className="section-title">{t(lang, 'claim_form_missing_items')}</legend>
+          {items.map((it, i) => {
+            const checked = i in missingItems
+            return (
+              <div key={`${it.productName}-${i}`} className="flex items-center gap-3 text-sm">
+                <label className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={checked}
+                    onChange={(e) => toggleMissingItem(i, e.target.checked)}
+                  />
+                  {it.productName}
+                </label>
+                {checked && (
+                  <input
+                    type="number"
+                    min={1}
+                    inputMode="numeric"
+                    aria-label={`${t(lang, 'claim_form_qty')}: ${it.productName}`}
+                    value={missingItems[i]}
+                    onChange={(e) =>
+                      setMissingItemQty(i, Math.max(1, Math.floor(Number(e.target.value)) || 1))
+                    }
+                    onFocus={(e) => e.target.select()}
+                    className="w-20"
+                  />
+                )}
+              </div>
+            )
+          })}
+        </fieldset>
+      )}
 
       <label className="field text-sm">
         <span className="field-label">{t(lang, 'claim_form_description')}</span>
@@ -121,7 +188,7 @@ export default function CustomerClaimForm({ token, items, lang, onDone }: Props)
         <PhotoCapture
           scope="claim"
           token={token}
-          max={3}
+          max={5}
           onBusyChange={setPhotoBusy}
           onUploaded={(k) => setKeys((ks) => [...ks, k])}
         />
@@ -131,7 +198,11 @@ export default function CustomerClaimForm({ token, items, lang, onDone }: Props)
 
       {photoBusy && <p className="muted text-xs">{t(lang, 'claim_form_photo_uploading')}</p>}
 
-      <button type="submit" disabled={busy || photoBusy} className="btn btn-primary w-full">
+      <button
+        type="submit"
+        disabled={busy || photoBusy || !canSubmit}
+        className="btn btn-primary w-full"
+      >
         {busy ? t(lang, 'claim_form_submitting') : t(lang, 'claim_form_submit')}
       </button>
     </form>

@@ -146,3 +146,51 @@ test('opens the claim form stub when report-a-problem is clicked', async () => {
     expect(screen.queryByRole('button', { name: 'Report a problem' })).not.toBeInTheDocument(),
   )
 })
+
+test('renders each claim item as product × qty for a multi-item claim', async () => {
+  fetchMock.mockReset().mockResolvedValue(
+    ok({
+      ...payload,
+      claims: [
+        {
+          id: 'c1',
+          type: 'missing_in_box',
+          items: [
+            { productName: 'Rice 5kg', qty: 2 },
+            { productName: 'Fish sauce', qty: 1 },
+          ],
+          description: '',
+          status: 'open',
+          resolution: null,
+          createdAt: '2026-09-10T00:00:00.000Z',
+        },
+      ],
+    }),
+  )
+  renderAt()
+  await screen.findByText(/PO-1001/)
+  expect(document.body.textContent).toContain('Rice 5kg × 2')
+  expect(document.body.textContent).toContain('Fish sauce × 1')
+})
+
+test('renders a claim with no items (box_lost) with no item line', async () => {
+  fetchMock.mockReset().mockResolvedValue(
+    ok({
+      ...payload,
+      claims: [
+        {
+          id: 'c2',
+          type: 'box_lost',
+          items: [],
+          description: '',
+          status: 'open',
+          resolution: null,
+          createdAt: '2026-09-10T00:00:00.000Z',
+        },
+      ],
+    }),
+  )
+  renderAt()
+  expect(await screen.findByText(/Box lost/)).toBeInTheDocument()
+  expect(screen.queryByText(/×/)).not.toBeInTheDocument()
+})
