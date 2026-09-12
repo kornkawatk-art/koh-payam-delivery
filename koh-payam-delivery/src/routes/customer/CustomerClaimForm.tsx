@@ -10,9 +10,22 @@ type ClaimType = (typeof CLAIM_TYPES)[number]
 
 type Props = {
   token: string
-  items: { productName: string }[]
+  items: { productName: string; shippedQty: number }[]
   lang: Lang
   onDone: () => void
+}
+
+// Mobile Safari/Chrome don't reliably apply a synchronous `.select()` called
+// inside a focus handler for `type="number"` inputs — the native focus/
+// keyboard-open sequence hasn't settled yet. Deferring one tick with
+// `setTimeout(…, 0)` (rather than `requestAnimationFrame`) matches this
+// component's other deferred-work precedent in the codebase (PhotoCapture's
+// timeout handling also reaches for `setTimeout`), and is trivially
+// testable with `vi.useFakeTimers()` the same way that file's tests already
+// do — no jsdom RAF polyfill quirks to worry about.
+function selectOnFocus(e: React.FocusEvent<HTMLInputElement>) {
+  const el = e.target
+  setTimeout(() => el.select(), 0)
 }
 
 /**
@@ -23,26 +36,34 @@ type Props = {
  *
  * Item selection depends on the claim type:
  *  - box_lost references no item at all.
- *  - damaged references exactly one item (a single <select> + qty).
- *  - missing_in_box can reference several items at once — a checkbox per
- *    item, each with its own qty once checked.
+ *  - missing_in_box and damaged both reference one or more items — a
+ *    checkbox per item, each with its own qty once checked, capped at that
+ *    item's shippedQty (an item that shipped 0 units isn't offered at all —
+ *    that's the existing shortage/backorder flow, a different concept).
  */
 export default function CustomerClaimForm({ token, items, lang, onDone }: Props) {
   const [type, setType] = useState<ClaimType>('missing_in_box')
-  const [itemIndex, setItemIndex] = useState(0)
-  const [qty, setQty] = useState(1)
-  const [missingItems, setMissingItems] = useState<Record<number, number>>({})
+  const [checkedItems, setCheckedItems] = useState<Record<number, number>>({})
   const [description, setDescription] = useState('')
   const [keys, setKeys] = useState<string[]>([])
   const [busy, setBusy] = useState(false)
   const [photoBusy, setPhotoBusy] = useState(false)
   const [err, setErr] = useState(false)
 
-  const missingCount = Object.keys(missingItems).length
-  const canSubmit = type !== 'missing_in_box' || missingCount > 0
+  const checkedCount = Object.keys(checkedItems).length
+  const canSubmit = type === 'box_lost' || checkedCount > 0
+  const showItemChecklist = type === 'missing_in_box' || type === 'damaged'
+  const claimableItems = items
+    .map((it, index) => ({ ...it, index }))
+    .filter((it) => it.shippedQty > 0)
 
-  function toggleMissingItem(idx: number, checked: boolean) {
-    setMissingItems((prev) => {
+  function changeType(ct: ClaimType) {
+    setType(ct)
+    setCheckedItems({})
+  }
+
+  function toggleItem(idx: number, checked: boolean) {
+    setCheckedItems((prev) => {
       const next = { ...prev }
       if (checked) next[idx] = next[idx] ?? 1
       else delete next[idx]
@@ -50,8 +71,8 @@ export default function CustomerClaimForm({ token, items, lang, onDone }: Props)
     })
   }
 
-  function setMissingItemQty(idx: number, q: number) {
-    setMissingItems((prev) => ({ ...prev, [idx]: q }))
+  function setItemQty(idx: number, q: number) {
+    setCheckedItems((prev) => ({ ...prev, [idx]: q }))
   }
 
   async function submit() {
@@ -61,12 +82,10 @@ export default function CustomerClaimForm({ token, items, lang, onDone }: Props)
       const claimItems =
         type === 'box_lost'
           ? []
-          : type === 'damaged'
-            ? [{ orderItemIndex: itemIndex, qty }]
-            : Object.entries(missingItems).map(([idx, q]) => ({
-                orderItemIndex: Number(idx),
-                qty: q,
-              }))
+          : Object.entries(checkedItems).map(([idx, q]) => ({
+              orderItemIndex: Number(idx),
+              qty: q,
+            }))
       const res = await fetch(FN, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${ANON}` },
@@ -104,67 +123,48 @@ export default function CustomerClaimForm({ token, items, lang, onDone }: Props)
               name="claim_type"
               value={ct}
               checked={type === ct}
-              onChange={() => setType(ct)}
+              onChange={() => changeType(ct)}
             />
             {t(lang, `claim_type_${ct}`)}
           </label>
         ))}
       </fieldset>
 
-      {type === 'damaged' && (
-        <label className="field text-sm">
-          <span className="field-label">{t(lang, 'claim_form_item')}</span>
-          <select value={itemIndex} onChange={(e) => setItemIndex(Number(e.target.value))}>
-            {items.map((it, i) => (
-              <option key={`${it.productName}-${i}`} value={i}>
-                {it.productName}
-              </option>
-            ))}
-          </select>
-        </label>
-      )}
-
-      {type === 'damaged' && (
-        <label className="field text-sm">
-          <span className="field-label">{t(lang, 'claim_form_qty')}</span>
-          <input
-            type="number"
-            min={1}
-            inputMode="numeric"
-            value={qty}
-            onChange={(e) => setQty(Math.max(1, Math.floor(Number(e.target.value)) || 1))}
-            onFocus={(e) => e.target.select()}
-            className="w-28"
-          />
-        </label>
-      )}
-
-      {type === 'missing_in_box' && (
+      {showItemChecklist && (
         <fieldset className="flex flex-col gap-2">
-          <legend className="section-title">{t(lang, 'claim_form_missing_items')}</legend>
-          {items.map((it, i) => {
-            const checked = i in missingItems
+          <legend className="section-title">
+            {t(lang, type === 'damaged' ? 'claim_form_damaged_items' : 'claim_form_missing_items')}
+          </legend>
+          {claimableItems.map(({ productName, shippedQty, index }) => {
+            const checked = index in checkedItems
             return (
-              <div key={`${it.productName}-${i}`} className="flex items-center gap-3 text-sm">
+              <div key={`${productName}-${index}`} className="flex items-center gap-3 text-sm">
                 <label className="flex items-center gap-2">
                   <input
                     type="checkbox"
                     checked={checked}
-                    onChange={(e) => toggleMissingItem(i, e.target.checked)}
+                    onChange={(e) => toggleItem(index, e.target.checked)}
                   />
-                  {it.productName}
+                  {productName}
                 </label>
                 {checked && (
                   <input
                     type="number"
                     min={1}
+                    max={shippedQty}
                     inputMode="numeric"
-                    aria-label={`${t(lang, 'claim_form_qty')}: ${it.productName}`}
-                    value={missingItems[i]}
+                    aria-label={`${t(lang, 'claim_form_qty')}: ${productName}`}
+                    value={checkedItems[index]}
                     onChange={(e) =>
-                      setMissingItemQty(i, Math.max(1, Math.floor(Number(e.target.value)) || 1))
+                      setItemQty(
+                        index,
+                        Math.min(
+                          shippedQty,
+                          Math.max(1, Math.floor(Number(e.target.value)) || 1),
+                        ),
+                      )
                     }
-                    onFocus={(e) => e.target.select()}
+                    onFocus={selectOnFocus}
                     className="w-20"
                   />
                 )}
