@@ -164,11 +164,21 @@ export function parseExpectedDate(raw: string): string | null {
   return `${m[3]}-${mm}-${m[1].padStart(2, '0')}`
 }
 
-/** เกาะพยาม: Sub District = "เกาะพยาม" หรือ ที่อยู่มี ไต๋แขก / tai kak / taikak */
+// Sub District is inconsistently filled in by Makro's own staff — seen so far:
+// "เกาะพยาม" (Thai), "Ko Phayam" / "Koh Phayam" (English, any spacing/case).
+// Some orders are even filed under a mainland sub-district ("บางนอน" — a real,
+// mostly-mainland Ranong sub-district covering dozens of unrelated addresses)
+// with "เกาะพยาม" only appearing as free text at the start of the shipping
+// address. So the address check must also recognise the island's own name,
+// not just the Taikak-pier landmark it originally covered.
+const PAYAM_NAME = /เกาะพยาม|ko\s*h?\s*phayam/i
+
+/** เกาะพยาม: Sub District = เกาะพยาม/Ko(h) Phayam, หรือที่อยู่มีชื่อเกาะ/ไต๋แขก/tai kak/taikak */
 export function isPayam(o: { subDistrict: string; shippingAddress: string }): boolean {
   return (
-    (o.subDistrict ?? '').trim() === 'เกาะพยาม' ||
-    /ไต๋แขก|tai\s*kak|taikak/i.test(o.shippingAddress ?? '')
+    PAYAM_NAME.test((o.subDistrict ?? '').trim()) ||
+    /ไต๋แขก|tai\s*kak|taikak/i.test(o.shippingAddress ?? '') ||
+    PAYAM_NAME.test(o.shippingAddress ?? '')
   )
 }
 

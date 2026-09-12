@@ -39,6 +39,40 @@ test('isPayam: ที่อยู่อื่น -> false', () => {
   expect(isPayam({ subDistrict: 'บางริ้น', shippingAddress: '9 ถนนเรืองราษฎร์' })).toBe(false)
 })
 
+// Real orders missed on 2026-09-12 import: Makro's own Sub District field is
+// filled in inconsistently — English spelling, or even a mainland
+// sub-district with the island name only in the free-text address.
+test('isPayam: Sub District สะกดอังกฤษ "Ko Phayam" -> true', () => {
+  expect(
+    isPayam({
+      subDistrict: 'Ko Phayam',
+      shippingAddress: 'moo1 aow yai  Ko Phayam,Mueang Ranong ,Ranong, 85000,Thailand',
+    }),
+  ).toBe(true)
+  expect(isPayam({ subDistrict: 'Koh Phayam', shippingAddress: '' })).toBe(true)
+})
+
+test('isPayam: Sub District เป็นตำบลอื่น (บางนอน) แต่ที่อยู่ขึ้นต้นด้วยเกาะพยาม -> true', () => {
+  expect(
+    isPayam({
+      subDistrict: 'บางนอน',
+      shippingAddress: 'เกาะพยาม  บางนอน,เมืองระนอง ,ระนอง, 85000,Thailand',
+    }),
+  ).toBe(true)
+})
+
+test('isPayam: บางนอน ธรรมดา (ไม่มีชื่อเกาะในที่อยู่) ยังคงเป็น false', () => {
+  // บางนอน is a real, mostly-mainland Ranong sub-district — must not become a
+  // blanket match on its own, or dozens of unrelated mainland orders would
+  // be misfiled as Koh Payam deliveries.
+  expect(
+    isPayam({
+      subDistrict: 'บางนอน',
+      shippingAddress: '89/165 ม.2  บางนอน,เมืองระนอง ,ระนอง, 85000,Thailand',
+    }),
+  ).toBe(false)
+})
+
 // --- parseExpectedDate ---------------------------------------------------------
 
 test('parseExpectedDate takes the first date and returns ISO', () => {
