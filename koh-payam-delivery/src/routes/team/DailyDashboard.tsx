@@ -163,6 +163,8 @@ export default function DailyDashboard() {
                 <th>สถานะ</th>
                 <th>รวม</th>
                 <th>เรือ</th>
+                <th>คนแพ็ค</th>
+                <th>คนลงเรือ</th>
               </tr>
             </thead>
             <tbody>
@@ -187,6 +189,8 @@ export default function DailyDashboard() {
                     {o.paper_box_count + o.foam_box_count + o.piece_count}
                   </td>
                   <td className="whitespace-nowrap">{o.boat_id ?? '—'}</td>
+                  <td>{o.packer_name || '—'}</td>
+                  <td>{o.pier_name || '—'}</td>
                 </tr>
               ))}
             </tbody>

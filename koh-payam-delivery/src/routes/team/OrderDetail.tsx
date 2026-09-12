@@ -145,6 +145,9 @@ export default function OrderDetail() {
         {order.piece_count} · รวม{' '}
         {order.paper_box_count + order.foam_box_count + order.piece_count}
       </p>
+      <p className="muted">
+        คนแพ็ค: {order.packer_name || '—'} · คนลงเรือ: {order.pier_name || '—'}
+      </p>
 
       <div className="flex gap-4 text-sm">
         <Link className="link" to={`/order/${id}/pack`}>
