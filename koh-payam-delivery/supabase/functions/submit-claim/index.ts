@@ -2,10 +2,11 @@
 //   -> { ok: true, claimId }
 //
 // `items` holds the order_items this claim references, each with its own qty:
-// box_lost must send [] (no item is referenced), damaged must send exactly 1
-// entry, missing_in_box must send 1+ entries (a claim can now reference
-// several products at once). The claim + its items are created atomically by
-// the `create_claim` RPC.
+// box_lost must send [] (no item is referenced), damaged and missing_in_box
+// must both send 1+ entries (a claim can reference several products at
+// once). Each entry's qty is clamped server-side to that order_item's
+// qty_shipped — defense-in-depth against a client that bypasses the UI cap.
+// The claim + its items are created atomically by the `create_claim` RPC.
 //
 // config.toml sets verify_jwt = false: the customer submits this from an emailed
 // link with no Supabase session. Auth here mirrors photo-upload-url's claim
@@ -20,7 +21,7 @@ const CLAIM_WINDOW_MS = 48 * 60 * 60 * 1000
 // How many `items` entries each claim type requires.
 const ITEMS_COUNT_OK: Record<string, (n: number) => boolean> = {
   box_lost: (n) => n === 0,
-  damaged: (n) => n === 1,
+  damaged: (n) => n >= 1,
   missing_in_box: (n) => n >= 1,
 }
 
@@ -84,12 +85,13 @@ Deno.serve(async (req) => {
 
     // Resolve each item's orderItemIndex to an order_items.id the same way the
     // single-item form used to: index into this order's items ordered by
-    // line_no. Fetched once and reused for every entry in `items`.
-    let orderItemsList: { id: string }[] | null = null
+    // line_no. Fetched once and reused for every entry in `items`. qty_shipped
+    // is fetched alongside so each entry's qty can be clamped below.
+    let orderItemsList: { id: string; qty_shipped: number }[] | null = null
     if (rawItems.length) {
       const { data: items } = await admin
         .from('order_items')
-        .select('id,line_no')
+        .select('id,line_no,qty_shipped')
         .eq('order_id', o.id)
         .order('line_no')
       orderItemsList = items ?? []
@@ -97,10 +99,10 @@ Deno.serve(async (req) => {
 
     const itemsJson = rawItems.map((it: Record<string, unknown>) => {
       const idx = it?.orderItemIndex
-      const orderItemId = Number.isInteger(idx)
-        ? (orderItemsList?.[idx as number]?.id ?? null)
-        : null
-      const qty = Math.max(1, Math.floor(Number(it?.qty) || 1))
+      const resolvedItem = Number.isInteger(idx) ? orderItemsList?.[idx as number] : null
+      const orderItemId = resolvedItem?.id ?? null
+      const submittedQty = Math.max(1, Math.floor(Number(it?.qty) || 1))
+      const qty = Math.min(submittedQty, resolvedItem?.qty_shipped || 1)
       return { order_item_id: orderItemId, qty }
     })
 
