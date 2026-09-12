@@ -6,15 +6,21 @@ import OrderDetail from './OrderDetail'
 const getOrder = vi.fn()
 const updateOrderStatus = vi.fn().mockResolvedValue(undefined)
 const regenTokenLink = vi.fn().mockResolvedValue('o_new')
+const deleteOrder = vi.fn().mockResolvedValue(undefined)
 const listRelatedBackordersForOrder = vi.fn().mockResolvedValue([])
+const useAuthMock = vi.fn()
 
 vi.mock('../../lib/api/orders', () => ({
   getOrder: (...a: unknown[]) => getOrder(...a),
   updateOrderStatus: (...a: unknown[]) => updateOrderStatus(...a),
   regenTokenLink: (...a: unknown[]) => regenTokenLink(...a),
+  deleteOrder: (...a: unknown[]) => deleteOrder(...a),
 }))
 vi.mock('../../lib/api/backorders', () => ({
   listRelatedBackordersForOrder: (...a: unknown[]) => listRelatedBackordersForOrder(...a),
+}))
+vi.mock('../../lib/auth', () => ({
+  useAuth: () => useAuthMock(),
 }))
 
 const order = {
@@ -47,7 +53,9 @@ beforeEach(() => {
   getOrder.mockReset().mockResolvedValue(order)
   updateOrderStatus.mockClear()
   regenTokenLink.mockClear().mockResolvedValue('o_new')
+  deleteOrder.mockClear().mockResolvedValue(undefined)
   listRelatedBackordersForOrder.mockReset().mockResolvedValue([])
+  useAuthMock.mockReset().mockReturnValue({ profile: { id: 'u1', name: 'ผจก', role: 'manager' } })
   Object.assign(navigator, { clipboard: { writeText: vi.fn() } })
 })
 
@@ -60,6 +68,7 @@ const renderPage = () =>
       <Routes>
         <Route path="/order/:id" element={<OrderDetail />} />
         <Route path="/order/:id/pack" element={<div>pack page</div>} />
+        <Route path="/" element={<div>home page</div>} />
       </Routes>
     </MemoryRouter>,
   )
@@ -159,4 +168,71 @@ test('a pack-stage photo alone does NOT open the pier gate', async () => {
   expect(
     screen.getByText('ต้องเลือกเรือและถ่ายรูปหลักฐานที่หน้า "ที่ท่าเรือ" ก่อน'),
   ).toBeInTheDocument()
+})
+
+test('a non-manager does not see the delete button', async () => {
+  useAuthMock.mockReset().mockReturnValue({ profile: { id: 'u1', name: 'แพ็ค', role: 'packer' } })
+  renderPage()
+  await screen.findByText(order.customer_name_en, { exact: false })
+  expect(screen.queryByRole('button', { name: 'ลบออเดอร์นี้' })).not.toBeInTheDocument()
+})
+
+test('a manager sees the delete button', async () => {
+  renderPage()
+  expect(await screen.findByRole('button', { name: 'ลบออเดอร์นี้' })).toBeInTheDocument()
+})
+
+test('the confirm-delete button stays disabled until the order number is typed exactly', async () => {
+  renderPage()
+  await userEvent.click(await screen.findByRole('button', { name: 'ลบออเดอร์นี้' }))
+  const confirmBtn = screen.getByRole('button', { name: 'ลบถาวร' })
+  expect(confirmBtn).toBeDisabled()
+
+  const input = screen.getByRole('textbox')
+  await userEvent.type(input, 'PO-1 ')
+  expect(confirmBtn).toBeDisabled()
+
+  await userEvent.clear(input)
+  await userEvent.type(input, 'PO-1')
+  expect(confirmBtn).toBeEnabled()
+})
+
+test('confirming the delete calls deleteOrder with the snapshot then navigates home', async () => {
+  renderPage()
+  await userEvent.click(await screen.findByRole('button', { name: 'ลบออเดอร์นี้' }))
+  await userEvent.type(screen.getByRole('textbox'), 'PO-1')
+  await userEvent.click(screen.getByRole('button', { name: 'ลบถาวร' }))
+
+  expect(deleteOrder).toHaveBeenCalledWith('ord1', {
+    makroOrderNo: 'PO-1',
+    customerNameEn: 'BLUE VIEW',
+    status: 'imported',
+    shipDate: '2026-10-01',
+  })
+  expect(await screen.findByText('home page')).toBeInTheDocument()
+})
+
+test('a failed delete shows the Thai error and stays on the page', async () => {
+  deleteOrder.mockReset().mockRejectedValue(new Error('ลบออเดอร์ไม่สำเร็จ: boom'))
+  renderPage()
+  await userEvent.click(await screen.findByRole('button', { name: 'ลบออเดอร์นี้' }))
+  await userEvent.type(screen.getByRole('textbox'), 'PO-1')
+  await userEvent.click(screen.getByRole('button', { name: 'ลบถาวร' }))
+
+  expect(await screen.findByText('ลบออเดอร์ไม่สำเร็จ: boom')).toBeInTheDocument()
+  expect(screen.queryByText('home page')).not.toBeInTheDocument()
+})
+
+test('shows a distinctly stronger warning when the order is already shipped', async () => {
+  getOrder.mockReset().mockResolvedValue({ ...order, status: 'shipped' })
+  renderPage()
+  await userEvent.click(await screen.findByRole('button', { name: 'ลบออเดอร์นี้' }))
+  expect(screen.getByText(/ส่งขึ้นเรือแล้ว/)).toBeInTheDocument()
+})
+
+test('does not show the shipped warning for a non-shipped order', async () => {
+  renderPage()
+  await userEvent.click(await screen.findByRole('button', { name: 'ลบออเดอร์นี้' }))
+  expect(screen.queryByText(/ส่งขึ้นเรือแล้ว/)).not.toBeInTheDocument()
+  expect(screen.getByText(/พิมพ์เลขออเดอร์ PO-1 เพื่อยืนยันการลบถาวร/)).toBeInTheDocument()
 })

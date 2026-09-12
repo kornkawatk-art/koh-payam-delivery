@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
-import { getOrder, updateOrderStatus, regenTokenLink } from '../../lib/api/orders'
+import { Link, useParams, useNavigate } from 'react-router-dom'
+import { getOrder, updateOrderStatus, regenTokenLink, deleteOrder } from '../../lib/api/orders'
 import {
   listRelatedBackordersForOrder,
   type BackorderRow,
@@ -9,6 +9,7 @@ import { nextStatus, type OrderStatus } from '../../lib/status'
 import { StatusBadge } from '../../components/ui/StatusBadge'
 import { Spinner } from '../../components/ui/Spinner'
 import { formatTHB } from '../../lib/format'
+import { useAuth } from '../../lib/auth'
 
 const STATUS_LABEL: Record<OrderStatus, string> = {
   imported: 'นำเข้าแล้ว',
@@ -19,11 +20,15 @@ const STATUS_LABEL: Record<OrderStatus, string> = {
 
 export default function OrderDetail() {
   const { id } = useParams()
+  const nav = useNavigate()
+  const { profile } = useAuth()
   const [order, setOrder] = useState<any>(null)
   const [backorders, setBackorders] = useState<BackorderRow[]>([])
   const [failed, setFailed] = useState(false)
   const [msg, setMsg] = useState<string>()
   const [busy, setBusy] = useState(false)
+  const [deleteOpen, setDeleteOpen] = useState(false)
+  const [confirmText, setConfirmText] = useState('')
 
   const load = useCallback(() => {
     getOrder(id!)
@@ -76,6 +81,24 @@ export default function OrderDetail() {
       await regenTokenLink(id!)
       load()
       setMsg('สร้างลิงก์ใหม่แล้ว')
+    } catch (e) {
+      setMsg((e as Error).message)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function doDelete() {
+    setBusy(true)
+    setMsg(undefined)
+    try {
+      await deleteOrder(id!, {
+        makroOrderNo: order.makro_order_no,
+        customerNameEn: order.customer_name_en,
+        status: order.status,
+        shipDate: order.ship_date,
+      })
+      nav('/')
     } catch (e) {
       setMsg((e as Error).message)
     } finally {
@@ -249,6 +272,54 @@ export default function OrderDetail() {
           </ul>
         )}
       </section>
+
+      {profile?.role === 'manager' && (
+        <section className="card flex flex-col gap-3 text-sm">
+          <p className="section-title">พื้นที่อันตราย</p>
+          {!deleteOpen ? (
+            <button
+              className="btn btn-danger btn-sm self-start"
+              onClick={() => setDeleteOpen(true)}
+            >
+              ลบออเดอร์นี้
+            </button>
+          ) : (
+            <div className="flex flex-col gap-3">
+              {order.status === 'shipped' && (
+                <p className="alert alert-danger">
+                  ⚠️ ออเดอร์นี้ส่งขึ้นเรือแล้ว ลูกค้าอาจเคยเห็นลิงก์หรือเคยแจ้งเคลมไปแล้ว —
+                  การลบจะลบข้อมูลเคลมที่เกี่ยวข้องไปด้วยถาวร
+                </p>
+              )}
+              <label className="field">
+                <span className="field-label">
+                  พิมพ์เลขออเดอร์ {order.makro_order_no} เพื่อยืนยันการลบถาวร
+                </span>
+                <input
+                  value={confirmText}
+                  onChange={(e) => setConfirmText(e.target.value)}
+                />
+              </label>
+              <div className="flex gap-2">
+                <button
+                  className="btn btn-danger"
+                  onClick={doDelete}
+                  disabled={busy || confirmText !== order.makro_order_no}
+                >
+                  ลบถาวร
+                </button>
+                <button
+                  className="btn btn-secondary btn-sm"
+                  onClick={() => setDeleteOpen(false)}
+                  disabled={busy}
+                >
+                  ยกเลิก
+                </button>
+              </div>
+            </div>
+          )}
+        </section>
+      )}
 
       {msg && <p className="muted">{msg}</p>}
     </div>
