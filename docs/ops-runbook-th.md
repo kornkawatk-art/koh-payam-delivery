@@ -165,13 +165,21 @@ SITE_URL=
 1. ไปที่ https://developers.line.biz/console/ → ล็อกอินด้วยบัญชี LINE ที่ผูกกับ OA (LINE Official Account) ของร้านอยู่แล้ว
 2. เปิด **Messaging API** ให้ช่องทาง OA เดิม (ถ้ายังไม่เปิด): เลือก provider → **Create a Messaging API channel** ผูกกับ OA เดิม
 3. คัดลอก **Channel access token** (long-lived) จากแท็บ **Messaging API** ของช่องทางนั้น → เอาไปใส่ `LINE_CHANNEL_ACCESS_TOKEN` ด้านบน
-4. สร้าง **LIFF app** ใหม่ (แท็บ **LIFF** ของ provider เดียวกัน หรือคนละ channel ก็ได้):
+4. สร้าง **LIFF app** ใหม่ (แท็บ **LIFF** — จะอยู่ใน channel เดียวกับ Messaging API หรือเป็น LINE Login channel แยกอีกอันก็ได้):
+   - ⚠️ **LIFF app ต้องอยู่ภายใต้ provider เดียวกัน กับ Messaging API channel — คนละ provider จะส่งข้อความไม่ได้เลย** เพราะ LINE `userId` ผูกกับ provider: `userId` ที่ได้จาก LIFF ของ provider อื่นจะใช้ push เข้า OA นี้ไม่ได้ (LINE ตอบ 400 ทุกครั้ง) และจะไม่มีอะไรฟ้องนอกจาก "ส่งลิงก์ไลน์ 0 ฉบับ"
    - **Endpoint URL:** `<โดเมนเว็บจริง>/liff/register` (เช่น `https://koh-payam.vercel.app/liff/register`)
    - **Scope:** `openid`, `profile` (ใช้ `liff.getIDToken()`)
    - **Size:** Full ก็พอ
-   - คัดลอก **LIFF ID** ที่ได้ → ใส่ `VITE_LIFF_ID` (ฝั่งเว็บ) **และ** `LIFF_CHANNEL_ID` (channel id ของ LIFF app นี้ ใช้ฝั่ง edge function ตอนตรวจสอบ id token — อยู่ในหน้า channel เดียวกัน)
+   - ⚠️ **ต้องคัดลอก 2 ค่า ที่คนละที่กัน — ไม่ใช่ค่าเดียวกันใส่ 2 ช่อง:**
+     - `VITE_LIFF_ID` = **LIFF ID** ของ LIFF app ที่เพิ่งสร้าง (อยู่ในแท็บ **LIFF** ตรงแถวของ app นั้น หน้าตาเป็น `1234567890-AbCdEfGh`) — ค่านี้ฝังในหน้าเว็บ ไม่ใช่ความลับ
+     - `LIFF_CHANNEL_ID` = **Channel ID** (ตัวเลขล้วน) ของ **channel ที่ LIFF app นี้สังกัดอยู่** ดูได้ที่แท็บ **Basic settings** ของ channel นั้น — edge function `register-line-contact` เอาไปใช้เป็น `client_id` ตอนตรวจสอบ id token กับ LINE ถ้าใส่ผิด/ใส่ LIFF ID แทน จะได้ 401 "ยืนยันตัวตน LINE ไม่สำเร็จ" ทุกครั้ง
 5. ใส่ `SITE_URL` เป็นโดเมนเว็บจริง (ไม่มี `/` ท้าย) — `send-order-links` เอาไปต่อเป็น `<SITE_URL>/o/<token>` ตอนส่งลิงก์ทาง LINE
 6. รัน `supabase secrets set LIFF_CHANNEL_ID=... LINE_CHANNEL_ACCESS_TOKEN=... SITE_URL=...` (ดูขั้นที่ 4 ด้านล่าง) แล้ว `supabase functions deploy register-line-contact send-order-links`
+
+> 🔧 **กู้คืนกรณีวันไหนถูกทำเครื่องหมายว่า "ส่งแล้ว" ทั้งที่ยังไม่ได้ส่งจริง** (เช่น เผลอ deploy ก่อนตั้ง secrets): ระบบส่งลิงก์ได้วันละครั้งเท่านั้น ถ้าต้องให้ส่งใหม่ ให้ล้างตัวกันซ้ำด้วย SQL ใน Supabase → SQL Editor แล้วกด **บันทึก** ที่หน้า "ตั้งค่าเรือประจำวัน" อีกครั้ง (ส่งได้เฉพาะ **วันปัจจุบัน** เท่านั้น — วันย้อนหลังระบบจะข้ามให้เงียบ ๆ เพราะลิงก์หมดอายุไปแล้ว):
+> ```sql
+> update ship_days set links_sent_at = null where ship_date = '<date>';
+> ```
 
 > ⚠️ **โควตาข้อความ:** ร้านมีออเดอร์จริงมากกว่า 50 รายการ/วัน ซึ่ง**เกินโควตาฟรีของ LINE Official Account แน่นอน** — ต้องอัปเกรดเป็นแพลนเสียเงิน (Light/Standard) ก่อนเปิดใช้ฟีเจอร์นี้กับลูกค้าจริง ไม่งั้นข้อความจะถูกบล็อกกลางทาง
 

@@ -384,6 +384,15 @@ deno_version = 2
 # [edge_runtime.secrets]
 # secret_key = "env(SECRET_VALUE)"
 
+# STANDING RULE for every [functions.*] block below. The default is
+# `verify_jwt = true`. A function gets an entry here ONLY if it must be callable
+# without a Supabase session (a customer link with no login, or a server-to-server
+# caller). Adding a `verify_jwt = false` entry for a function meant to be called
+# by a logged-in team member is the dangerous mistake — it silently opens that
+# function to the whole internet, and every block already in this file looks
+# exactly like that, so it would not stand out in review. Omitting an entry only
+# ever fails closed (the gateway rejects the call), so when in doubt, omit.
+#
 # Customer-facing functions: hit from an emailed link with no Supabase session.
 # They do their own auth (order-view: link_token; photo-upload-url: bearer token
 # for evidence, link_token + 48h window for claim; submit-claim: link_token +
