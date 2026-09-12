@@ -31,13 +31,19 @@ const SCANNER_ELEMENT_ID = 'qr-order-scanner-view'
 export default function QrOrderScanner({ onFound, onClose }: Props) {
   const scannerRef = useRef<Html5Qrcode | null>(null)
   const busyRef = useRef(false)
+  // Set by BOTH the effect's unmount cleanup and the close button (unlike a
+  // plain effect-local `cancelled` variable, which the close-button handler
+  // has no way to reach). `start()`'s post-await continuation checks this to
+  // know whether it should tear the camera back down instead of leaving it
+  // running.
+  const cancelledRef = useRef(false)
   const [starting, setStarting] = useState(true)
   const [cameraErr, setCameraErr] = useState('')
   const [retryMsg, setRetryMsg] = useState('')
   const [candidates, setCandidates] = useState<FoundOrder[] | null>(null)
 
   useEffect(() => {
-    let cancelled = false
+    cancelledRef.current = false
 
     async function handleDecoded(decodedText: string) {
       if (busyRef.current) return
@@ -47,7 +53,6 @@ export default function QrOrderScanner({ onFound, onClose }: Props) {
         const orders = await findOrdersByMakroOrderNo(decodedText)
         if (orders.length === 0) {
           setRetryMsg(`ไม่พบออเดอร์เลข ${decodedText} กรุณาลองสแกนใหม่`)
-          busyRef.current = false
           return
         }
         await stopCamera()
@@ -59,10 +64,16 @@ export default function QrOrderScanner({ onFound, onClose }: Props) {
       } catch (e) {
         await stopCamera()
         setCameraErr((e as Error).message || 'ค้นหาออเดอร์ไม่สำเร็จ')
+      } finally {
+        busyRef.current = false
       }
     }
 
     async function start() {
+      // Captured in this closure so the post-await continuation below can
+      // always reach the real scanner it started — even if `stopCamera()`
+      // ran (from unmount or the close button) while `.start()` was still
+      // pending and already nulled `scannerRef.current` in the meantime.
       const scanner = new Html5Qrcode(SCANNER_ELEMENT_ID)
       scannerRef.current = scanner
       try {
@@ -77,31 +88,37 @@ export default function QrOrderScanner({ onFound, onClose }: Props) {
             // while scanning, not a real error.
           },
         )
-        if (cancelled) {
-          await stopCamera()
+        if (cancelledRef.current) {
+          // Unmount or "ปิด" happened while `.start()` was still pending
+          // (permission prompt / hardware init). The camera has *now*
+          // actually attached, so stop this exact instance directly rather
+          // than going through `stopCamera()` / `scannerRef.current`, which
+          // may already have been nulled by that earlier teardown.
+          await stopScannerInstance(scanner)
           return
         }
       } catch {
-        if (!cancelled) {
+        if (!cancelledRef.current) {
           setCameraErr('เปิดกล้องไม่สำเร็จ กรุณาอนุญาตการใช้กล้องแล้วลองใหม่')
         }
       } finally {
-        if (!cancelled) setStarting(false)
+        if (!cancelledRef.current) setStarting(false)
       }
     }
 
     start()
     return () => {
-      cancelled = true
+      cancelledRef.current = true
       void stopCamera()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  async function stopCamera() {
-    const scanner = scannerRef.current
-    scannerRef.current = null
-    if (scanner && scanner.isScanning) {
+  async function stopScannerInstance(scanner: Html5Qrcode) {
+    if (scannerRef.current === scanner) {
+      scannerRef.current = null
+    }
+    if (scanner.isScanning) {
       try {
         await scanner.stop()
       } catch {
@@ -110,7 +127,16 @@ export default function QrOrderScanner({ onFound, onClose }: Props) {
     }
   }
 
+  async function stopCamera() {
+    const scanner = scannerRef.current
+    scannerRef.current = null
+    if (scanner) {
+      await stopScannerInstance(scanner)
+    }
+  }
+
   async function handleClose() {
+    cancelledRef.current = true
     await stopCamera()
     onClose()
   }

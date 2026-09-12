@@ -10,6 +10,14 @@ let capturedSuccessCallback: ((text: string) => void) | null = null
 const startMock = vi.fn()
 const stopMock = vi.fn().mockResolvedValue(undefined)
 
+// When true, `start()` returns a promise that only resolves once
+// `resolvePendingStart()` is called — modeling the real
+// permission-prompt/hardware-init delay between `.start()` being called and
+// the camera actually attaching (during which `isScanning` is still false).
+// Used to exercise the unmount/close-before-start-resolves race.
+let startShouldPend = false
+let resolvePendingStart: (() => void) | null = null
+
 vi.mock('html5-qrcode', () => ({
   Html5Qrcode: class {
     isScanning = false
@@ -21,8 +29,16 @@ vi.mock('html5-qrcode', () => ({
       errorCb: unknown,
     ) {
       capturedSuccessCallback = successCb
-      this.isScanning = true
       startMock(cameraIdOrConfig, config, successCb, errorCb)
+      if (startShouldPend) {
+        return new Promise<null>((resolve) => {
+          resolvePendingStart = () => {
+            this.isScanning = true
+            resolve(null)
+          }
+        })
+      }
+      this.isScanning = true
       return Promise.resolve(null)
     }
     stop() {
@@ -42,6 +58,8 @@ beforeEach(() => {
   startMock.mockClear()
   stopMock.mockClear()
   findOrdersByMakroOrderNo.mockReset()
+  startShouldPend = false
+  resolvePendingStart = null
 })
 
 async function renderScanner() {
@@ -119,4 +137,53 @@ test('a camera start failure surfaces a Thai message instead of crashing', async
   expect(
     await screen.findByText('เปิดกล้องไม่สำเร็จ กรุณาอนุญาตการใช้กล้องแล้วลองใหม่'),
   ).toBeInTheDocument()
+})
+
+// Teardown-race regression tests: on a real device, `Html5Qrcode.isScanning`
+// only flips true once the camera stream actually attaches — asynchronous
+// (permission prompt + hardware init). If unmount or the close button fires
+// while `scanner.start(...)` is still pending, the camera must still get
+// `.stop()` called on it once that promise resolves, instead of being
+// silently orphaned running. The mock above is put into "pending start" mode
+// for these tests so `start()`'s promise does not resolve until
+// `resolvePendingStart()` is called manually, after the unmount/close.
+
+test('unmounting while start() is still pending still stops the camera once it resolves', async () => {
+  startShouldPend = true
+  const { unmount } = render(<QrOrderScanner onFound={vi.fn()} onClose={vi.fn()} />)
+  await waitFor(() => expect(capturedSuccessCallback).not.toBeNull())
+
+  unmount()
+  // The camera hasn't actually attached yet (isScanning still false), so the
+  // cleanup's stopCamera() call finds nothing to stop yet.
+  expect(stopMock).not.toHaveBeenCalled()
+
+  await act(async () => {
+    resolvePendingStart?.()
+    await Promise.resolve()
+    await Promise.resolve()
+  })
+
+  expect(stopMock).toHaveBeenCalledTimes(1)
+})
+
+test('clicking close while start() is still pending still stops the camera once it resolves', async () => {
+  startShouldPend = true
+  const onClose = vi.fn()
+  render(<QrOrderScanner onFound={vi.fn()} onClose={onClose} />)
+  await waitFor(() => expect(capturedSuccessCallback).not.toBeNull())
+
+  await userEvent.click(screen.getByRole('button', { name: 'ปิด' }))
+
+  expect(onClose).toHaveBeenCalled()
+  // Same as above: nothing to stop yet since the camera hasn't attached.
+  expect(stopMock).not.toHaveBeenCalled()
+
+  await act(async () => {
+    resolvePendingStart?.()
+    await Promise.resolve()
+    await Promise.resolve()
+  })
+
+  expect(stopMock).toHaveBeenCalledTimes(1)
 })
