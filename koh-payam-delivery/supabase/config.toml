@@ -397,6 +397,11 @@ verify_jwt = false
 [functions.submit-claim]
 verify_jwt = false
 
+# Opened from LINE's in-app browser (a LIFF page), also with no Supabase
+# session — it verifies the LINE id token itself against LINE's servers.
+[functions.register-line-contact]
+verify_jwt = false
+
 # Called server-to-server by pg_cron (r2-cleanup cron), not a browser and not
 # with a Supabase JWT — it authenticates on the `x-cleanup-secret` header.
 [functions.cleanup]
