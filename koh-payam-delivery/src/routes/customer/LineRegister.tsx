@@ -50,10 +50,14 @@ export default function LineRegister() {
     try {
       const idToken = liff.getIDToken()
       if (!idToken) throw new Error('no id token')
+      // Defence in depth only: register-line-contact normalizes the phone
+      // properly (supabase/functions/_shared/phone.ts) and is the thing that
+      // actually decides what gets stored. Trimming here just keeps the
+      // obvious mobile-keyboard trailing space out of the request.
       const res = await fetch(FN, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${ANON}` },
-        body: JSON.stringify({ idToken, phone }),
+        body: JSON.stringify({ idToken, phone: phone.trim() }),
       })
       const json = await res.json().catch(() => null)
       if (!res.ok || !json?.ok) throw new Error('register failed')

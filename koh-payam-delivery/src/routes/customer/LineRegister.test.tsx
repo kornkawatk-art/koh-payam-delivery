@@ -70,6 +70,17 @@ test('happy path: submits {idToken, phone} to register-line-contact and shows su
   expect(lastBody()).toEqual({ idToken: 'id-token-123', phone: '0812345678' })
 })
 
+test('trims the phone before sending it (defence in depth on top of the server-side normalize)', async () => {
+  render(<LineRegister />)
+
+  const phoneInput = await screen.findByLabelText('เบอร์โทรศัพท์')
+  await userEvent.type(phoneInput, '  0812345678  ')
+  await userEvent.click(screen.getByRole('button', { name: 'ลงทะเบียน' }))
+
+  await waitFor(() => expect(screen.getByText(/ลงทะเบียนสำเร็จ/)).toBeInTheDocument())
+  expect(lastBody()).toEqual({ idToken: 'id-token-123', phone: '0812345678' })
+})
+
 test('a failed registration shows a Thai error and does not crash', async () => {
   fetchMock.mockResolvedValueOnce({
     ok: false,
