@@ -48,23 +48,35 @@ export async function syncShortageBackorders(orderId: string): Promise<void> {
 }
 
 // Called by the claim resolution flow (Task 22): queue a compensating shipment
-// for an approved "resend next day" claim.
+// for an approved "resend next day" claim — one backorder row per item the
+// claim references (a missing_in_box claim can reference several products;
+// damaged always has exactly one; box_lost has none).
 export async function createResendBackorder(claimId: string): Promise<void> {
   const { data: c } = await supabase
     .from('claims')
-    .select('order_id,qty,order_item_id, order_items(product_name)')
+    .select('order_id, claim_items(qty,order_items(product_name))')
     .eq('id', claimId)
     .single()
   if (!c) throw new Error('ไม่พบเคลม')
-  const product = (c as any).order_items?.product_name ?? 'ไม่ระบุสินค้า'
-  const { error } = await supabase.from('backorders').insert({
-    source_order_id: (c as any).order_id,
+  const orderId = (c as any).order_id
+  const items = ((c as any).claim_items ?? []) as Array<{
+    qty: number
+    order_items: { product_name?: string } | null
+  }>
+  // A box_lost claim (or any claim that somehow has zero claim_items) has
+  // nothing to loop over — silently succeeding here would report the claim
+  // resolved while queuing no compensating shipment at all. Fail loudly
+  // instead so resolveClaim's existing catch surfaces it to the manager.
+  if (!items.length) throw new Error('เคลมนี้ไม่มีรายการสินค้า จึงสร้างรายการส่งชดเชยไม่ได้')
+  const rows = items.map((it) => ({
+    source_order_id: orderId,
     reason: 'claim_resend',
-    product_name: product,
-    qty: (c as any).qty,
+    product_name: it.order_items?.product_name ?? 'ไม่ระบุสินค้า',
+    qty: it.qty,
     status: 'pending',
     target_ship_date: null,
-  })
+  }))
+  const { error } = await supabase.from('backorders').insert(rows)
   if (error) throw new Error('สร้างรายการส่งชดเชยไม่สำเร็จ: ' + error.message)
 }
 

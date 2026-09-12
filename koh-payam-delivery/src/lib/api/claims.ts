@@ -8,7 +8,7 @@ export type ClaimRow = {
   makro_order_no: string | undefined
   customer_name_en: string | undefined
   type: string
-  qty: number
+  itemCount: number
   status: string
   deadline_at: string
   created_at: string
@@ -18,7 +18,7 @@ export async function listClaims(filter: { status?: string } = {}): Promise<Clai
   let q = supabase
     .from('claims')
     .select(
-      'id,order_id,type,qty,status,deadline_at,created_at, orders(makro_order_no,customer_name_en)',
+      'id,order_id,type,status,deadline_at,created_at, orders(makro_order_no,customer_name_en), claim_items(id)',
     )
     .order('deadline_at', { ascending: true })
   if (filter.status) q = q.eq('status', filter.status)
@@ -28,7 +28,7 @@ export async function listClaims(filter: { status?: string } = {}): Promise<Clai
     id: c.id,
     order_id: c.order_id,
     type: c.type,
-    qty: Number(c.qty),
+    itemCount: (c.claim_items ?? []).length,
     status: c.status,
     deadline_at: c.deadline_at,
     created_at: c.created_at,
@@ -41,7 +41,7 @@ export async function getClaim(id: string) {
   const { data, error } = await supabase
     .from('claims')
     .select(
-      '*, orders(makro_order_no,customer_name_en), order_items(product_name,qty_ordered,qty_shipped), claim_photos(r2_key)',
+      '*, orders(makro_order_no,customer_name_en), claim_items(qty,order_items(product_name)), claim_photos(r2_key)',
     )
     .eq('id', id)
     .single()

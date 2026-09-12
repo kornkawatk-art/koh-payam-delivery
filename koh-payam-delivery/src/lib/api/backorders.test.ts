@@ -5,6 +5,7 @@ import {
   listPendingBackordersForOrder,
   listRelatedBackordersForOrder,
   markBackorderFulfilled,
+  createResendBackorder,
 } from './backorders'
 
 const calls: any[] = []
@@ -14,6 +15,7 @@ let pending: any[] = []
 let dayList: any[] = []
 let orderList: any[] = []
 let relatedList: any[] = []
+let claimRow: any = null
 
 vi.mock('../supabase', () => {
   const res = (data: any) => {
@@ -32,6 +34,8 @@ vi.mock('../supabase', () => {
           },
           eq: (col: string, val: any) => {
             calls.push(['select', t, sel, col, val])
+            if (t === 'claims')
+              return { single: () => Promise.resolve({ data: claimRow, error: null }) }
             if (t === 'order_items') return res(orderItems)
             if (t === 'orders') return res(dayOrders)
             if (t === 'backorders')
@@ -78,6 +82,7 @@ beforeEach(() => {
   dayList = []
   orderList = []
   relatedList = []
+  claimRow = null
 })
 
 test('syncShortageBackorders deletes old shortage rows then inserts one per short item', async () => {
@@ -174,6 +179,45 @@ test('listRelatedBackordersForOrder matches source OR target on the order id', a
   expect(rows).toEqual(relatedList)
   const orCall = calls.find((c) => c[0] === 'or' && c[1] === 'backorders')
   expect(orCall[3]).toBe('source_order_id.eq.ord-x,target_order_id.eq.ord-x')
+})
+
+test('createResendBackorder inserts one backorder row per claim item', async () => {
+  claimRow = {
+    order_id: 'ord1',
+    claim_items: [
+      { qty: 2, order_items: { product_name: 'rice' } },
+      { qty: 1, order_items: { product_name: 'fish sauce' } },
+    ],
+  }
+  await createResendBackorder('c1')
+  const ins = calls.find((c) => c[0] === 'insert')
+  expect(ins[1]).toBe('backorders')
+  expect(ins[2]).toEqual([
+    {
+      source_order_id: 'ord1',
+      reason: 'claim_resend',
+      product_name: 'rice',
+      qty: 2,
+      status: 'pending',
+      target_ship_date: null,
+    },
+    {
+      source_order_id: 'ord1',
+      reason: 'claim_resend',
+      product_name: 'fish sauce',
+      qty: 1,
+      status: 'pending',
+      target_ship_date: null,
+    },
+  ])
+})
+
+test('createResendBackorder throws and inserts nothing when the claim has zero items (box_lost)', async () => {
+  claimRow = { order_id: 'ord1', claim_items: [] }
+  await expect(createResendBackorder('c1')).rejects.toThrow(
+    'เคลมนี้ไม่มีรายการสินค้า จึงสร้างรายการส่งชดเชยไม่ได้',
+  )
+  expect(calls.some((c) => c[0] === 'insert')).toBe(false)
 })
 
 test('markBackorderFulfilled sets fulfilled status with actor and timestamp', async () => {

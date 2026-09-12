@@ -91,17 +91,23 @@ export default function ClaimDetail() {
     }
   }
 
-  const item = c.order_items
+  const claimItems = (c.claim_items ?? []) as { qty: number; order_items: { product_name: string } | null }[]
 
   return (
     <div className="flex flex-col gap-5">
       <PageHeader title={`เคลม · ${c.orders?.makro_order_no} · ${c.orders?.customer_name_en}`} />
 
       <div className="card flex flex-col gap-2 text-sm">
-        <p>
-          ประเภท: {c.type} · จำนวน: {c.qty}
-        </p>
-        {item && <p>รายการ: {item.product_name}</p>}
+        <p>ประเภท: {c.type}</p>
+        {claimItems.length > 0 && (
+          <ul className="list-inside list-disc">
+            {claimItems.map((ci, i) => (
+              <li key={i}>
+                {ci.order_items?.product_name ?? 'ไม่ระบุสินค้า'} × {ci.qty}
+              </li>
+            ))}
+          </ul>
+        )}
         {c.description && <p className="whitespace-pre-wrap text-ink-soft">{c.description}</p>}
       </div>
 
@@ -205,9 +211,15 @@ export default function ClaimDetail() {
                 type="radio"
                 checked={resolution === 'resend_next_day'}
                 onChange={() => setResolution('resend_next_day')}
+                disabled={claimItems.length === 0}
               />
               ส่งชดเชยวันถัดไป
             </label>
+            {claimItems.length === 0 && (
+              <p className="muted text-xs">
+                เคลมนี้ไม่มีรายการสินค้า จึงส่งชดเชยไม่ได้ — เลือกคืนเงินแทน
+              </p>
+            )}
           </div>
         )}
       </fieldset>

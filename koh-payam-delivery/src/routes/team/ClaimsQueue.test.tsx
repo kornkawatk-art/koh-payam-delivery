@@ -18,7 +18,7 @@ const rows = [
     makro_order_no: 'PO-OVERDUE',
     customer_name_en: 'BLUE VIEW',
     type: 'damaged',
-    qty: 2,
+    itemCount: 1,
     status: 'open',
     deadline_at: past,
     created_at: past,
@@ -28,8 +28,8 @@ const rows = [
     order_id: 'o2',
     makro_order_no: 'PO-FRESH',
     customer_name_en: 'SUNSET',
-    type: 'missing',
-    qty: 1,
+    type: 'missing_in_box',
+    itemCount: 3,
     status: 'open',
     deadline_at: future,
     created_at: past,
@@ -40,7 +40,7 @@ const rows = [
     makro_order_no: 'PO-DONE',
     customer_name_en: 'CORAL',
     type: 'damaged',
-    qty: 1,
+    itemCount: 1,
     status: 'approved',
     deadline_at: past,
     created_at: past,
@@ -69,6 +69,14 @@ test('lists claims and links each row to its detail page', async () => {
   const link = await screen.findByRole('link', { name: 'PO-OVERDUE' })
   expect(link).toHaveAttribute('href', '/claims/c1')
   expect(listClaims).toHaveBeenCalledWith({})
+})
+
+test('renders the item-count column as "N รายการ" per row', async () => {
+  renderPage()
+  await screen.findByText('PO-OVERDUE')
+  expect(screen.getByText('จำนวนรายการ')).toBeInTheDocument()
+  expect(screen.getAllByText('1 รายการ')).toHaveLength(2)
+  expect(screen.getByText('3 รายการ')).toBeInTheDocument()
 })
 
 test('highlights an open row whose deadline has already passed', async () => {

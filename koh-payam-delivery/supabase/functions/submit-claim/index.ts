@@ -1,5 +1,11 @@
-// POST { token, type, orderItemIndex?, boxSeq?, qty, description, photoKeys: string[] }
+// POST { token, type, items: { orderItemIndex, qty }[], description, photoKeys: string[] }
 //   -> { ok: true, claimId }
+//
+// `items` holds the order_items this claim references, each with its own qty:
+// box_lost must send [] (no item is referenced), damaged must send exactly 1
+// entry, missing_in_box must send 1+ entries (a claim can now reference
+// several products at once). The claim + its items are created atomically by
+// the `create_claim` RPC.
 //
 // config.toml sets verify_jwt = false: the customer submits this from an emailed
 // link with no Supabase session. Auth here mirrors photo-upload-url's claim
@@ -10,6 +16,13 @@ import { cors } from '../_shared/cors.ts'
 
 const JSON_HEADERS = { ...cors, 'Content-Type': 'application/json' }
 const CLAIM_WINDOW_MS = 48 * 60 * 60 * 1000
+
+// How many `items` entries each claim type requires.
+const ITEMS_COUNT_OK: Record<string, (n: number) => boolean> = {
+  box_lost: (n) => n === 0,
+  damaged: (n) => n === 1,
+  missing_in_box: (n) => n >= 1,
+}
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: cors })
@@ -23,6 +36,11 @@ Deno.serve(async (req) => {
 
     if (!['missing_in_box', 'damaged', 'box_lost'].includes(p.type)) {
       return new Response(JSON.stringify({ error: 'invalid type' }), { status: 400, headers: cors })
+    }
+
+    const rawItems = Array.isArray(p.items) ? p.items : []
+    if (!ITEMS_COUNT_OK[p.type](rawItems.length)) {
+      return new Response(JSON.stringify({ error: 'invalid items' }), { status: 400, headers: cors })
     }
 
     // Photo keys must belong to this order's claim folder. photo-upload-url
@@ -42,7 +60,6 @@ Deno.serve(async (req) => {
       }
     }
 
-    const qty = Math.max(1, Math.floor(Number(p.qty) || 1))
     const description = String(p.description ?? '').slice(0, 2000)
 
     const admin = createClient(
@@ -65,32 +82,37 @@ Deno.serve(async (req) => {
       })
     }
 
-    let orderItemId: string | null = null
-    if (p.type !== 'box_lost' && Number.isInteger(p.orderItemIndex)) {
+    // Resolve each item's orderItemIndex to an order_items.id the same way the
+    // single-item form used to: index into this order's items ordered by
+    // line_no. Fetched once and reused for every entry in `items`.
+    let orderItemsList: { id: string }[] | null = null
+    if (rawItems.length) {
       const { data: items } = await admin
         .from('order_items')
         .select('id,line_no')
         .eq('order_id', o.id)
         .order('line_no')
-      orderItemId = items?.[p.orderItemIndex]?.id ?? null
+      orderItemsList = items ?? []
     }
 
+    const itemsJson = rawItems.map((it: Record<string, unknown>) => {
+      const idx = it?.orderItemIndex
+      const orderItemId = Number.isInteger(idx)
+        ? (orderItemsList?.[idx as number]?.id ?? null)
+        : null
+      const qty = Math.max(1, Math.floor(Number(it?.qty) || 1))
+      return { order_item_id: orderItemId, qty }
+    })
+
     const deadline = new Date(shippedMs + CLAIM_WINDOW_MS).toISOString()
-    const { data: claim, error } = await admin
-      .from('claims')
-      .insert({
-        order_id: o.id,
-        order_item_id: orderItemId,
-        box_seq: p.boxSeq ?? null,
-        type: p.type,
-        qty,
-        description,
-        status: 'open',
-        deadline_at: deadline,
-      })
-      .select('id')
-      .single()
-    if (error || !claim) {
+    const { data: claimId, error } = await admin.rpc('create_claim', {
+      p_order_id: o.id,
+      p_type: p.type,
+      p_description: description,
+      p_deadline_at: deadline,
+      p_items: itemsJson,
+    })
+    if (error || !claimId) {
       console.error('submit-claim', error)
       return new Response(JSON.stringify({ error: 'ส่งเรื่องไม่สำเร็จ' }), {
         status: 500,
@@ -101,17 +123,17 @@ Deno.serve(async (req) => {
     if (photoKeys.length) {
       await admin
         .from('claim_photos')
-        .insert(photoKeys.map((k) => ({ claim_id: claim.id, r2_key: k })))
+        .insert(photoKeys.map((k) => ({ claim_id: claimId, r2_key: k })))
     }
     await admin.from('audit_logs').insert({
       user_id: null,
       action: 'claim_submitted',
       entity_type: 'claim',
-      entity_id: claim.id,
+      entity_id: claimId,
       meta: { orderId: o.id },
     })
 
-    return new Response(JSON.stringify({ ok: true, claimId: claim.id }), { headers: JSON_HEADERS })
+    return new Response(JSON.stringify({ ok: true, claimId }), { headers: JSON_HEADERS })
   } catch (e) {
     // Log server-side only; never echo DB/env error text to the customer.
     console.error('submit-claim', e)

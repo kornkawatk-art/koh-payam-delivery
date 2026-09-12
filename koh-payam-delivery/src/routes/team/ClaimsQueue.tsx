@@ -76,7 +76,7 @@ export default function ClaimsQueue() {
                 <th>เลขออเดอร์</th>
                 <th>ลูกค้า</th>
                 <th>ประเภท</th>
-                <th>จำนวน</th>
+                <th>จำนวนรายการ</th>
                 <th>สถานะ</th>
                 <th>กำหนดเส้นตาย</th>
               </tr>
@@ -94,7 +94,7 @@ export default function ClaimsQueue() {
                     </td>
                     <td>{c.customer_name_en}</td>
                     <td>{c.type}</td>
-                    <td className="tnum">{c.qty}</td>
+                    <td className="tnum">{c.itemCount} รายการ</td>
                     <td>
                       <span className={'badge ' + (STATUS_TONE[c.status] ?? 'badge-neutral')}>
                         {c.status}
