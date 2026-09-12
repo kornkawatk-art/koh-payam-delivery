@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { getOrCreateShipDay, setBoats } from '../../lib/api/shipDays'
+import { getOrCreateShipDay, sendOrderLinks, setBoats } from '../../lib/api/shipDays'
 import { supabase } from '../../lib/supabase'
 import { PageHeader } from '../../components/ui/PageHeader'
 import { todayLocalISO } from '../../lib/format'
@@ -51,7 +51,18 @@ export default function BoatSetup() {
     setMsg(undefined)
     try {
       await setBoats(shipDayId, boats)
-      setMsg('บันทึกรายการเรือแล้ว')
+      // setBoats already succeeded at this point — a failure in the
+      // secondary sendOrderLinks step below must not make the boat save
+      // itself look like it failed (mirrors resolveClaim's "main action
+      // succeeded, secondary step failed" message pattern in claims.ts).
+      let text = 'บันทึกรายการเรือแล้ว'
+      try {
+        const { sent, skipped } = await sendOrderLinks(date)
+        if (!skipped) text += ` · ส่งลิงก์ไลน์ ${sent} ฉบับ`
+      } catch (e) {
+        text += ' แต่ส่งลิงก์ไลน์ไม่สำเร็จ: ' + (e as Error).message
+      }
+      setMsg(text)
     } catch {
       setMsg('บันทึกรายการเรือไม่สำเร็จ ลองใหม่อีกครั้ง')
     }

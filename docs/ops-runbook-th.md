@@ -14,14 +14,14 @@
 | Project ref | `kprlqjxwolljkgqyzygf` |
 | Region | `ap-southeast-1` (Singapore) |
 | Supabase URL | `https://kprlqjxwolljkgqyzygf.supabase.co` |
-| Edge Functions | `order-view`, `photo-upload-url`, `submit-claim`, `cleanup` (ทุกตัว `verify_jwt = false`) |
+| Edge Functions | `order-view`, `photo-upload-url`, `submit-claim`, `register-line-contact`, `cleanup` (ทุกตัว `verify_jwt = false`) และ `send-order-links` (**ไม่มี** entry ใน `config.toml` โดยตั้งใจ → คง `verify_jwt = true` ค่าเริ่มต้น เพราะเรียกจากเซสชันทีมที่ล็อกอินแล้วเท่านั้น ไม่ใช่ลิงก์ลูกค้า) |
 | R2 bucket | `koh-payam-photos` (Cloudflare) |
 | R2 public base URL | `https://pub-4a2a896c192541cf87225ae05c77fb39.r2.dev` |
 | Migrations ที่ apply แล้ว | `0001`–`0007` (`0007` = team-access gate `is_active` + realtime `orders` + R2-key delete triggers) |
 | pg_cron jobs | `purge-old-orders` (`0 3 * * *`), `r2-cleanup` (`10 3 * * *`) |
 | บัญชีทีมคนแรก (หัวหน้า) | `kornkawat.k@gmail.com` (role = `manager`) |
 
-> ค่าคีย์ลับ (DB password, service_role key, R2 keys, `CLEANUP_SECRET`) **ไม่อยู่ในเอกสารนี้** — เก็บใน `koh-payam-delivery/.env.local` (ไม่ commit) และใน Supabase → Edge Functions → Secrets
+> ค่าคีย์ลับ (DB password, service_role key, R2 keys, `CLEANUP_SECRET`, `LIFF_CHANNEL_ID`, `LINE_CHANNEL_ACCESS_TOKEN`) **ไม่อยู่ในเอกสารนี้** — เก็บใน `koh-payam-delivery/.env.local` (ไม่ commit) และใน Supabase → Edge Functions → Secrets
 
 ---
 
@@ -136,6 +136,7 @@ Vercel + GitHub ทำในส่วน B
 VITE_SUPABASE_URL=
 VITE_SUPABASE_ANON_KEY=
 VITE_R2_PUBLIC_BASE_URL=
+VITE_LIFF_ID=
 SUPABASE_PROJECT_REF=
 SUPABASE_DB_PASSWORD=
 SUPABASE_SERVICE_ROLE_KEY=
@@ -146,9 +147,41 @@ R2_SECRET_ACCESS_KEY=
 R2_BUCKET=koh-payam-photos
 R2_PUBLIC_BASE_URL=
 CLEANUP_SECRET=
+LIFF_CHANNEL_ID=
+LINE_CHANNEL_ACCESS_TOKEN=
+SITE_URL=
 ```
 
+> `VITE_LIFF_ID` เป็นค่า public (ฝังในหน้าเว็บได้ ไม่ใช่ความลับ) ส่วน `LIFF_CHANNEL_ID`, `LINE_CHANNEL_ACCESS_TOKEN`, `SITE_URL` เป็น secret ของฝั่ง Edge Functions เท่านั้น — ดูวิธีได้ค่าเหล่านี้ในหัวข้อ A6 ถัดไป
+
 > **ความปลอดภัย:** `SUPABASE_SERVICE_ROLE_KEY` และ `R2_SECRET_ACCESS_KEY` มีสิทธิ์เต็ม — ถ้ากังวลว่าค่าหลุด rotate ใหม่ได้ (Supabase: Settings → API → Roll; R2: ลบ token เดิมสร้างใหม่) แล้วอัปเดต `.env.local` + `supabase secrets set` ใหม่
+
+---
+
+### A6. LINE Developers Console — เปิด Messaging API + สร้าง LIFF app (ต้องทำก่อนฟีเจอร์ "ส่งลิงก์ไลน์อัตโนมัติ" จะใช้งานได้จริง)
+
+> ฟีเจอร์นี้ (ลงทะเบียนลูกค้าผ่าน LIFF + ส่งลิงก์ออเดอร์อัตโนมัติหลังตั้งค่าเรือประจำวัน) เขียนโค้ดเสร็จแล้วในฝั่งแอป แต่ **ยังใช้งานจริงไม่ได้จนกว่าทีมจะทำขั้นตอนนี้เอง** — ทีมพัฒนาไม่มีสิทธิ์เข้า LINE Developers Console ของร้าน
+
+1. ไปที่ https://developers.line.biz/console/ → ล็อกอินด้วยบัญชี LINE ที่ผูกกับ OA (LINE Official Account) ของร้านอยู่แล้ว
+2. เปิด **Messaging API** ให้ช่องทาง OA เดิม (ถ้ายังไม่เปิด): เลือก provider → **Create a Messaging API channel** ผูกกับ OA เดิม
+3. คัดลอก **Channel access token** (long-lived) จากแท็บ **Messaging API** ของช่องทางนั้น → เอาไปใส่ `LINE_CHANNEL_ACCESS_TOKEN` ด้านบน
+4. สร้าง **LIFF app** ใหม่ (แท็บ **LIFF** — จะอยู่ใน channel เดียวกับ Messaging API หรือเป็น LINE Login channel แยกอีกอันก็ได้):
+   - ⚠️ **LIFF app ต้องอยู่ภายใต้ provider เดียวกัน กับ Messaging API channel — คนละ provider จะส่งข้อความไม่ได้เลย** เพราะ LINE `userId` ผูกกับ provider: `userId` ที่ได้จาก LIFF ของ provider อื่นจะใช้ push เข้า OA นี้ไม่ได้ (LINE ตอบ 400 ทุกครั้ง) และจะไม่มีอะไรฟ้องนอกจาก "ส่งลิงก์ไลน์ 0 ฉบับ"
+   - **Endpoint URL:** `<โดเมนเว็บจริง>/liff/register` (เช่น `https://koh-payam.vercel.app/liff/register`)
+   - **Scope:** `openid`, `profile` (ใช้ `liff.getIDToken()`)
+   - **Size:** Full ก็พอ
+   - ⚠️ **ต้องคัดลอก 2 ค่า ที่คนละที่กัน — ไม่ใช่ค่าเดียวกันใส่ 2 ช่อง:**
+     - `VITE_LIFF_ID` = **LIFF ID** ของ LIFF app ที่เพิ่งสร้าง (อยู่ในแท็บ **LIFF** ตรงแถวของ app นั้น หน้าตาเป็น `1234567890-AbCdEfGh`) — ค่านี้ฝังในหน้าเว็บ ไม่ใช่ความลับ
+     - `LIFF_CHANNEL_ID` = **Channel ID** (ตัวเลขล้วน) ของ **channel ที่ LIFF app นี้สังกัดอยู่** ดูได้ที่แท็บ **Basic settings** ของ channel นั้น — edge function `register-line-contact` เอาไปใช้เป็น `client_id` ตอนตรวจสอบ id token กับ LINE ถ้าใส่ผิด/ใส่ LIFF ID แทน จะได้ 401 "ยืนยันตัวตน LINE ไม่สำเร็จ" ทุกครั้ง
+5. ใส่ `SITE_URL` เป็นโดเมนเว็บจริง (ไม่มี `/` ท้าย) — `send-order-links` เอาไปต่อเป็น `<SITE_URL>/o/<token>` ตอนส่งลิงก์ทาง LINE
+6. รัน `supabase secrets set LIFF_CHANNEL_ID=... LINE_CHANNEL_ACCESS_TOKEN=... SITE_URL=...` (ดูขั้นที่ 4 ด้านล่าง) แล้ว `supabase functions deploy register-line-contact send-order-links`
+
+> 🔧 **กู้คืนกรณีวันไหนถูกทำเครื่องหมายว่า "ส่งแล้ว" ทั้งที่ยังไม่ได้ส่งจริง** (เช่น เผลอ deploy ก่อนตั้ง secrets): ระบบส่งลิงก์ได้วันละครั้งเท่านั้น ถ้าต้องให้ส่งใหม่ ให้ล้างตัวกันซ้ำด้วย SQL ใน Supabase → SQL Editor แล้วกด **บันทึก** ที่หน้า "ตั้งค่าเรือประจำวัน" อีกครั้ง (ส่งได้เฉพาะ **วันปัจจุบัน** เท่านั้น — วันย้อนหลังระบบจะข้ามให้เงียบ ๆ เพราะลิงก์หมดอายุไปแล้ว):
+> ```sql
+> update ship_days set links_sent_at = null where ship_date = '<date>';
+> ```
+
+> ⚠️ **โควตาข้อความ:** ร้านมีออเดอร์จริงมากกว่า 50 รายการ/วัน ซึ่ง**เกินโควตาฟรีของ LINE Official Account แน่นอน** — ต้องอัปเกรดเป็นแพลนเสียเงิน (Light/Standard) ก่อนเปิดใช้ฟีเจอร์นี้กับลูกค้าจริง ไม่งั้นข้อความจะถูกบล็อกกลางทาง
 
 ---
 
@@ -212,20 +245,27 @@ Cloudflare → R2 → bucket `koh-payam-photos` → **Settings → CORS Policy**
 supabase link --project-ref kprlqjxwolljkgqyzygf
 # (จะถาม DB password — ใส่ค่า SUPABASE_DB_PASSWORD)
 
-# 2) push migrations 0001–0006 ขึ้น cloud DB
+# 2) push migrations ขึ้น cloud DB (0001 ถึงเลขล่าสุด)
 supabase db push
 
-# 3) ตั้ง secrets ของ Edge Functions (ค่าจริงจาก .env.local)
+# 3) ตั้ง secrets ของ Edge Functions (ค่าจริงจาก .env.local — LIFF_CHANNEL_ID /
+#    LINE_CHANNEL_ACCESS_TOKEN / SITE_URL มาจากขั้นตอน A6 ด้านบน)
 supabase secrets set \
   R2_ACCOUNT_ID=... \
   R2_ACCESS_KEY_ID=... \
   R2_SECRET_ACCESS_KEY=... \
   R2_BUCKET=koh-payam-photos \
   R2_PUBLIC_BASE_URL=https://pub-4a2a896c192541cf87225ae05c77fb39.r2.dev \
-  CLEANUP_SECRET=cs_xxxxxxxxxxxxxxxx        # สุ่มค่าใหม่ยาว ๆ ก็ได้
+  CLEANUP_SECRET=cs_xxxxxxxxxxxxxxxx \      # สุ่มค่าใหม่ยาว ๆ ก็ได้
+  LIFF_CHANNEL_ID=... \
+  LINE_CHANNEL_ACCESS_TOKEN=... \
+  SITE_URL=https://<โดเมนเว็บจริง>
 
-# 4) deploy Edge Functions ทั้ง 4 ตัว (config.toml ตั้ง verify_jwt=false ไว้แล้ว)
-supabase functions deploy order-view photo-upload-url submit-claim cleanup
+# 4) deploy Edge Functions ทั้งหมด
+#    (order-view/photo-upload-url/submit-claim/register-line-contact/cleanup
+#    มี verify_jwt=false ใน config.toml แล้ว; send-order-links ตั้งใจไม่มี entry
+#    เลยคง verify_jwt=true ค่าเริ่มต้น — ดูคอมเมนต์ใน config.toml)
+supabase functions deploy order-view photo-upload-url submit-claim register-line-contact send-order-links cleanup
 ```
 
 จากนั้นใน **Supabase Dashboard → SQL Editor** รัน:

@@ -2,13 +2,16 @@ import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
 import BoatSetup from './BoatSetup'
+import { todayLocalISO } from '../../lib/format'
 
 const getOrCreateShipDay = vi.fn()
 const setBoats = vi.fn().mockResolvedValue(undefined)
+const sendOrderLinks = vi.fn().mockResolvedValue({ sent: 0, failed: 0, skipped: false })
 
 vi.mock('../../lib/api/shipDays', () => ({
   getOrCreateShipDay: (...a: unknown[]) => getOrCreateShipDay(...a),
   setBoats: (...a: unknown[]) => setBoats(...a),
+  sendOrderLinks: (...a: unknown[]) => sendOrderLinks(...a),
 }))
 
 // Reconfigurable per test: the orders count-query result that removeBoat sees.
@@ -35,6 +38,7 @@ beforeEach(() => {
     ],
   })
   setBoats.mockClear()
+  sendOrderLinks.mockReset().mockResolvedValue({ sent: 0, failed: 0, skipped: false })
   countResult.current = { count: 0, error: null }
 })
 
@@ -115,6 +119,33 @@ test('save() shows a Thai error message when persisting fails', async () => {
   expect(
     await screen.findByText('บันทึกรายการเรือไม่สำเร็จ ลองใหม่อีกครั้ง'),
   ).toBeInTheDocument()
+})
+
+test('saving boats successfully also sends LINE links for the same date and folds the count into the success message', async () => {
+  sendOrderLinks.mockResolvedValueOnce({ sent: 5, failed: 1, skipped: false })
+  renderPage()
+  await screen.findByDisplayValue('เรือเช้า')
+
+  await userEvent.click(screen.getByRole('button', { name: 'บันทึก' }))
+
+  expect(sendOrderLinks).toHaveBeenCalledTimes(1)
+  expect(sendOrderLinks).toHaveBeenCalledWith(todayLocalISO())
+  expect(
+    await screen.findByText('บันทึกรายการเรือแล้ว · ส่งลิงก์ไลน์ 5 ฉบับ'),
+  ).toBeInTheDocument()
+})
+
+test('a sendOrderLinks failure still shows the boat-save success, distinctly, not the whole save reported as failed', async () => {
+  sendOrderLinks.mockRejectedValueOnce(new Error('LINE API ล่ม'))
+  renderPage()
+  await screen.findByDisplayValue('เรือเช้า')
+
+  await userEvent.click(screen.getByRole('button', { name: 'บันทึก' }))
+
+  const msg = await screen.findByText(/บันทึกรายการเรือแล้ว/)
+  expect(msg).toBeInTheDocument()
+  expect(msg.textContent).toMatch(/ส่งลิงก์ไลน์ไม่สำเร็จ/)
+  expect(screen.queryByText('บันทึกรายการเรือไม่สำเร็จ ลองใหม่อีกครั้ง')).not.toBeInTheDocument()
 })
 
 test('fails closed when the count query errors — boat stays, warning shown', async () => {

@@ -384,6 +384,15 @@ deno_version = 2
 # [edge_runtime.secrets]
 # secret_key = "env(SECRET_VALUE)"
 
+# STANDING RULE for every [functions.*] block below. The default is
+# `verify_jwt = true`. A function gets an entry here ONLY if it must be callable
+# without a Supabase session (a customer link with no login, or a server-to-server
+# caller). Adding a `verify_jwt = false` entry for a function meant to be called
+# by a logged-in team member is the dangerous mistake — it silently opens that
+# function to the whole internet, and every block already in this file looks
+# exactly like that, so it would not stand out in review. Omitting an entry only
+# ever fails closed (the gateway rejects the call), so when in doubt, omit.
+#
 # Customer-facing functions: hit from an emailed link with no Supabase session.
 # They do their own auth (order-view: link_token; photo-upload-url: bearer token
 # for evidence, link_token + 48h window for claim; submit-claim: link_token +
@@ -397,10 +406,22 @@ verify_jwt = false
 [functions.submit-claim]
 verify_jwt = false
 
+# Opened from LINE's in-app browser (a LIFF page), also with no Supabase
+# session — it verifies the LINE id token itself against LINE's servers.
+[functions.register-line-contact]
+verify_jwt = false
+
 # Called server-to-server by pg_cron (r2-cleanup cron), not a browser and not
 # with a Supabase JWT — it authenticates on the `x-cleanup-secret` header.
 [functions.cleanup]
 verify_jwt = false
+
+# send-order-links is called by an *authenticated team session* (from
+# BoatSetup.tsx after saving the day's boat list), not a customer link — it
+# deliberately has NO [functions.send-order-links] entry here, unlike every
+# function above. That absence, not an oversight, is what keeps verify_jwt at
+# its default `true`: the gateway rejects the call before the function's own
+# code runs unless the bearer is a real, valid Supabase session.
 
 [analytics]
 enabled = true
