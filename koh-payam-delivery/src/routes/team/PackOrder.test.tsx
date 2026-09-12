@@ -6,6 +6,7 @@ import PackOrder from './PackOrder'
 const getOrder = vi.fn()
 const updateOrderStatus = vi.fn().mockResolvedValue(undefined)
 const savePack = vi.fn().mockResolvedValue(undefined)
+const listDistinctPackerNames = vi.fn().mockResolvedValue([])
 const listPendingBackordersForOrder = vi.fn().mockResolvedValue([])
 const markBackorderFulfilled = vi.fn().mockResolvedValue(undefined)
 const attachEvidencePhoto = vi.fn().mockResolvedValue(undefined)
@@ -16,6 +17,7 @@ vi.mock('../../lib/api/orders', () => ({
 }))
 vi.mock('../../lib/api/pack', () => ({
   savePack: (...a: unknown[]) => savePack(...a),
+  listDistinctPackerNames: (...a: unknown[]) => listDistinctPackerNames(...a),
 }))
 vi.mock('../../lib/api/photos', () => ({
   attachEvidencePhoto: (...a: unknown[]) => attachEvidencePhoto(...a),
@@ -75,6 +77,7 @@ beforeEach(() => {
   attachEvidencePhoto.mockClear()
   listPendingBackordersForOrder.mockReset().mockResolvedValue([])
   markBackorderFulfilled.mockClear()
+  listDistinctPackerNames.mockReset().mockResolvedValue([])
 })
 
 const renderPage = () =>
@@ -118,6 +121,7 @@ test('"บันทึก" records the box count via savePack', async () => {
     paperCount: 3,
     foamCount: 0,
     pieceCount: 0,
+    packerName: '',
   })
   expect(updateOrderStatus).not.toHaveBeenCalled()
 })
@@ -142,12 +146,34 @@ test('typing into all three count fields passes the right pieceCount to savePack
     paperCount: 2,
     foamCount: 1,
     pieceCount: 5,
+    packerName: '',
   })
 
   // the read-only total line reflects all three
   expect(
     screen.getByText('ลังกระดาษ 2 · ลังโฟม 1 · ชิ้น 5 · รวม 8'),
   ).toBeInTheDocument()
+})
+
+test('typing a packer name passes it through to savePack, and the pack gate is unaffected', async () => {
+  renderPage()
+  await screen.findByText('rice')
+  const packerInput = screen.getByLabelText('ชื่อคนแพ็ค')
+  await userEvent.type(packerInput, 'สมชาย')
+
+  const packBtn = screen.getByRole('button', { name: 'บันทึก + แพ็คเสร็จ' })
+  expect(packBtn).toBeDisabled() // still gated on photo + box count, unaffected by packer name
+
+  await userEvent.click(screen.getByRole('button', { name: 'บันทึก' }))
+
+  expect(savePack).toHaveBeenCalledTimes(1)
+  expect(savePack.mock.calls[0][0]).toEqual({
+    orderId: 'ord1',
+    paperCount: 0,
+    foamCount: 0,
+    pieceCount: 0,
+    packerName: 'สมชาย',
+  })
 })
 
 test('focusing any of the three count fields selects its current value', async () => {
