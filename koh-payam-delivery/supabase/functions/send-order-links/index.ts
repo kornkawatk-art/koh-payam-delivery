@@ -17,12 +17,28 @@
 // business logic).
 //
 // Algorithm (see the plan's Global Constraints section):
+//   0. Today-only guard: BoatSetup.tsx's date picker makes ANY past date
+//      reachable in one click ("let me check yesterday's boats"), and saving
+//      from there would re-send links that order-view already treats as
+//      expired (48h after shipped_at) — a shop-branded "your order is ready"
+//      pointing at a 404. Only *today* (Asia/Bangkok, see guards.ts) sends.
+//      Any other date is a QUIET skip, not an error: setting up boats for a
+//      future date in advance is legitimate existing behaviour — it is only
+//      the automatic *send* that is scoped to today.
 //   1. Idempotency guard: ship_days.links_sent_at already set for this day ->
 //      no-op, { ok: true, sent: 0, failed: 0, skipped: true }.
+//   1b. Fail fast if LINE_CHANNEL_ACCESS_TOKEN or SITE_URL is unset (the
+//      expected state until the team provisions them — see the runbook's A6).
+//      Without them nothing can be sent, or worse, real messages go out with a
+//      broken link; either way links_sent_at must NOT be burned on a day where
+//      nothing was legitimately attempted.
 //   2. Load every order shipping that day (id, customer_name_en,
 //      customer_phone, link_token).
 //   3. Dedup by phone (dedupOrdersByPhone, dedup.ts) — one message per
-//      customer even with several same-day POs.
+//      customer even with several same-day POs. Phones are compared
+//      NORMALIZED (_shared/phone.ts) on both sides: orders.customer_phone is
+//      stored exactly as Makro's export had it, while line_contacts.phone is
+//      written normalized by register-line-contact.
 //   4. For each deduped order whose phone has a line_contacts row, push a
 //      LINE text message with that order's link. No matching row -> skipped;
 //      the existing manual "คัดลอก" button on OrderDetail.tsx stays the
@@ -30,14 +46,19 @@
 //      registration yet.
 //   5. Each push is independent: one recipient's failure (e.g. they blocked
 //      the OA) must never abort the rest of the batch.
-//   6. After the loop — regardless of any individual failures — set
+//   6. After the loop — regardless of any individual PUSH failure — set
 //      ship_days.links_sent_at = now(). A partial-failure run still counts
 //      as "attempted for today"; it must not retry-storm on every later
-//      same-day setBoats save.
+//      same-day setBoats save. This applies to per-recipient failures only:
+//      a failure that means we never got to *try* (missing secret, orders
+//      load error, line_contacts lookup error) returns an error WITHOUT
+//      setting links_sent_at, so the day can be retried.
 //   7. Return { ok: true, sent, failed, skipped: false }.
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { cors } from '../_shared/cors.ts'
+import { normalizePhone } from '../_shared/phone.ts'
 import { dedupOrdersByPhone } from './dedup.ts'
+import { bangkokToday, missingLineSecrets } from './guards.ts'
 
 const JSON_HEADERS = { ...cors, 'Content-Type': 'application/json' }
 const LINE_PUSH_URL = 'https://api.line.me/v2/bot/message/push'
@@ -94,6 +115,18 @@ Deno.serve(async (req) => {
       })
     }
 
+    // Step 0: today-only guard. Placed after the auth checks (an unauthenticated
+    // caller should never get a 200 out of this function) but before the
+    // idempotency check and before any order is loaded. A quiet skip: saving a
+    // future day's boat list in advance stays a normal, successful save.
+    const todayBangkok = bangkokToday()
+    if (shipDate !== todayBangkok) {
+      return new Response(
+        JSON.stringify({ ok: true, sent: 0, failed: 0, skipped: true, reason: 'not-today' }),
+        { headers: JSON_HEADERS },
+      )
+    }
+
     // Step 1: idempotency guard.
     const { data: shipDay, error: shipDayErr } = await admin
       .from('ship_days')
@@ -108,6 +141,23 @@ Deno.serve(async (req) => {
     }
     if (shipDay.links_sent_at) {
       return new Response(JSON.stringify({ ok: true, sent: 0, failed: 0, skipped: true }), {
+        headers: JSON_HEADERS,
+      })
+    }
+
+    // Step 1b: fail fast on unprovisioned secrets, BEFORE any order is loaded
+    // or any push attempted, and without touching links_sent_at. Both default
+    // to '' when unset — the expected state until the team completes the LINE
+    // Console setup (runbook A6). Marking the day "sent" here would burn the
+    // one-shot guard on day one; failing loudly instead surfaces in BoatSetup's
+    // "แต่ส่งลิงก์ไลน์ไม่สำเร็จ" message while the boat save itself still succeeds.
+    const channelToken = Deno.env.get('LINE_CHANNEL_ACCESS_TOKEN') ?? ''
+    const site = Deno.env.get('SITE_URL') ?? ''
+    const missingSecrets = missingLineSecrets(channelToken, site)
+    if (missingSecrets.length) {
+      console.error('send-order-links missing secrets', missingSecrets.join(','))
+      return new Response(JSON.stringify({ error: 'ยังไม่ได้ตั้งค่า LINE (ดูคู่มือ A6)' }), {
+        status: 500,
         headers: JSON_HEADERS,
       })
     }
@@ -132,16 +182,27 @@ Deno.serve(async (req) => {
     let failed = 0
 
     if (deduped.length) {
-      const phones = deduped.map((o) => o.customer_phone!) as string[]
+      // line_contacts.phone is written normalized by register-line-contact, so
+      // the lookup key must be the normalized form of orders.customer_phone
+      // (which itself stays as-imported in the orders table — only this
+      // in-memory key changes). dedupOrdersByPhone already dropped anything
+      // that normalizes to empty, so these are all non-empty.
+      const phones = deduped.map((o) => normalizePhone(o.customer_phone ?? ''))
       const { data: contacts, error: contactsErr } = await admin
         .from('line_contacts')
         .select('phone,line_user_id')
         .in('phone', phones)
       if (contactsErr) {
-        // Can't look up who's registered — nothing below can send, but this
-        // must not throw: links_sent_at still gets set at the end (step 6),
-        // same as any other partial-failure run.
+        // Can't look up who's registered, so nothing below could send. Treat
+        // this exactly like the orders-load failure above: return an error and
+        // do NOT set links_sent_at. Continuing would send zero messages and
+        // still mark the day done — indistinguishable in the UI from "nobody
+        // registered yet", silently burning the day on a transient DB blip.
         console.error('send-order-links load line_contacts', contactsErr)
+        return new Response(JSON.stringify({ error: 'โหลดรายชื่อ LINE ไม่สำเร็จ' }), {
+          status: 500,
+          headers: JSON_HEADERS,
+        })
       }
       const contactByPhone = new Map(
         (contacts ?? []).map((c: { phone: string; line_user_id: string }) => [
@@ -150,13 +211,10 @@ Deno.serve(async (req) => {
         ]),
       )
 
-      const channelToken = Deno.env.get('LINE_CHANNEL_ACCESS_TOKEN') ?? ''
-      const site = Deno.env.get('SITE_URL') ?? ''
-
       // Steps 4+5: push per recipient, independently — one bad send must
       // never abort the batch.
       for (const o of deduped) {
-        const lineUserId = contactByPhone.get(o.customer_phone!)
+        const lineUserId = contactByPhone.get(normalizePhone(o.customer_phone ?? ''))
         if (!lineUserId) continue // not registered yet -- "คัดลอก" stays the fallback
 
         try {
