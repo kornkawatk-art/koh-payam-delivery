@@ -94,6 +94,22 @@ export async function commitImport(
   return { created, synced }
 }
 
+// Lookup by the Makro shipping-label QR code (plain text = makro_order_no).
+// Uniqueness is only guaranteed per ship_day_id, not globally, so this can
+// return zero, one, or multiple rows — the caller (QrOrderScanner) decides
+// what to do with each case. No ship_date filter: searches everything the
+// current user can read under RLS (all orders, for a team member).
+export async function findOrdersByMakroOrderNo(
+  orderNo: string,
+): Promise<{ id: string; customer_name_en: string; ship_date: string }[]> {
+  const { data, error } = await supabase
+    .from('orders')
+    .select('id,customer_name_en,ship_date')
+    .eq('makro_order_no', orderNo.trim())
+  if (error) throw new Error('ค้นหาออเดอร์ไม่สำเร็จ: ' + error.message)
+  return (data ?? []) as { id: string; customer_name_en: string; ship_date: string }[]
+}
+
 export async function getOrder(orderId: string) {
   const { data, error } = await supabase
     .from('orders')

@@ -1,8 +1,32 @@
 import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { MemoryRouter } from 'react-router-dom'
+import { MemoryRouter, Routes, Route, useParams } from 'react-router-dom'
 import DailyDashboard from './DailyDashboard'
 import { listOrdersForDay } from '../../lib/api/shipDays'
+
+// QrOrderScanner owns the real camera (html5-qrcode) — stub it so this file
+// only exercises the dashboard's own toggle + navigate-on-found wiring.
+vi.mock('../../components/QrOrderScanner', () => ({
+  default: ({
+    onFound,
+    onClose,
+  }: {
+    onFound: (o: { id: string; customer_name_en: string; ship_date: string }) => void
+    onClose: () => void
+  }) => (
+    <div>
+      <p>qr scanner section</p>
+      <button
+        onClick={() =>
+          onFound({ id: '2', customer_name_en: 'PAYAM CAFE', ship_date: '2026-10-01' })
+        }
+      >
+        mock decode → found
+      </button>
+      <button onClick={onClose}>mock decode → close</button>
+    </div>
+  ),
+}))
 
 vi.mock('../../lib/api/shipDays', () => ({
   listOrdersForDay: vi.fn().mockResolvedValue([
@@ -56,10 +80,21 @@ vi.mock('../../lib/supabase', () => ({
 
 const renderPage = () =>
   render(
-    <MemoryRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
-      <DailyDashboard />
+    <MemoryRouter
+      initialEntries={['/']}
+      future={{ v7_startTransition: true, v7_relativeSplatPath: true }}
+    >
+      <Routes>
+        <Route path="/" element={<DailyDashboard />} />
+        <Route path="/order/:id" element={<OrderPageStub />} />
+      </Routes>
     </MemoryRouter>,
   )
+
+function OrderPageStub() {
+  const { id } = useParams()
+  return <div>order detail page {id}</div>
+}
 
 test('summarises status progress for the day', async () => {
   renderPage()
@@ -197,4 +232,37 @@ test('load fails → Thai error + retry re-invokes the loader', async () => {
     expect(vi.mocked(listOrdersForDay).mock.calls.length).toBeGreaterThan(callsBefore),
   )
   expect(await screen.findByText('BLUE VIEW')).toBeInTheDocument()
+})
+
+test('the camera button toggles the scanner section open and closed', async () => {
+  renderPage()
+  await screen.findByText('BLUE VIEW')
+  expect(screen.queryByText('qr scanner section')).not.toBeInTheDocument()
+
+  await userEvent.click(screen.getByRole('button', { name: 'สแกน QR ออเดอร์' }))
+  expect(screen.getByText('qr scanner section')).toBeInTheDocument()
+
+  await userEvent.click(screen.getByRole('button', { name: 'สแกน QR ออเดอร์' }))
+  expect(screen.queryByText('qr scanner section')).not.toBeInTheDocument()
+})
+
+test('closing from inside the scanner (onClose) also closes the section', async () => {
+  renderPage()
+  await screen.findByText('BLUE VIEW')
+  await userEvent.click(screen.getByRole('button', { name: 'สแกน QR ออเดอร์' }))
+  expect(screen.getByText('qr scanner section')).toBeInTheDocument()
+
+  await userEvent.click(screen.getByRole('button', { name: 'mock decode → close' }))
+  expect(screen.queryByText('qr scanner section')).not.toBeInTheDocument()
+})
+
+test('a found order (onFound) navigates to /order/<id> and closes the scanner', async () => {
+  renderPage()
+  await screen.findByText('BLUE VIEW')
+  await userEvent.click(screen.getByRole('button', { name: 'สแกน QR ออเดอร์' }))
+
+  await userEvent.click(screen.getByRole('button', { name: 'mock decode → found' }))
+
+  expect(await screen.findByText('order detail page 2')).toBeInTheDocument()
+  expect(screen.queryByText('qr scanner section')).not.toBeInTheDocument()
 })
