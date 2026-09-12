@@ -35,7 +35,7 @@ declare
   v_item jsonb;
 begin
   insert into claims (order_id, type, description, status, deadline_at)
-  values (p_order_id, p_type, p_description, 'open', p_deadline_at)
+  values (p_order_id, p_type::claim_type, p_description, 'open', p_deadline_at)
   returning id into v_claim_id;
 
   for v_item in select * from jsonb_array_elements(p_items)
