@@ -8,6 +8,11 @@ vi.mock('../../lib/api/claims', () => ({
   listClaims: (...a: unknown[]) => listClaims(...a),
 }))
 
+const listUnmatchedBackorders = vi.fn()
+vi.mock('../../lib/api/backorders', () => ({
+  listUnmatchedBackorders: (...a: unknown[]) => listUnmatchedBackorders(...a),
+}))
+
 const past = '2000-01-01T00:00:00.000Z'
 const future = '2999-01-01T00:00:00.000Z'
 
@@ -49,6 +54,7 @@ const rows = [
 
 beforeEach(() => {
   listClaims.mockReset().mockResolvedValue(rows)
+  listUnmatchedBackorders.mockReset().mockResolvedValue([])
 })
 
 const renderPage = () =>
@@ -104,4 +110,70 @@ test('shows a Thai error when the queue fails to load', async () => {
   listClaims.mockReset().mockRejectedValueOnce(new Error('nope'))
   renderPage()
   expect(await screen.findByText('โหลดคิวเคลมไม่สำเร็จ')).toBeInTheDocument()
+})
+
+const daysAgo = (n: number) => new Date(Date.now() - n * 24 * 60 * 60 * 1000).toISOString()
+
+const unmatched = [
+  {
+    id: 'ub-old',
+    customerName: 'PALM BEACH',
+    productName: 'rice',
+    qty: 2,
+    reason: 'shortage' as const,
+    createdAt: daysAgo(10),
+  },
+  {
+    id: 'ub-fresh',
+    customerName: 'REEF LODGE',
+    productName: 'fish sauce',
+    qty: 1,
+    reason: 'claim_resend' as const,
+    createdAt: daysAgo(1),
+  },
+]
+
+test('renders every unmatched backorder row with customer/product/qty/reason label', async () => {
+  listUnmatchedBackorders.mockReset().mockResolvedValue(unmatched)
+  renderPage()
+  await screen.findByText('PALM BEACH')
+  expect(screen.getByText('rice x2')).toBeInTheDocument()
+  expect(screen.getByText('ของขาด')).toBeInTheDocument()
+  expect(screen.getByText('REEF LODGE')).toBeInTheDocument()
+  expect(screen.getByText('fish sauce x1')).toBeInTheDocument()
+  expect(screen.getByText('ชดเชยจากเคลม')).toBeInTheDocument()
+})
+
+test('highlights an unmatched backorder waiting more than 7 days, not one waiting less', async () => {
+  listUnmatchedBackorders.mockReset().mockResolvedValue(unmatched)
+  renderPage()
+  const old = (await screen.findByText('PALM BEACH')).closest('tr')
+  const fresh = screen.getByText('REEF LODGE').closest('tr')
+  expect(old?.className).toContain('bg-red-50')
+  expect(fresh?.className).not.toContain('bg-red-50')
+})
+
+test('shows the empty state when there are zero unmatched backorders', async () => {
+  listUnmatchedBackorders.mockReset().mockResolvedValue([])
+  renderPage()
+  expect(
+    await screen.findByText('ไม่มีรายการค้างส่งที่ยังจับคู่ไม่สำเร็จ'),
+  ).toBeInTheDocument()
+})
+
+test('a failure loading unmatched backorders does not blank the claims table', async () => {
+  listUnmatchedBackorders.mockReset().mockRejectedValueOnce(new Error('nope'))
+  renderPage()
+  await screen.findByText('PO-OVERDUE')
+  expect(
+    await screen.findByText('โหลดรายการค้างส่งที่ยังจับคู่ไม่สำเร็จ'),
+  ).toBeInTheDocument()
+})
+
+test('a failure loading claims does not blank the unmatched backorders table', async () => {
+  listClaims.mockReset().mockRejectedValueOnce(new Error('nope'))
+  listUnmatchedBackorders.mockReset().mockResolvedValue(unmatched)
+  renderPage()
+  await screen.findByText('โหลดคิวเคลมไม่สำเร็จ')
+  expect(await screen.findByText('PALM BEACH')).toBeInTheDocument()
 })
