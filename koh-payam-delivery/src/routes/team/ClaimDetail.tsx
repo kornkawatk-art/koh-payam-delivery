@@ -4,6 +4,7 @@ import { getClaim, resolveClaim } from '../../lib/api/claims'
 import { supabase } from '../../lib/supabase'
 import { Spinner } from '../../components/ui/Spinner'
 import { PageHeader } from '../../components/ui/PageHeader'
+import { ZoomableImage } from '../../components/ui/ZoomableImage'
 
 const R2 = import.meta.env.VITE_R2_PUBLIC_BASE_URL as string
 
@@ -116,12 +117,7 @@ export default function ClaimDetail() {
         <div className="flex flex-wrap gap-2">
           {(c.claim_photos ?? []).length === 0 && <p className="muted">ไม่มีรูป</p>}
           {(c.claim_photos ?? []).map((p: any) => (
-            <img
-              key={p.r2_key}
-              src={`${R2}/${p.r2_key}`}
-              alt="รูปจากลูกค้า"
-              className="h-24 w-24 rounded-lg border border-line object-cover"
-            />
+            <ZoomableImage key={p.r2_key} src={`${R2}/${p.r2_key}`} alt="รูปจากลูกค้า" />
           ))}
         </div>
       </section>
@@ -135,12 +131,7 @@ export default function ClaimDetail() {
           {evi
             .filter((p) => p.stage === 'pack')
             .map((p) => (
-              <img
-                key={p.url}
-                src={p.url}
-                alt="รูปหลักฐานของทีม"
-                className="h-24 w-24 rounded-lg border border-line object-cover"
-              />
+              <ZoomableImage key={p.url} src={p.url} alt="รูปหลักฐานของทีม" />
             ))}
         </div>
       </section>
@@ -154,12 +145,7 @@ export default function ClaimDetail() {
           {evi
             .filter((p) => p.stage !== 'pack')
             .map((p) => (
-              <img
-                key={p.url}
-                src={p.url}
-                alt="รูปหลักฐานของทีม"
-                className="h-24 w-24 rounded-lg border border-line object-cover"
-              />
+              <ZoomableImage key={p.url} src={p.url} alt="รูปหลักฐานของทีม" />
             ))}
         </div>
       </section>

@@ -156,7 +156,7 @@ export default function PierLoad() {
       </h1>
 
       {sel.outstanding_amount != null && sel.outstanding_amount > 0 && (
-        <p className="alert alert-warn">
+        <p className="alert alert-danger">
           เก็บเงินปลายทาง {formatTHB(sel.outstanding_amount)} ({sel.payment_method})
         </p>
       )}

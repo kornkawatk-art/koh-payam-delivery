@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import CustomerClaimForm from './CustomerClaimForm'
 
@@ -29,8 +29,8 @@ vi.mock('../../components/PhotoCapture', () => ({
 }))
 
 const items = [
-  { productName: 'Rice 5kg', qtyOrdered: 10 },
-  { productName: 'Fish sauce', qtyOrdered: 4 },
+  { productName: 'Rice 5kg', shippedQty: 10 },
+  { productName: 'Fish sauce', shippedQty: 4 },
 ]
 
 beforeEach(() => {
@@ -44,18 +44,19 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.unstubAllGlobals()
+  vi.useRealTimers()
 })
 
 const lastCall = () => fetchMock.mock.calls[fetchMock.mock.calls.length - 1]
 const lastBody = () => JSON.parse((lastCall()[1] as RequestInit).body as string)
 
-test('damaged + first item + qty + description + photo -> POSTs to submit-claim', async () => {
+test('damaged: checking an item + qty + description + photo -> POSTs to submit-claim', async () => {
   const onDone = vi.fn()
   render(<CustomerClaimForm token="tok_abc" items={items} lang="en" onDone={onDone} />)
 
   await userEvent.click(screen.getByRole('radio', { name: 'Damaged' }))
-  // first item (index 0) is the default <select> value
-  expect((screen.getByLabelText('Item') as HTMLSelectElement).value).toBe('0')
+  expect(screen.getByText('Which items are damaged?')).toBeInTheDocument()
+  await userEvent.click(screen.getByRole('checkbox', { name: 'Rice 5kg' }))
   await userEvent.type(screen.getByLabelText('Description'), 'crushed tin')
   await userEvent.click(screen.getByRole('button', { name: 'mock-upload' }))
   await userEvent.click(screen.getByRole('button', { name: 'Submit' }))
@@ -78,13 +79,40 @@ test('damaged + first item + qty + description + photo -> POSTs to submit-claim'
   expect(body.photoKeys).toContain('k1')
 })
 
+test('damaged: allows checking multiple products at once, same as missing_in_box', async () => {
+  const onDone = vi.fn()
+  render(<CustomerClaimForm token="tok_abc" items={items} lang="en" onDone={onDone} />)
+
+  await userEvent.click(screen.getByRole('radio', { name: 'Damaged' }))
+  await userEvent.click(screen.getByRole('checkbox', { name: 'Rice 5kg' }))
+  await userEvent.click(screen.getByRole('checkbox', { name: 'Fish sauce' }))
+  await userEvent.click(screen.getByRole('button', { name: 'Submit' }))
+
+  await waitFor(() => expect(onDone).toHaveBeenCalled())
+  const body = lastBody()
+  expect(body.type).toBe('damaged')
+  expect(body.items).toEqual([
+    { orderItemIndex: 0, qty: 1 },
+    { orderItemIndex: 1, qty: 1 },
+  ])
+})
+
+test('damaged: submit is disabled until at least one item is checked', async () => {
+  render(<CustomerClaimForm token="tok_abc" items={items} lang="en" onDone={vi.fn()} />)
+
+  await userEvent.click(screen.getByRole('radio', { name: 'Damaged' }))
+  expect(screen.getByRole('button', { name: 'Submit' })).toBeDisabled()
+  await userEvent.click(screen.getByRole('checkbox', { name: 'Rice 5kg' }))
+  expect(screen.getByRole('button', { name: 'Submit' })).toBeEnabled()
+})
+
 test('box_lost hides the item picker and sends an empty items array', async () => {
   const onDone = vi.fn()
   render(<CustomerClaimForm token="tok_abc" items={items} lang="en" onDone={onDone} />)
 
   await userEvent.click(screen.getByRole('radio', { name: 'Box lost' }))
-  expect(screen.queryByLabelText('Item')).not.toBeInTheDocument()
   expect(screen.queryByText('Which items are missing?')).not.toBeInTheDocument()
+  expect(screen.queryByText('Which items are damaged?')).not.toBeInTheDocument()
 
   await userEvent.click(screen.getByRole('button', { name: 'Submit' }))
   await waitFor(() => expect(onDone).toHaveBeenCalled())
@@ -104,9 +132,10 @@ test('missing_in_box: checking two items with qtys POSTs one items[] entry each'
   await userEvent.click(screen.getByRole('checkbox', { name: 'Fish sauce' }))
 
   const riceQty = screen.getByLabelText('Quantity: Rice 5kg')
-  // onFocus selects the current value (default 1), so typing over it replaces
-  // rather than appends.
+  // onFocus (deferred) selects the current value (default 1), so typing over
+  // it replaces rather than appends.
   await userEvent.click(riceQty)
+  await new Promise((resolve) => setTimeout(resolve, 0))
   await userEvent.keyboard('3')
 
   await userEvent.click(screen.getByRole('button', { name: 'Submit' }))
@@ -148,11 +177,78 @@ test('missing_in_box: submit is disabled until at least one item is checked', as
   expect(screen.getByRole('button', { name: 'Submit' })).toBeDisabled()
 })
 
-test('qty inputs select their contents on focus so the default 1 is easy to overwrite', async () => {
+test('switching claim type clears the previous item selection', async () => {
+  render(<CustomerClaimForm token="tok_abc" items={items} lang="en" onDone={vi.fn()} />)
+
+  await userEvent.click(screen.getByRole('checkbox', { name: 'Rice 5kg' }))
+  expect(screen.getByRole('checkbox', { name: 'Rice 5kg' })).toBeChecked()
+  expect(screen.getByRole('button', { name: 'Submit' })).toBeEnabled()
+
+  await userEvent.click(screen.getByRole('radio', { name: 'Damaged' }))
+  expect(screen.getByRole('checkbox', { name: 'Rice 5kg' })).not.toBeChecked()
+  expect(screen.getByRole('button', { name: 'Submit' })).toBeDisabled()
+
+  await userEvent.click(screen.getByRole('checkbox', { name: 'Fish sauce' }))
+  await userEvent.click(screen.getByRole('radio', { name: 'Missing from box' }))
+  expect(screen.getByRole('checkbox', { name: 'Fish sauce' })).not.toBeChecked()
+  expect(screen.getByRole('button', { name: 'Submit' })).toBeDisabled()
+})
+
+test('a qty input cannot be typed or clamped above its item shippedQty', async () => {
+  render(<CustomerClaimForm token="tok_abc" items={items} lang="en" onDone={vi.fn()} />)
+
+  await userEvent.click(screen.getByRole('checkbox', { name: 'Fish sauce' }))
+  const fishQty = screen.getByLabelText('Quantity: Fish sauce') as HTMLInputElement
+  expect(fishQty).toHaveAttribute('max', '4')
+
+  await userEvent.click(fishQty)
+  await new Promise((resolve) => setTimeout(resolve, 0))
+  await userEvent.keyboard('9')
+  // shippedQty for Fish sauce is 4 — typing 9 clamps down to it.
+  expect(fishQty.value).toBe('4')
+})
+
+test('an item with shippedQty 0 never appears in either type selectable list', async () => {
+  const itemsWithZeroShipped = [
+    { productName: 'Out of Stock Thing', shippedQty: 0 },
+    { productName: 'Rice 5kg', shippedQty: 10 },
+  ]
+  render(
+    <CustomerClaimForm token="tok_abc" items={itemsWithZeroShipped} lang="en" onDone={vi.fn()} />,
+  )
+
+  expect(screen.queryByRole('checkbox', { name: 'Out of Stock Thing' })).not.toBeInTheDocument()
+  expect(screen.getByRole('checkbox', { name: 'Rice 5kg' })).toBeInTheDocument()
+
+  await userEvent.click(screen.getByRole('radio', { name: 'Damaged' }))
+  expect(screen.queryByRole('checkbox', { name: 'Out of Stock Thing' })).not.toBeInTheDocument()
+  expect(screen.getByRole('checkbox', { name: 'Rice 5kg' })).toBeInTheDocument()
+})
+
+test('qty input onFocus defers the select() call to the next tick rather than calling it synchronously', () => {
+  vi.useFakeTimers()
+  render(<CustomerClaimForm token="tok_abc" items={items} lang="en" onDone={vi.fn()} />)
+  fireEvent.click(screen.getByRole('checkbox', { name: 'Rice 5kg' }))
+  const riceQty = screen.getByLabelText('Quantity: Rice 5kg') as HTMLInputElement
+  const selectSpy = vi.spyOn(riceQty, 'select')
+
+  fireEvent.focus(riceQty)
+  // The old synchronous `onFocus={(e) => e.target.select()}` would have
+  // called select() here already — the fix defers it, so it must not have
+  // fired yet.
+  expect(selectSpy).not.toHaveBeenCalled()
+
+  vi.advanceTimersByTime(0)
+  expect(selectSpy).toHaveBeenCalledTimes(1)
+})
+
+test('qty inputs still select their contents on focus (after the deferred tick) so the default 1 is easy to overwrite', async () => {
   render(<CustomerClaimForm token="tok_abc" items={items} lang="en" onDone={vi.fn()} />)
   await userEvent.click(screen.getByRole('checkbox', { name: 'Rice 5kg' }))
   const riceQty = screen.getByLabelText('Quantity: Rice 5kg') as HTMLInputElement
   await userEvent.click(riceQty)
+  // Let the deferred setTimeout(…, 0) select() call actually run before typing.
+  await new Promise((resolve) => setTimeout(resolve, 0))
   await userEvent.keyboard('9')
   // select-all-on-focus means the typed digit replaces the previous value
   // rather than appending to it.
