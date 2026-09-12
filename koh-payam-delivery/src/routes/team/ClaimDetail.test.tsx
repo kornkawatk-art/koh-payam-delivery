@@ -26,10 +26,9 @@ const claim = {
   id: 'c1',
   order_id: 'o1',
   type: 'damaged',
-  qty: 2,
   description: 'ข้าวสารเปียก',
   orders: { makro_order_no: 'PO-1', customer_name_en: 'BLUE VIEW' },
-  order_items: { product_name: 'rice' },
+  claim_items: [{ qty: 2, order_items: { product_name: 'rice' } }],
   claim_photos: [],
 }
 
@@ -55,6 +54,34 @@ const renderPage = () =>
 test('leaves the refund amount empty for the team to type', async () => {
   renderPage()
   expect(await screen.findByLabelText('จำนวนเงินคืน')).toHaveValue(null)
+})
+
+test('renders every claim_items entry as product × qty', async () => {
+  renderPage()
+  await screen.findByLabelText('จำนวนเงินคืน')
+  expect(screen.getByText('rice × 2')).toBeInTheDocument()
+})
+
+test('renders several claim_items entries for a multi-item missing_in_box claim', async () => {
+  getClaim.mockReset().mockResolvedValue({
+    ...claim,
+    type: 'missing_in_box',
+    claim_items: [
+      { qty: 2, order_items: { product_name: 'rice' } },
+      { qty: 1, order_items: { product_name: 'fish sauce' } },
+    ],
+  })
+  renderPage()
+  await screen.findByLabelText('จำนวนเงินคืน')
+  expect(screen.getByText('rice × 2')).toBeInTheDocument()
+  expect(screen.getByText('fish sauce × 1')).toBeInTheDocument()
+})
+
+test('renders no item list for a box_lost claim (zero claim_items)', async () => {
+  getClaim.mockReset().mockResolvedValue({ ...claim, type: 'box_lost', claim_items: [] })
+  renderPage()
+  await screen.findByLabelText('จำนวนเงินคืน')
+  expect(screen.queryByText(/×/)).not.toBeInTheDocument()
 })
 
 test('switching to resend hides the amount field and resolves without a refund', async () => {
