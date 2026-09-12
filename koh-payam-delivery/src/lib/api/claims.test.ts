@@ -73,17 +73,17 @@ beforeEach(() => {
   state.updates = []
 })
 
-test('listClaims flattens the order join, coerces qty, and sorts by deadline asc', async () => {
+test('listClaims flattens the order join, counts claim_items, and sorts by deadline asc', async () => {
   state.listData = [
     {
       id: 'c1',
       order_id: 'o1',
       type: 'damaged',
-      qty: '2',
       status: 'open',
       deadline_at: '2026-09-01T00:00:00Z',
       created_at: '2026-08-30T00:00:00Z',
       orders: { makro_order_no: 'PO-1', customer_name_en: 'BLUE VIEW' },
+      claim_items: [{ id: 'ci1' }],
     },
   ]
   const rows = await listClaims({ status: 'open' })
@@ -93,7 +93,7 @@ test('listClaims flattens the order join, coerces qty, and sorts by deadline asc
     id: 'c1',
     order_id: 'o1',
     type: 'damaged',
-    qty: 2,
+    itemCount: 1,
     status: 'open',
     deadline_at: '2026-09-01T00:00:00Z',
     created_at: '2026-08-30T00:00:00Z',
@@ -102,16 +102,33 @@ test('listClaims flattens the order join, coerces qty, and sorts by deadline asc
   })
 })
 
+test('listClaims counts zero claim_items as itemCount 0 (e.g. box_lost)', async () => {
+  state.listData = [
+    {
+      id: 'c2',
+      order_id: 'o2',
+      type: 'box_lost',
+      status: 'open',
+      deadline_at: '2026-09-01T00:00:00Z',
+      created_at: '2026-08-30T00:00:00Z',
+      orders: { makro_order_no: 'PO-2', customer_name_en: 'SUNSET' },
+      claim_items: [],
+    },
+  ]
+  const rows = await listClaims()
+  expect(rows[0].itemCount).toBe(0)
+})
+
 test('listClaims without a status filter never calls eq', async () => {
   await listClaims()
   expect(state.eqArgs).toHaveLength(0)
 })
 
-test('getClaim selects order_items without any price column', async () => {
+test('getClaim selects claim_items with product_name, without any price column', async () => {
   state.singleData = { id: 'c1', description: '' }
   await getClaim('c1')
   expect(
-    state.selectArgs.some((s) => s.includes('order_items(product_name,qty_ordered,qty_shipped)')),
+    state.selectArgs.some((s) => s.includes('claim_items(qty,order_items(product_name))')),
   ).toBe(true)
   expect(state.selectArgs.some((s) => /price|value_cached/.test(s))).toBe(false)
 })

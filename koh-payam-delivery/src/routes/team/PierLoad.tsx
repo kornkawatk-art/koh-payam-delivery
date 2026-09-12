@@ -197,11 +197,11 @@ export default function PierLoad() {
       </label>
 
       <section>
-        <p className="section-title mb-2">รูปหลักฐาน (สูงสุด 3)</p>
+        <p className="section-title mb-2">รูปหลักฐาน (สูงสุด 5)</p>
         <PhotoCapture
           scope="evidence"
           orderId={sel.id}
-          max={3}
+          max={5}
           onBusyChange={setPhotoBusy}
           onUploaded={async (key) => {
             try {
