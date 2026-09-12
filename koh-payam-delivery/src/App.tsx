@@ -15,6 +15,7 @@ import OrderDetail from './routes/team/OrderDetail'
 import PackOrder from './routes/team/PackOrder'
 import LabelSheet from './routes/team/LabelSheet'
 import CustomerOrderView from './routes/customer/CustomerOrderView'
+import LineRegister from './routes/customer/LineRegister'
 
 const LOADING = (
   <div className="flex min-h-screen items-center justify-center text-sm text-ink-soft">
@@ -49,6 +50,8 @@ export default function App() {
           <Route path="/login" element={<Login />} />
           {/* Customer order link — no team session; the link_token is the only credential. */}
           <Route path="/o/:token" element={<CustomerOrderView />} />
+          {/* LIFF registration page — opened inside LINE's in-app browser; no team session, no link_token. */}
+          <Route path="/liff/register" element={<LineRegister />} />
           <Route path="/2fa/setup" element={<TwoFactorSetup />} />
           <Route path="/2fa" element={<TwoFactorChallenge />} />
           <Route
