@@ -78,6 +78,18 @@ test('shows the makro item code per line item', async () => {
   expect(screen.getByText('100002')).toBeInTheDocument()
 })
 
+test('evidence photo thumbnail can be tapped to enlarge, and dismissed', async () => {
+  const user = userEvent.setup()
+  renderAt()
+  const thumb = await screen.findAllByAltText('Delivery photos')
+  expect(thumb).toHaveLength(1)
+  await user.click(thumb[0].closest('button')!)
+  // enlarged version: a second img with the same alt now on screen
+  expect(await screen.findAllByAltText('Delivery photos')).toHaveLength(2)
+  await user.click(screen.getByRole('button', { name: 'ปิด' }))
+  expect(await screen.findAllByAltText('Delivery photos')).toHaveLength(1)
+})
+
 test('language toggle switches the header text to Thai and persists', async () => {
   renderAt()
   expect(await screen.findByText(/Order · PO-1001/)).toBeInTheDocument()

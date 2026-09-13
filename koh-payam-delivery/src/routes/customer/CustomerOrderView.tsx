@@ -3,6 +3,7 @@ import { Link, useParams } from 'react-router-dom'
 import { t, type Lang } from './i18n'
 import OrderStatusTimeline from '../../components/OrderStatusTimeline'
 import CustomerClaimForm from './CustomerClaimForm'
+import { ZoomableImage } from '../../components/ui/ZoomableImage'
 import { formatDate, formatDateTime, formatTHB } from '../../lib/format'
 
 const FN = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/order-view`
@@ -247,12 +248,7 @@ export default function CustomerOrderView() {
           <h2 className="section-title">{t(lang, 'evidence')}</h2>
           <div className="flex flex-wrap gap-2">
             {data.evidencePhotos.map((src) => (
-              <img
-                key={src}
-                src={src}
-                alt={t(lang, 'evidence')}
-                className="h-24 w-24 rounded-lg border border-line object-cover"
-              />
+              <ZoomableImage key={src} src={src} alt={t(lang, 'evidence')} />
             ))}
           </div>
         </section>
