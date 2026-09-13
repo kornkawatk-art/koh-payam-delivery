@@ -16,7 +16,10 @@ export default function LineContacts() {
   const [q, setQ] = useState('')
 
   const [pending, setPending] = useState<PendingLineContactRow[]>([])
-  const [busyPhone, setBusyPhone] = useState<string | null>(null)
+  // Every phone currently mid-decision. A Set (rather than a single scalar)
+  // so approving/rejecting one row's request doesn't affect another row's
+  // disabled state -- each row only cares whether ITS OWN phone is in here.
+  const [busyPhones, setBusyPhones] = useState<Set<string>>(new Set())
   const [pendingError, setPendingError] = useState('')
 
   const load = useCallback(() => {
@@ -41,7 +44,7 @@ export default function LineContacts() {
   }, [loadPending])
 
   async function decide(phone: string, decision: 'approve' | 'reject') {
-    setBusyPhone(phone)
+    setBusyPhones((prev) => new Set(prev).add(phone))
     setPendingError('')
     try {
       await resolveLineContactRequest(phone, decision)
@@ -49,7 +52,11 @@ export default function LineContacts() {
     } catch (e) {
       setPendingError((e as Error).message)
     } finally {
-      setBusyPhone(null)
+      setBusyPhones((prev) => {
+        const next = new Set(prev)
+        next.delete(phone)
+        return next
+      })
     }
   }
 
@@ -96,7 +103,7 @@ export default function LineContacts() {
                         <button
                           type="button"
                           className="btn btn-primary btn-sm"
-                          disabled={busyPhone === p.phone}
+                          disabled={busyPhones.has(p.phone)}
                           onClick={() => void decide(p.phone, 'approve')}
                         >
                           อนุมัติ
@@ -104,7 +111,7 @@ export default function LineContacts() {
                         <button
                           type="button"
                           className="btn btn-secondary btn-sm"
-                          disabled={busyPhone === p.phone}
+                          disabled={busyPhones.has(p.phone)}
                           onClick={() => void decide(p.phone, 'reject')}
                         >
                           ปฏิเสธ

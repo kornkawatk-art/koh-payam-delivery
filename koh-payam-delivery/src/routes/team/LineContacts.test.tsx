@@ -111,6 +111,45 @@ test('reject button calls resolveLineContactRequest(phone, "reject") and removes
   await waitFor(() => expect(screen.queryByText('0888888888')).not.toBeInTheDocument())
 })
 
+test('deciding row A leaves only row A disabled while its call is in flight, unaffected by clicking row B', async () => {
+  const rowB = {
+    phone: '0877777777',
+    oldDisplayName: 'Boonmee (old)',
+    pendingDisplayName: 'Boonmee (new)',
+    requestedAt: '2026-09-12T04:00:00.000Z',
+  }
+  listPendingLineContactRequests.mockResolvedValue([...pendingRows, rowB])
+
+  let resolveA: () => void = () => {}
+  const aPromise = new Promise<void>((resolve) => {
+    resolveA = resolve
+  })
+  resolveLineContactRequest.mockImplementation((phone: string) =>
+    phone === pendingRows[0].phone ? aPromise : Promise.resolve(undefined),
+  )
+
+  render(<LineContacts />)
+  await screen.findByText('0888888888')
+  await screen.findByText('0877777777')
+
+  const approveButtons = screen.getAllByRole('button', { name: 'อนุมัติ' })
+  expect(approveButtons).toHaveLength(2)
+
+  // Click row A's approve -- its call stays pending (aPromise unresolved).
+  await userEvent.click(approveButtons[0])
+  expect(approveButtons[0]).toBeDisabled()
+
+  // While A is still in flight, click row B's approve (resolves immediately).
+  await userEvent.click(approveButtons[1])
+  await waitFor(() => expect(resolveLineContactRequest).toHaveBeenCalledWith('0877777777', 'approve'))
+
+  // Row A must still be disabled -- B's click/resolution must not re-enable it.
+  expect(approveButtons[0]).toBeDisabled()
+
+  resolveA()
+  await waitFor(() => expect(approveButtons[0]).not.toBeDisabled())
+})
+
 test('a failed decision shows a Thai error and keeps the row in the pending section', async () => {
   listPendingLineContactRequests.mockResolvedValue(pendingRows)
   resolveLineContactRequest.mockRejectedValueOnce(new Error('บันทึกผลคำขอไม่สำเร็จ: boom'))

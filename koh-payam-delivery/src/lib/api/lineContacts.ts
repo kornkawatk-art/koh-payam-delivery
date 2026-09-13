@@ -78,6 +78,12 @@ export async function resolveLineContactRequest(
     pending_display_name: string | null
   }
 
+  // Another call (double-click, two managers, a stale re-render) may have
+  // already resolved this same phone's request between our read and now --
+  // in that case pending_line_user_id is already cleared and there is
+  // nothing left to decide on. Bail out before writing anything.
+  if (!row.pending_line_user_id) throw new Error('คำขอนี้ถูกดำเนินการไปแล้ว')
+
   const patch =
     decision === 'approve'
       ? {
@@ -93,8 +99,22 @@ export async function resolveLineContactRequest(
           pending_requested_at: null,
         }
 
-  const { error } = await supabase.from('line_contacts').update(patch).eq('phone', phone)
+  // Guard the write with the exact pending_line_user_id we just read, so the
+  // update only takes effect if no other call resolved this request in the
+  // meantime. If it did, this filter matches zero rows instead of clobbering
+  // whatever the other call already wrote.
+  const { data: updated, error } = await supabase
+    .from('line_contacts')
+    .update(patch)
+    .eq('phone', phone)
+    .eq('pending_line_user_id', row.pending_line_user_id)
+    .select('phone')
   if (error) throw new Error('บันทึกผลคำขอไม่สำเร็จ: ' + error.message)
+  if (!updated || updated.length === 0) {
+    throw new Error(
+      'คำขอนี้ถูกดำเนินการไปแล้ว หรือมีคำขอใหม่เข้ามาแทน กรุณาโหลดหน้าใหม่',
+    )
+  }
 
   await logAction(
     decision === 'approve' ? 'line_contact_approved' : 'line_contact_rejected',
