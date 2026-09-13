@@ -5,7 +5,7 @@ const FN = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/register-line-cont
 const ANON = import.meta.env.VITE_SUPABASE_ANON_KEY as string
 
 type InitState = 'loading' | 'ready' | 'error'
-type SubmitState = 'idle' | 'busy' | 'success' | 'error'
+type SubmitState = 'idle' | 'busy' | 'success' | 'pending' | 'error'
 
 /**
  * LIFF (LINE Front-end Framework) registration page, opened from a link
@@ -61,7 +61,7 @@ export default function LineRegister() {
       })
       const json = await res.json().catch(() => null)
       if (!res.ok || !json?.ok) throw new Error('register failed')
-      setSubmitState('success')
+      setSubmitState(json.pending ? 'pending' : 'success')
     } catch {
       setSubmitState('error')
     }
@@ -82,7 +82,7 @@ export default function LineRegister() {
           </p>
         )}
 
-        {initState === 'ready' && submitState !== 'success' && (
+        {initState === 'ready' && submitState !== 'success' && submitState !== 'pending' && (
           <form
             className="flex flex-col gap-4 rounded-lg border border-line bg-paper p-4"
             onSubmit={(e) => {
@@ -119,6 +119,13 @@ export default function LineRegister() {
         {submitState === 'success' && (
           <p className="alert alert-ok">
             ลงทะเบียนสำเร็จ ระบบจะส่งลิงก์ออเดอร์ให้ทาง LINE นี้
+          </p>
+        )}
+
+        {submitState === 'pending' && (
+          <p className="alert alert-warn">
+            คำขอกำลังรอตรวจสอบ เบอร์นี้เคยลงทะเบียนไว้กับ LINE บัญชีอื่น
+            กรุณารอทีมงานตรวจสอบและอนุมัติก่อน
           </p>
         )}
       </div>

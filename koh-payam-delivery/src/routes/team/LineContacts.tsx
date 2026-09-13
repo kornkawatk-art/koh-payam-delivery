@@ -1,5 +1,11 @@
-import { useEffect, useMemo, useState } from 'react'
-import { listLineContacts, type LineContactRow } from '../../lib/api/lineContacts'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import {
+  listLineContacts,
+  listPendingLineContactRequests,
+  resolveLineContactRequest,
+  type LineContactRow,
+  type PendingLineContactRow,
+} from '../../lib/api/lineContacts'
 import { Spinner } from '../../components/ui/Spinner'
 import { PageHeader } from '../../components/ui/PageHeader'
 import { formatDateTimeTH } from '../../lib/format'
@@ -9,19 +15,43 @@ export default function LineContacts() {
   const [failed, setFailed] = useState(false)
   const [q, setQ] = useState('')
 
-  useEffect(() => {
-    let active = true
-    listLineContacts()
-      .then((r) => {
-        if (active) setRows(r)
-      })
-      .catch(() => {
-        if (active) setFailed(true)
-      })
-    return () => {
-      active = false
-    }
+  const [pending, setPending] = useState<PendingLineContactRow[]>([])
+  const [busyPhone, setBusyPhone] = useState<string | null>(null)
+  const [pendingError, setPendingError] = useState('')
+
+  const load = useCallback(() => {
+    return listLineContacts()
+      .then((r) => setRows(r))
+      .then(() => setFailed(false))
+      .catch(() => setFailed(true))
   }, [])
+
+  const loadPending = useCallback(() => {
+    return listPendingLineContactRequests()
+      .then((p) => setPending(p))
+      .catch(() => setPending([]))
+  }, [])
+
+  useEffect(() => {
+    void load()
+  }, [load])
+
+  useEffect(() => {
+    void loadPending()
+  }, [loadPending])
+
+  async function decide(phone: string, decision: 'approve' | 'reject') {
+    setBusyPhone(phone)
+    setPendingError('')
+    try {
+      await resolveLineContactRequest(phone, decision)
+      await Promise.all([load(), loadPending()])
+    } catch (e) {
+      setPendingError((e as Error).message)
+    } finally {
+      setBusyPhone(null)
+    }
+  }
 
   const filtered = useMemo(() => {
     const r = rows ?? []
@@ -38,6 +68,56 @@ export default function LineContacts() {
   return (
     <div className="flex flex-col gap-5">
       <PageHeader title="ผู้ลงทะเบียน LINE" />
+
+      {pending.length > 0 && (
+        <section className="flex flex-col gap-2">
+          <p className="section-title">คำขอรออนุมัติ</p>
+          {pendingError && <p className="alert alert-danger">{pendingError}</p>}
+          <div className="table-wrap">
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th>เบอร์โทร</th>
+                  <th>ชื่อ LINE เดิม</th>
+                  <th>ชื่อ LINE ใหม่</th>
+                  <th>วันที่ขอ</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                {pending.map((p) => (
+                  <tr key={p.phone}>
+                    <td className="whitespace-nowrap">{p.phone}</td>
+                    <td>{p.oldDisplayName || '—'}</td>
+                    <td>{p.pendingDisplayName || '—'}</td>
+                    <td className="whitespace-nowrap">{formatDateTimeTH(p.requestedAt)}</td>
+                    <td className="whitespace-nowrap">
+                      <div className="flex gap-2">
+                        <button
+                          type="button"
+                          className="btn btn-primary btn-sm"
+                          disabled={busyPhone === p.phone}
+                          onClick={() => void decide(p.phone, 'approve')}
+                        >
+                          อนุมัติ
+                        </button>
+                        <button
+                          type="button"
+                          className="btn btn-secondary btn-sm"
+                          disabled={busyPhone === p.phone}
+                          onClick={() => void decide(p.phone, 'reject')}
+                        >
+                          ปฏิเสธ
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      )}
 
       <input
         placeholder="ค้นหาเบอร์โทร / ชื่อ LINE"
