@@ -217,6 +217,48 @@ test('linkBackordersToDay falls back to name match when no same-day order shares
   expect(update[2].target_order_id).toBe('o-sun')
 })
 
+test('linkBackordersToDay never matches a backorder back to its own source order', async () => {
+  // Reproduces a bug confirmed live in production (98 self-linked rows
+  // across 4 real orders): re-importing/syncing a ship date after its own
+  // pack screen already created a shortage backorder used to match the
+  // backorder right back to the order that caused it, since the source
+  // order is itself present in that day's order list and trivially shares
+  // its own customer's phone/name.
+  dayOrders = [
+    { id: 's1', customer_name_en: 'SELF LINK CO', customer_phone: '0812345678' },
+  ]
+  pending = [
+    {
+      id: 'b1',
+      source_order_id: 's1',
+      target_ship_date: null,
+      orders: { customer_name_en: 'SELF LINK CO', customer_phone: '0812345678' },
+    },
+  ]
+  const n = await linkBackordersToDay('2026-10-01')
+  expect(n).toBe(0)
+  expect(calls.some((c) => c[0] === 'update')).toBe(false)
+})
+
+test('linkBackordersToDay matches a genuinely different same-day order for the same customer, excluding only the source order itself', async () => {
+  dayOrders = [
+    { id: 's1', customer_name_en: 'SELF LINK CO', customer_phone: '0812345678' }, // the source order itself -- must be excluded
+    { id: 'o-new', customer_name_en: 'SELF LINK CO', customer_phone: '0812345678' }, // a real new order, same customer
+  ]
+  pending = [
+    {
+      id: 'b1',
+      source_order_id: 's1',
+      target_ship_date: null,
+      orders: { customer_name_en: 'SELF LINK CO', customer_phone: '0812345678' },
+    },
+  ]
+  const n = await linkBackordersToDay('2026-10-01')
+  expect(n).toBe(1)
+  const update = calls.find((c) => c[0] === 'update')
+  expect(update[2].target_order_id).toBe('o-new')
+})
+
 test('listUnmatchedBackorders selects unmatched rows ordered oldest-first and flattens customer name', async () => {
   unmatchedList = [
     {

@@ -113,13 +113,22 @@ export async function linkBackordersToDay(shipDate: string): Promise<number> {
     if ((b as any).target_ship_date && (b as any).target_ship_date !== shipDate) continue
     const custPhone = (b as any).orders?.customer_phone
     const custName = (b as any).orders?.customer_name_en
+    // Never match a backorder back to its own source order — this happens
+    // for real when the source order's ship date gets re-imported (synced)
+    // *after* its pack screen already created the shortage backorder: the
+    // source order is itself in `orders` for that ship date, shares its own
+    // customer's phone/name by definition, and used to get matched to
+    // itself, silently turning "ต้นทาง" into "ต้นทาง + ปลายทาง" on the same
+    // row and leaving the real compensation delivery untracked. Confirmed
+    // live on 4 real orders (98 rows) before this fix.
+    const candidates = (orders ?? []).filter((o: any) => o.id !== (b as any).source_order_id)
     // Phone first: same-day order sharing the source order's phone number.
     // Fall back to the exact name match when the phone doesn't apply (empty
     // source phone) or didn't find anything among that day's orders.
     let match = custPhone
-      ? (orders ?? []).find((o: any) => o.customer_phone === custPhone)
+      ? candidates.find((o: any) => o.customer_phone === custPhone)
       : undefined
-    if (!match) match = (orders ?? []).find((o: any) => o.customer_name_en === custName)
+    if (!match) match = candidates.find((o: any) => o.customer_name_en === custName)
     if (!match) continue
     const { error } = await supabase
       .from('backorders')
