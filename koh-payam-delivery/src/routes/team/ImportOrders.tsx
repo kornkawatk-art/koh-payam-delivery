@@ -12,6 +12,7 @@ import {
   type BuildResult,
 } from '../../lib/import/buildImport'
 import { commitImport } from '../../lib/api/orders'
+import { UploadSimple } from '@phosphor-icons/react'
 import { PageHeader } from '../../components/ui/PageHeader'
 import { todayLocalISO } from '../../lib/format'
 
@@ -124,7 +125,7 @@ export default function ImportOrders() {
 
   return (
     <div className="flex flex-col gap-5">
-      <PageHeader title="นำเข้าออเดอร์" />
+      <PageHeader title="นำเข้าออเดอร์" icon={UploadSimple} accent="emerald" />
 
       <div className="card grid gap-4 sm:grid-cols-2">
         <label className="field">

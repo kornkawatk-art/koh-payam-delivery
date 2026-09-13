@@ -51,6 +51,21 @@ export default {
           ink: '#1e40af',
           soft: '#eff4ff',
         },
+        // Vivid, jewel-toned identity colors -- decorative accents (nav icons,
+        // section highlights), never status/semantic meaning (that stays
+        // ok/warn/danger/info above). Chosen distinctly from those four hues
+        // so an accent chip next to a status badge never reads as a status.
+        // One color per team nav destination, in src/lib/roles.ts's NAV order;
+        // `line` intentionally reuses LINE's own brand green so the LINE
+        // registrations menu is instantly recognizable.
+        accent: {
+          indigo: { DEFAULT: '#4f46e5', soft: '#eef2ff' },
+          emerald: { DEFAULT: '#059669', soft: '#ecfdf5' },
+          amber: { DEFAULT: '#d97706', soft: '#fffbeb' },
+          teal: { DEFAULT: '#0d9488', soft: '#f0fdfa' },
+          rose: { DEFAULT: '#e11d48', soft: '#fff1f2' },
+          line: { DEFAULT: '#06c755', soft: '#eafff2' },
+        },
       },
       borderRadius: {
         xl: '0.875rem',

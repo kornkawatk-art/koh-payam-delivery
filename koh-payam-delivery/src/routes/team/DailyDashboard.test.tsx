@@ -96,11 +96,18 @@ function OrderPageStub() {
   return <div>order detail page {id}</div>
 }
 
-test('summarises status progress for the day', async () => {
+test('summarises status progress for the day as three icon-labeled chips', async () => {
   renderPage()
-  expect(
-    await screen.findByText('แพ็คแล้ว 3/3 · ถึงท่าเรือ 1 · ส่งแล้ว 1'),
-  ).toBeInTheDocument()
+  // "3/3" only ever appears in the packed-count chip -- unambiguous.
+  const packedCount = await screen.findByText('3/3')
+  const packedChip = packedCount.parentElement! // the chip <span> wrapping the icon/label/count
+  expect(packedChip.textContent).toContain('แพ็คแล้ว')
+  // "ถึงท่าเรือ"/"ส่งแล้ว" also label status badges in the table below, so
+  // scope to the chip row specifically (the packed chip's own parent) rather
+  // than asserting a page-wide unique match.
+  const chipRow = packedChip.parentElement!
+  expect(within(chipRow).getByText('ถึงท่าเรือ')).toBeInTheDocument()
+  expect(within(chipRow).getByText('ส่งแล้ว')).toBeInTheDocument()
 })
 
 test('search filters rows client-side by customer name', async () => {

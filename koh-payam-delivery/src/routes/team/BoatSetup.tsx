@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { getOrCreateShipDay, sendOrderLinks, setBoats } from '../../lib/api/shipDays'
 import { supabase } from '../../lib/supabase'
+import { Anchor } from '@phosphor-icons/react'
 import { PageHeader } from '../../components/ui/PageHeader'
 import { todayLocalISO } from '../../lib/format'
 
@@ -82,6 +83,8 @@ export default function BoatSetup() {
     <div className="flex flex-col gap-5">
       <PageHeader
         title="ตั้งค่าเรือประจำวัน"
+        icon={Anchor}
+        accent="amber"
         actions={
           <input
             type="date"

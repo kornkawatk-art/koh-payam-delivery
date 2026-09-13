@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react'
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
+import { List, SignOut } from '@phosphor-icons/react'
 import { useAuth } from '../lib/auth'
 import { NAV, canAccess } from '../lib/roles'
+import { NAV_ACCENT_CLASSES } from '../lib/navAccentStyles'
 
 export default function AppShell() {
   const { profile, signOut } = useAuth()
@@ -29,14 +31,7 @@ export default function AppShell() {
           aria-expanded={open}
           onClick={() => setOpen((v) => !v)}
         >
-          <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-            <path
-              d="M4 7h16M4 12h16M4 17h16"
-              stroke="currentColor"
-              strokeWidth="1.75"
-              strokeLinecap="round"
-            />
-          </svg>
+          <List size={20} weight="bold" aria-hidden="true" />
           <span className="font-semibold">เกาะพยาม</span>
         </button>
         <span className="truncate text-sm text-ink-soft">
@@ -60,8 +55,8 @@ export default function AppShell() {
           (open ? 'translate-x-0 shadow-pop' : '-translate-x-full')
         }
       >
-        <div className="flex items-center gap-2 border-b border-line px-4 py-4">
-          <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-ink text-sm font-semibold text-white">
+        <div className="flex items-center gap-2.5 border-b border-line px-4 py-4">
+          <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-gradient-to-br from-ink to-brand-ink text-sm font-semibold text-white shadow-card">
             KP
           </span>
           <div className="leading-tight">
@@ -72,22 +67,43 @@ export default function AppShell() {
 
         <nav className="flex-1 overflow-y-auto p-3">
           <ul className="flex flex-col gap-1">
-            {items.map((n) => (
-              <li key={n.path}>
-                <NavLink
-                  to={n.path}
-                  end
-                  className={({ isActive }) =>
-                    'block rounded-lg px-3 py-2 text-sm font-medium transition-colors ' +
-                    (isActive
-                      ? 'bg-brand-soft text-brand-ink'
-                      : 'text-ink-soft hover:bg-paper hover:text-ink')
-                  }
-                >
-                  {n.label}
-                </NavLink>
-              </li>
-            ))}
+            {items.map((n) => {
+              const Icon = n.icon
+              const accent = NAV_ACCENT_CLASSES[n.accent]
+              return (
+                <li key={n.path}>
+                  <NavLink
+                    to={n.path}
+                    end
+                    className={({ isActive }) =>
+                      'flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium transition-colors ' +
+                      (isActive
+                        ? accent.activeBg + ' ' + accent.activeText
+                        : 'text-ink-soft hover:bg-paper hover:text-ink')
+                    }
+                  >
+                    {({ isActive }) => (
+                      <>
+                        <span
+                          className={
+                            'flex h-7 w-7 shrink-0 items-center justify-center rounded-md ' +
+                            (isActive ? 'bg-surface/60' : accent.chipBg)
+                          }
+                        >
+                          <Icon
+                            size={16}
+                            weight={isActive ? 'fill' : 'regular'}
+                            className={accent.icon}
+                            aria-hidden="true"
+                          />
+                        </span>
+                        {n.label}
+                      </>
+                    )}
+                  </NavLink>
+                </li>
+              )
+            })}
           </ul>
         </nav>
 
@@ -95,7 +111,8 @@ export default function AppShell() {
           <p className="truncate px-1 pb-2 text-xs text-ink-faint">
             {profile?.name} · {role}
           </p>
-          <button className="btn btn-secondary btn-sm w-full" onClick={signOut}>
+          <button className="btn btn-secondary btn-sm w-full gap-1.5" onClick={signOut}>
+            <SignOut size={16} weight="bold" aria-hidden="true" />
             ออกจากระบบ
           </button>
         </div>

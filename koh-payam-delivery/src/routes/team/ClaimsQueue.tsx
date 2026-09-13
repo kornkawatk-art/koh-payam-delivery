@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { listClaims, countOutstandingClaims, type ClaimRow } from '../../lib/api/claims'
 import { listUnmatchedBackorders, type UnmatchedBackorderRow } from '../../lib/api/backorders'
+import { Flag } from '@phosphor-icons/react'
 import { Spinner } from '../../components/ui/Spinner'
 import { PageHeader } from '../../components/ui/PageHeader'
 import { formatDateTimeTH } from '../../lib/format'
@@ -96,12 +97,15 @@ export default function ClaimsQueue() {
 
   return (
     <div className="flex flex-col gap-5">
-      <PageHeader title="คิวเคลม" />
+      <PageHeader title="คิวเคลม" icon={Flag} accent="rose" />
 
       {outstandingFailed ? (
         <p className="alert alert-danger">โหลดจำนวนเคลมค้างอยู่ไม่สำเร็จ</p>
       ) : outstandingCount !== null ? (
-        <p className="font-semibold">ค้างอยู่ {outstandingCount} รายการ</p>
+        <p className="inline-flex w-fit items-center gap-2 rounded-lg border border-accent-rose/25 bg-accent-rose-soft px-3 py-2 font-semibold text-accent-rose">
+          <Flag size={16} weight="fill" aria-hidden="true" />
+          ค้างอยู่ {outstandingCount} รายการ
+        </p>
       ) : null}
 
       <div className="flex flex-wrap gap-2">

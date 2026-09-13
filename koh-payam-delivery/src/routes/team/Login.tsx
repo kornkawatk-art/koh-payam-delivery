@@ -21,10 +21,14 @@ export default function Login() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-paper px-4 py-12">
-      <div className="w-full max-w-sm">
+    <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-paper px-4 py-12">
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute -top-24 left-1/2 h-72 w-72 -translate-x-1/2 rounded-full bg-brand/10 blur-3xl"
+      />
+      <div className="relative w-full max-w-sm">
         <div className="mb-6 flex flex-col items-center gap-2 text-center">
-          <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-ink text-base font-semibold text-white">
+          <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-gradient-to-br from-ink to-brand-ink text-base font-semibold text-white shadow-pop">
             KP
           </span>
           <h1 className="page-title">เข้าสู่ระบบทีมงาน</h1>
