@@ -22,16 +22,6 @@ const STATUS_TONE: Record<string, string> = {
   closed: 'badge-neutral',
 }
 
-// Same Thai wording this codebase already uses for these backorder reasons
-// elsewhere -- not invented here. `shortage` matches customer/i18n.ts's
-// item_short/shortages* keys. `claim_resend` reuses ClaimDetail.tsx's
-// `resend_next_day` resolution option's exact label verbatim, so a manager
-// reading both screens recognizes it as the same concept in the same words.
-const REASON_LABEL: Record<string, string> = {
-  shortage: 'ของขาด',
-  claim_resend: 'ส่งชดเชยวันถัดไป',
-}
-
 const MS_PER_DAY = 24 * 60 * 60 * 1000
 
 export default function ClaimsQueue() {
@@ -176,7 +166,7 @@ export default function ClaimsQueue() {
       )}
 
       <section className="flex flex-col gap-2">
-        <p className="section-title">ค้างส่งที่ยังจับคู่ไม่สำเร็จ</p>
+        <p className="section-title">ค้างส่งจากเคลมที่ยังจับคู่ไม่สำเร็จ</p>
         {backordersFailed ? (
           <p className="alert alert-danger">โหลดรายการค้างส่งที่ยังจับคู่ไม่สำเร็จ</p>
         ) : !backorders ? (
@@ -190,7 +180,6 @@ export default function ClaimsQueue() {
                 <tr>
                   <th>ลูกค้า</th>
                   <th>สินค้า</th>
-                  <th>ที่มา</th>
                   <th>ค้างมาแล้ว</th>
                 </tr>
               </thead>
@@ -204,7 +193,6 @@ export default function ClaimsQueue() {
                       <td>
                         {b.productName} x{b.qty}
                       </td>
-                      <td>{REASON_LABEL[b.reason] ?? b.reason}</td>
                       <td className="tnum">{daysWaiting} วัน</td>
                     </tr>
                   )

@@ -12,15 +12,19 @@ export type BackorderRow = {
   status: 'pending' | 'fulfilled'
 }
 
-// A pending backorder that hasn't been tied to any destination order yet —
-// shown on the manager's "unmatched backorders" view (ClaimsQueue.tsx) so it
+// A pending compensation backorder (queued by an approved "resend next day"
+// claim resolution) that hasn't been tied to a destination order yet — shown
+// on the manager's ClaimsQueue.tsx page so a claim's compensating shipment
 // doesn't stay invisible until (or unless) a matching order ever shows up.
+// Shortage backorders (from a short-shipped Makro import) are deliberately
+// excluded -- this section is claims-only; unmatched shortage carry-over
+// isn't surfaced anywhere in this app today, by design (it stays invisible
+// until a future import happens to match it by phone/name).
 export type UnmatchedBackorderRow = {
   id: string
   customerName: string | undefined
   productName: string
   qty: number
-  reason: 'shortage' | 'claim_resend'
   createdAt: string
 }
 
@@ -141,15 +145,18 @@ export async function linkBackordersToDay(shipDate: string): Promise<number> {
   return linked
 }
 
-// Every pending-or-not backorder that has never been matched to a destination
+// Every claim-resend backorder that has never been matched to a destination
 // order — invisible everywhere else until (or unless) linkBackordersToDay
-// finds it a home. Surfaced read-only on the manager's ClaimsQueue page.
+// finds it a home. Surfaced read-only on the manager's ClaimsQueue page,
+// which is claims-only; a shortage backorder in the same unmatched state is
+// deliberately excluded (see UnmatchedBackorderRow's comment).
 export async function listUnmatchedBackorders(): Promise<UnmatchedBackorderRow[]> {
   const { data, error } = await supabase
     .from('backorders')
     .select(
-      'id,reason,product_name,qty,created_at,orders!backorders_source_order_id_fkey(customer_name_en)',
+      'id,product_name,qty,created_at,orders!backorders_source_order_id_fkey(customer_name_en)',
     )
+    .eq('reason', 'claim_resend')
     .is('target_order_id', null)
     .order('created_at', { ascending: true })
   if (error) throw new Error('โหลดรายการค้างส่งที่ยังจับคู่ไม่สำเร็จ: ' + error.message)
@@ -158,7 +165,6 @@ export async function listUnmatchedBackorders(): Promise<UnmatchedBackorderRow[]
     customerName: b.orders?.customer_name_en,
     productName: b.product_name,
     qty: b.qty,
-    reason: b.reason,
     createdAt: b.created_at,
   }))
 }

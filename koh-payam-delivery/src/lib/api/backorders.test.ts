@@ -48,34 +48,8 @@ vi.mock('../supabase', () => {
         return Promise.resolve({ data: rpcResult, error: rpcError })
       },
       from: (t: string) => ({
-        select: (sel: string) => ({
-          or: (arg: string) => {
-            calls.push(['or', t, sel, arg])
-            return Promise.resolve({ data: relatedList, error: null })
-          },
-          eq: (col: string, val: any) => {
-            calls.push(['select', t, sel, col, val])
-            if (t === 'claims')
-              return { single: () => Promise.resolve({ data: claimRow, error: null }) }
-            if (t === 'order_items') return res(orderItems)
-            if (t === 'orders') return res(dayOrders)
-            if (t === 'backorders') {
-              if (col === 'id')
-                return {
-                  single: () =>
-                    Promise.resolve({ data: backorderRow, error: backorderRowError }),
-                }
-              return res(
-                col === 'target_ship_date'
-                  ? dayList
-                  : col === 'target_order_id'
-                    ? orderList
-                    : pending,
-              )
-            }
-            return res([])
-          },
-          is: (col: string, val: any) => {
+        select: (sel: string) => {
+          const isFn = (col: string, val: any) => {
             calls.push(['is', t, sel, col, val])
             const chain: any = Promise.resolve({ data: unmatchedList, error: null })
             chain.order = (ocol: string, opts: any) => {
@@ -83,8 +57,39 @@ vi.mock('../supabase', () => {
               return Promise.resolve({ data: unmatchedList, error: null })
             }
             return chain
-          },
-        }),
+          }
+          return {
+            or: (arg: string) => {
+              calls.push(['or', t, sel, arg])
+              return Promise.resolve({ data: relatedList, error: null })
+            },
+            eq: (col: string, val: any) => {
+              calls.push(['select', t, sel, col, val])
+              if (t === 'claims')
+                return { single: () => Promise.resolve({ data: claimRow, error: null }) }
+              if (t === 'order_items') return res(orderItems)
+              if (t === 'orders') return res(dayOrders)
+              if (t === 'backorders') {
+                if (col === 'id')
+                  return {
+                    single: () =>
+                      Promise.resolve({ data: backorderRow, error: backorderRowError }),
+                  }
+                // listUnmatchedBackorders: .eq('reason','claim_resend').is('target_order_id',null)
+                if (col === 'reason') return { is: isFn }
+                return res(
+                  col === 'target_ship_date'
+                    ? dayList
+                    : col === 'target_order_id'
+                      ? orderList
+                      : pending,
+                )
+              }
+              return res([])
+            },
+            is: isFn,
+          }
+        },
         delete: () => {
           const entry: any = ['delete', t, {} as Record<string, any>]
           const p: any = Promise.resolve({ error: null })
@@ -301,19 +306,13 @@ test('linkBackordersToDay matches a genuinely different same-day order for the s
   expect(update[2].target_order_id).toBe('o-new')
 })
 
-test('listUnmatchedBackorders selects unmatched rows ordered oldest-first and flattens customer name', async () => {
+test('listUnmatchedBackorders selects only claim_resend, unmatched rows, ordered oldest-first, and flattens customer name (no shortage rows, no reason field)', async () => {
+  // Real Supabase would already filter reason='claim_resend' server-side --
+  // this fixture represents that filtered result, matching this file's
+  // convention elsewhere (dayList/orderList/pending fixtures do the same).
   unmatchedList = [
     {
-      id: 'b1',
-      reason: 'shortage',
-      product_name: 'rice',
-      qty: 2,
-      created_at: '2026-09-01T00:00:00.000Z',
-      orders: { customer_name_en: 'BLUE VIEW' },
-    },
-    {
       id: 'b2',
-      reason: 'claim_resend',
       product_name: 'fish sauce',
       qty: 1,
       created_at: '2026-09-05T00:00:00.000Z',
@@ -323,22 +322,15 @@ test('listUnmatchedBackorders selects unmatched rows ordered oldest-first and fl
   const rows = await listUnmatchedBackorders()
   expect(rows).toEqual([
     {
-      id: 'b1',
-      customerName: 'BLUE VIEW',
-      productName: 'rice',
-      qty: 2,
-      reason: 'shortage',
-      createdAt: '2026-09-01T00:00:00.000Z',
-    },
-    {
       id: 'b2',
       customerName: 'SUNSET',
       productName: 'fish sauce',
       qty: 1,
-      reason: 'claim_resend',
       createdAt: '2026-09-05T00:00:00.000Z',
     },
   ])
+  const reasonCall = calls.find((c) => c[0] === 'select' && c[1] === 'backorders' && c[3] === 'reason')
+  expect(reasonCall[4]).toBe('claim_resend')
   const isCall = calls.find((c) => c[0] === 'is' && c[1] === 'backorders')
   expect(isCall[3]).toBe('target_order_id')
   expect(isCall[4]).toBe(null)

@@ -123,7 +123,6 @@ const unmatched = [
     customerName: 'PALM BEACH',
     productName: 'rice',
     qty: 2,
-    reason: 'shortage' as const,
     createdAt: daysAgo(10),
   },
   {
@@ -131,20 +130,20 @@ const unmatched = [
     customerName: 'REEF LODGE',
     productName: 'fish sauce',
     qty: 1,
-    reason: 'claim_resend' as const,
     createdAt: daysAgo(1),
   },
 ]
 
-test('renders every unmatched backorder row with customer/product/qty/reason label', async () => {
+test('renders every unmatched backorder row with customer/product/qty (claims-only, no reason column)', async () => {
   listUnmatchedBackorders.mockReset().mockResolvedValue(unmatched)
   renderPage()
   await screen.findByText('PALM BEACH')
   expect(screen.getByText('rice x2')).toBeInTheDocument()
-  expect(screen.getByText('ของขาด')).toBeInTheDocument()
   expect(screen.getByText('REEF LODGE')).toBeInTheDocument()
   expect(screen.getByText('fish sauce x1')).toBeInTheDocument()
-  expect(screen.getByText('ส่งชดเชยวันถัดไป')).toBeInTheDocument()
+  expect(screen.queryByText('ที่มา')).not.toBeInTheDocument()
+  expect(screen.queryByText('ของขาด')).not.toBeInTheDocument()
+  expect(screen.queryByText('ส่งชดเชยวันถัดไป')).not.toBeInTheDocument()
 })
 
 test('highlights an unmatched backorder waiting more than 7 days, not one waiting less', async () => {
