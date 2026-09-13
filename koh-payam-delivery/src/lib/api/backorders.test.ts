@@ -9,6 +9,11 @@ import {
   createResendBackorder,
 } from './backorders'
 
+const logAction = vi.fn().mockResolvedValue(undefined)
+vi.mock('./audit', () => ({
+  logAction: (...a: unknown[]) => logAction(...a),
+}))
+
 const calls: any[] = []
 let orderItems: any[] = []
 let dayOrders: any[] = []
@@ -18,6 +23,12 @@ let orderList: any[] = []
 let relatedList: any[] = []
 let unmatchedList: any[] = []
 let claimRow: any = null
+// The row markBackorderFulfilled's claim_id lookup (`select('claim_id').eq('id', id).single()`)
+// resolves to -- null means "no claim_id", matching a shortage backorder.
+let backorderRow: any = null
+// Sibling rows for closeClaimIfResendFulfilled's `select('status').eq('claim_id', ...)` check.
+let siblingRows: any[] = []
+let siblingError: any = null
 
 vi.mock('../supabase', () => {
   const res = (data: any) => {
@@ -40,7 +51,11 @@ vi.mock('../supabase', () => {
               return { single: () => Promise.resolve({ data: claimRow, error: null }) }
             if (t === 'order_items') return res(orderItems)
             if (t === 'orders') return res(dayOrders)
-            if (t === 'backorders')
+            if (t === 'backorders') {
+              if (col === 'id')
+                return { single: () => Promise.resolve({ data: backorderRow, error: null }) }
+              if (col === 'claim_id')
+                return Promise.resolve({ data: siblingRows, error: siblingError })
               return res(
                 col === 'target_ship_date'
                   ? dayList
@@ -48,6 +63,7 @@ vi.mock('../supabase', () => {
                     ? orderList
                     : pending,
               )
+            }
             return res([])
           },
           is: (col: string, val: any) => {
@@ -74,12 +90,23 @@ vi.mock('../supabase', () => {
           calls.push(['insert', t, rows])
           return Promise.resolve({ error: null })
         },
-        update: (patch: any) => ({
-          eq: (col: string, val: any) => {
-            calls.push(['update', t, patch, col, val])
-            return Promise.resolve({ error: null })
-          },
-        }),
+        update: (patch: any) => {
+          // Records every chained .eq() call onto one shared entry (so a
+          // multi-guard update like claims' `.eq('id',...).eq('status',...)`
+          // is captured in full) while staying a plain 5-element entry, as
+          // before, for callers that only chain a single .eq().
+          const entry: any = ['update', t, patch]
+          const step = {
+            eq: (col: string, val: any) => {
+              entry.push(col, val)
+              if (!calls.includes(entry)) calls.push(entry)
+              const p: any = Promise.resolve({ error: null })
+              p.eq = step.eq
+              return p
+            },
+          }
+          return step
+        },
       }),
     },
   }
@@ -95,6 +122,10 @@ beforeEach(() => {
   relatedList = []
   unmatchedList = []
   claimRow = null
+  backorderRow = null
+  siblingRows = []
+  siblingError = null
+  logAction.mockClear()
 })
 
 test('syncShortageBackorders deletes old shortage rows then inserts one per short item', async () => {
@@ -353,6 +384,7 @@ test('createResendBackorder inserts one backorder row per claim item', async () 
       qty: 2,
       status: 'pending',
       target_ship_date: null,
+      claim_id: 'c1',
     },
     {
       source_order_id: 'ord1',
@@ -361,6 +393,7 @@ test('createResendBackorder inserts one backorder row per claim item', async () 
       qty: 1,
       status: 'pending',
       target_ship_date: null,
+      claim_id: 'c1',
     },
   ])
 })
@@ -381,4 +414,56 @@ test('markBackorderFulfilled sets fulfilled status with actor and timestamp', as
   expect(typeof u[2].fulfilled_at).toBe('string')
   expect(u[3]).toBe('id')
   expect(u[4]).toBe('b9')
+})
+
+test('markBackorderFulfilled on a backorder with no claim_id: no claim update attempted', async () => {
+  backorderRow = { claim_id: null }
+  await markBackorderFulfilled('b9')
+  expect(calls.some((c) => c[0] === 'update' && c[1] === 'backorders')).toBe(true)
+  expect(calls.some((c) => c[0] === 'update' && c[1] === 'claims')).toBe(false)
+  expect(logAction).not.toHaveBeenCalled()
+})
+
+test('markBackorderFulfilled with a claim_id whose sibling rows are not all fulfilled yet: no claim update', async () => {
+  backorderRow = { claim_id: 'c1' }
+  siblingRows = [{ status: 'fulfilled' }, { status: 'pending' }]
+  await markBackorderFulfilled('b9')
+  expect(calls.some((c) => c[0] === 'update' && c[1] === 'claims')).toBe(false)
+  expect(logAction).not.toHaveBeenCalled()
+})
+
+test('markBackorderFulfilled closes the claim once every sibling backorder is fulfilled', async () => {
+  backorderRow = { claim_id: 'c1' }
+  siblingRows = [{ status: 'fulfilled' }, { status: 'fulfilled' }]
+  await markBackorderFulfilled('b9')
+  const claimUpdate = calls.find((c) => c[0] === 'update' && c[1] === 'claims')
+  expect(claimUpdate).toBeTruthy()
+  expect(claimUpdate[2]).toEqual({ status: 'closed' })
+  // guarded with .eq('id', claimId).eq('status', 'approved')
+  expect(claimUpdate.slice(3)).toEqual(['id', 'c1', 'status', 'approved'])
+  expect(logAction).toHaveBeenCalledWith('claim_auto_closed', 'claim', 'c1', {
+    trigger: 'resend_fulfilled',
+  })
+})
+
+test('markBackorderFulfilled closes a single-item claim on its own fulfillment', async () => {
+  backorderRow = { claim_id: 'c1' }
+  siblingRows = [{ status: 'fulfilled' }]
+  await markBackorderFulfilled('b9')
+  const claimUpdate = calls.find((c) => c[0] === 'update' && c[1] === 'claims')
+  expect(claimUpdate).toBeTruthy()
+  expect(claimUpdate[2]).toEqual({ status: 'closed' })
+})
+
+test('markBackorderFulfilled swallows a failure in the claim-closing side path without throwing, and the backorder fulfillment write already succeeded', async () => {
+  const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+  backorderRow = { claim_id: 'c1' }
+  siblingError = { message: 'sibling lookup boom' }
+  await expect(markBackorderFulfilled('b9')).resolves.toBeUndefined()
+  const backorderUpdate = calls.find((c) => c[0] === 'update' && c[1] === 'backorders')
+  expect(backorderUpdate).toBeTruthy()
+  expect(calls.some((c) => c[0] === 'update' && c[1] === 'claims')).toBe(false)
+  expect(logAction).not.toHaveBeenCalled()
+  expect(warnSpy).toHaveBeenCalled()
+  warnSpy.mockRestore()
 })

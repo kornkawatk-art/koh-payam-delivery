@@ -14,14 +14,17 @@ export type ClaimRow = {
   created_at: string
 }
 
-export async function listClaims(filter: { status?: string } = {}): Promise<ClaimRow[]> {
+export async function listClaims(
+  filter: { status?: string | string[] } = {},
+): Promise<ClaimRow[]> {
   let q = supabase
     .from('claims')
     .select(
       'id,order_id,type,status,deadline_at,created_at, orders(makro_order_no,customer_name_en), claim_items(id)',
     )
     .order('deadline_at', { ascending: true })
-  if (filter.status) q = q.eq('status', filter.status)
+  if (Array.isArray(filter.status)) q = q.in('status', filter.status)
+  else if (filter.status) q = q.eq('status', filter.status)
   const { data, error } = await q
   if (error) throw new Error('โหลดคิวเคลมไม่สำเร็จ: ' + error.message)
   return (data ?? []).map((c: any) => ({
@@ -35,6 +38,18 @@ export async function listClaims(filter: { status?: string } = {}): Promise<Clai
     makro_order_no: c.orders?.makro_order_no,
     customer_name_en: c.orders?.customer_name_en,
   }))
+}
+
+// "Outstanding" = still awaiting a decision, or approved-but-the-resend-
+// hasn't-shipped-yet. Used for the standing count on ClaimsQueue.tsx, shown
+// regardless of which filter tab is currently selected.
+export async function countOutstandingClaims(): Promise<number> {
+  const { count, error } = await supabase
+    .from('claims')
+    .select('id', { count: 'exact', head: true })
+    .in('status', ['open', 'approved'])
+  if (error) throw new Error('นับจำนวนเคลมค้างอยู่ไม่สำเร็จ: ' + error.message)
+  return count ?? 0
 }
 
 export async function getClaim(id: string) {
@@ -64,8 +79,15 @@ export async function resolveClaim(
   } = await supabase.from('claims').select('description').eq('id', id).single()
   if (readErr || !cur) throw new Error('ไม่พบเคลม')
   const { data: u } = await supabase.auth.getUser()
+  // 'rejected' stays 'rejected'. An approved refund has nothing left to
+  // track -- it closes immediately. An approved resend_next_day stays
+  // 'approved' until the compensating shipment it queued is actually
+  // delivered -- see closeClaimIfResendFulfilled in backorders.ts, which
+  // flips it to 'closed' once every backorder row it created is fulfilled.
+  const status: string =
+    input.decision === 'approved' && input.resolution === 'refund' ? 'closed' : input.decision
   const patch: Record<string, unknown> = {
-    status: input.decision,
+    status,
     resolution: input.decision === 'approved' ? input.resolution ?? null : null,
     refund_amount:
       input.decision === 'approved' &&

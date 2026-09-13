@@ -1,4 +1,5 @@
 import { supabase } from '../supabase'
+import { logAction } from './audit'
 
 export type BackorderRow = {
   id: string
@@ -87,6 +88,7 @@ export async function createResendBackorder(claimId: string): Promise<void> {
     qty: it.qty,
     status: 'pending',
     target_ship_date: null,
+    claim_id: claimId,
   }))
   const { error } = await supabase.from('backorders').insert(rows)
   if (error) throw new Error('สร้างรายการส่งชดเชยไม่สำเร็จ: ' + error.message)
@@ -201,6 +203,30 @@ export async function listRelatedBackordersForOrder(orderId: string): Promise<Ba
   return (data ?? []) as BackorderRow[]
 }
 
+// If every backorder row tied to this claim (via claim_id, set only by
+// createResendBackorder) is now fulfilled, the compensating shipment the
+// claim queued has been fully delivered -- close the claim. Guarded with
+// .eq('status','approved') so this is a no-op, not an error, if the claim
+// is somehow already in a different state. Caller (markBackorderFulfilled)
+// wraps this in a best-effort try/catch; nothing here needs to swallow its
+// own errors -- let them propagate up to that catch.
+async function closeClaimIfResendFulfilled(claimId: string): Promise<void> {
+  const { data: siblings, error } = await supabase
+    .from('backorders')
+    .select('status')
+    .eq('claim_id', claimId)
+  if (error) throw new Error(error.message)
+  const rows = (siblings ?? []) as Array<{ status: string }>
+  if (!rows.length || !rows.every((b) => b.status === 'fulfilled')) return
+  const { error: updErr } = await supabase
+    .from('claims')
+    .update({ status: 'closed' })
+    .eq('id', claimId)
+    .eq('status', 'approved')
+  if (updErr) throw new Error(updErr.message)
+  await logAction('claim_auto_closed', 'claim', claimId, { trigger: 'resend_fulfilled' })
+}
+
 export async function markBackorderFulfilled(id: string): Promise<void> {
   const { data: u } = await supabase.auth.getUser()
   const { error } = await supabase
@@ -208,4 +234,17 @@ export async function markBackorderFulfilled(id: string): Promise<void> {
     .update({ status: 'fulfilled', fulfilled_at: new Date().toISOString(), fulfilled_by: u.user?.id })
     .eq('id', id)
   if (error) throw new Error('อัปเดตรายการค้างส่งไม่สำเร็จ: ' + error.message)
+
+  // Best-effort: this backorder's own fulfillment write has already
+  // succeeded above and must be reported as a success to the packer
+  // regardless of whether this claim-closing side effect works -- mirrors
+  // ClaimDetail.tsx's evidence-photos loader precedent (secondary read/write
+  // failing must never surface as a failure of the primary action).
+  try {
+    const { data: row } = await supabase.from('backorders').select('claim_id').eq('id', id).single()
+    const claimId = (row as any)?.claim_id
+    if (claimId) await closeClaimIfResendFulfilled(claimId)
+  } catch (e) {
+    console.warn('claim auto-close check failed', e)
+  }
 }

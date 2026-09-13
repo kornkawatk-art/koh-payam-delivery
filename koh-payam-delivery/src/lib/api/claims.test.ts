@@ -1,4 +1,4 @@
-import { listClaims, getClaim, resolveClaim } from './claims'
+import { listClaims, getClaim, resolveClaim, countOutstandingClaims } from './claims'
 
 const createResendBackorder = vi.fn().mockResolvedValue(undefined)
 const logAction = vi.fn().mockResolvedValue(undefined)
@@ -14,9 +14,12 @@ const state = {
   listData: [] as any[],
   singleData: { description: '' } as any,
   error: null as any,
+  countValue: 0 as number | null,
   selectArgs: [] as string[],
+  selectOpts: [] as any[],
   orderArgs: [] as any[],
   eqArgs: [] as any[],
+  inArgs: [] as any[],
   updates: [] as any[],
 }
 
@@ -30,6 +33,10 @@ vi.mock('../supabase', () => {
         state.eqArgs.push([c2, v2])
         return Promise.resolve({ data: state.listData, error: state.error })
       }
+      p.in = (c2: string, v2: any) => {
+        state.inArgs.push([c2, v2])
+        return Promise.resolve({ data: state.listData, error: state.error })
+      }
       return p
     }
     b.eq = (col: string, val: any) => {
@@ -37,6 +44,10 @@ vi.mock('../supabase', () => {
       return {
         single: () => Promise.resolve({ data: state.singleData, error: state.error }),
       }
+    }
+    b.in = (col: string, val: any) => {
+      state.inArgs.push([col, val])
+      return Promise.resolve({ data: state.listData, count: state.countValue, error: state.error })
     }
     return b
   }
@@ -46,8 +57,9 @@ vi.mock('../supabase', () => {
         getUser: vi.fn().mockResolvedValue({ data: { user: { id: 'u1' } } }),
       },
       from: () => ({
-        select: (sel: string) => {
+        select: (sel: string, opts?: any) => {
           state.selectArgs.push(sel)
+          state.selectOpts.push(opts)
           return selectBuilder()
         },
         update: (patch: any) => ({
@@ -67,9 +79,12 @@ beforeEach(() => {
   state.listData = []
   state.singleData = { description: '' }
   state.error = null
+  state.countValue = 0
   state.selectArgs = []
+  state.selectOpts = []
   state.orderArgs = []
   state.eqArgs = []
+  state.inArgs = []
   state.updates = []
 })
 
@@ -152,8 +167,11 @@ test('resolveClaim: approved + resend_next_day creates a compensating backorder'
 test('resolveClaim: approved + refund does not create a backorder and stores the amount', async () => {
   await resolveClaim('c1', { decision: 'approved', resolution: 'refund', refundAmount: 100 })
   expect(createResendBackorder).not.toHaveBeenCalled()
+  // A refund resolution has nothing left to track after approval -- it
+  // closes immediately (unlike resend_next_day, which stays 'approved'
+  // until the compensating shipment is delivered).
   expect(state.updates[0].patch).toMatchObject({
-    status: 'approved',
+    status: 'closed',
     resolution: 'refund',
     refund_amount: 100,
   })
@@ -197,7 +215,7 @@ test('resolveClaim writes a claim_resolved audit log', async () => {
 test('resolveClaim: approved + refund with no amount stores 0', async () => {
   await resolveClaim('c1', { decision: 'approved', resolution: 'refund' })
   expect(state.updates[0].patch).toMatchObject({
-    status: 'approved',
+    status: 'closed',
     resolution: 'refund',
     refund_amount: 0,
   })
@@ -233,4 +251,33 @@ test('resolveClaim: a failed resend backorder still audits (flagged) and throws 
   })
   // the successful-path audit call must NOT also fire
   expect(logAction).toHaveBeenCalledTimes(1)
+})
+
+test('listClaims with a string[] status issues one .in() call, not separate .eq() calls', async () => {
+  await listClaims({ status: ['approved', 'closed'] })
+  expect(state.inArgs).toContainEqual(['status', ['approved', 'closed']])
+  expect(state.eqArgs).toHaveLength(0)
+})
+
+test('listClaims with a plain string status still uses .eq(), not .in() (regression guard)', async () => {
+  await listClaims({ status: 'open' })
+  expect(state.eqArgs).toContainEqual(['status', 'open'])
+  expect(state.inArgs).toHaveLength(0)
+})
+
+test('countOutstandingClaims filters status IN (open, approved) and returns the count', async () => {
+  state.countValue = 7
+  const n = await countOutstandingClaims()
+  expect(n).toBe(7)
+  expect(state.inArgs).toContainEqual(['status', ['open', 'approved']])
+  expect(state.selectArgs).toContain('id')
+  expect(state.selectOpts[state.selectOpts.length - 1]).toMatchObject({
+    count: 'exact',
+    head: true,
+  })
+})
+
+test('countOutstandingClaims throws a Thai error on query failure', async () => {
+  state.error = { message: 'boom' }
+  await expect(countOutstandingClaims()).rejects.toThrow('นับจำนวนเคลมค้างอยู่ไม่สำเร็จ')
 })
