@@ -13,5 +13,6 @@ alter table line_contacts
 -- public.is_manager() already exists (first created in 0002_rls.sql, then
 -- redefined with a stricter is_active check in 0013_manager_delete_orders.sql).
 -- Reused as-is here, not redefined again.
+drop policy if exists manager_update on line_contacts;
 create policy manager_update on line_contacts for update to authenticated
   using (public.is_manager()) with check (public.is_manager());

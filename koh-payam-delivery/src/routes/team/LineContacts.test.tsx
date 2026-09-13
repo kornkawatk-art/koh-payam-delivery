@@ -78,6 +78,13 @@ test('the pending-requests section is absent when there are no pending rows', as
   expect(screen.queryByText('คำขอรออนุมัติ')).not.toBeInTheDocument()
 })
 
+test('shows a distinct Thai error when the pending-requests load fails, instead of looking like zero pending requests', async () => {
+  listPendingLineContactRequests.mockReset().mockRejectedValueOnce(new Error('nope'))
+  render(<LineContacts />)
+  expect(await screen.findByText('คำขอรออนุมัติ')).toBeInTheDocument()
+  expect(screen.getByText('โหลดคำขอรออนุมัติไม่สำเร็จ')).toBeInTheDocument()
+})
+
 test('renders a pending row with both display names, the phone, and formatted request date', async () => {
   listPendingLineContactRequests.mockResolvedValue(pendingRows)
   render(<LineContacts />)

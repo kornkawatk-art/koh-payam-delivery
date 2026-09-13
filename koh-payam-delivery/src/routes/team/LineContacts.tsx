@@ -16,6 +16,7 @@ export default function LineContacts() {
   const [q, setQ] = useState('')
 
   const [pending, setPending] = useState<PendingLineContactRow[]>([])
+  const [pendingFailed, setPendingFailed] = useState(false)
   // Every phone currently mid-decision. A Set (rather than a single scalar)
   // so approving/rejecting one row's request doesn't affect another row's
   // disabled state -- each row only cares whether ITS OWN phone is in here.
@@ -31,8 +32,11 @@ export default function LineContacts() {
 
   const loadPending = useCallback(() => {
     return listPendingLineContactRequests()
-      .then((p) => setPending(p))
-      .catch(() => setPending([]))
+      .then((p) => {
+        setPending(p)
+        setPendingFailed(false)
+      })
+      .catch(() => setPendingFailed(true))
   }, [])
 
   useEffect(() => {
@@ -76,10 +80,14 @@ export default function LineContacts() {
     <div className="flex flex-col gap-5">
       <PageHeader title="ผู้ลงทะเบียน LINE" />
 
-      {pending.length > 0 && (
+      {(pending.length > 0 || pendingFailed) && (
         <section className="flex flex-col gap-2">
           <p className="section-title">คำขอรออนุมัติ</p>
+          {pendingFailed && (
+            <p className="alert alert-danger">โหลดคำขอรออนุมัติไม่สำเร็จ</p>
+          )}
           {pendingError && <p className="alert alert-danger">{pendingError}</p>}
+          {!pendingFailed && (
           <div className="table-wrap">
             <table className="data-table">
               <thead>
@@ -123,6 +131,7 @@ export default function LineContacts() {
               </tbody>
             </table>
           </div>
+          )}
         </section>
       )}
 
