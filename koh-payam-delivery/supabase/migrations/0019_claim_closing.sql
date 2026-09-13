@@ -16,7 +16,7 @@
 alter table backorders
   add column if not exists claim_id uuid references claims(id) on delete set null;
 
-create index on backorders (claim_id) where claim_id is not null;
+create index if not exists backorders_claim_id_idx on backorders (claim_id) where claim_id is not null;
 
 -- close_resend_claim_if_fulfilled(): claims has exactly one write policy,
 -- claims_update_manager (0007_hardening.sql), gated `is_manager() and
@@ -58,8 +58,13 @@ begin
     return false;
   end if;
 
+  -- `resolution = 'resend_next_day'` is redundant today (an approved refund
+  -- claim is written straight to 'closed' in resolveClaim and never queues
+  -- backorders, so 'approved' already implies resend) -- kept explicit here
+  -- so this function stays correct on its own even if that invariant ever
+  -- changes elsewhere.
   update claims set status = 'closed'
-    where id = p_claim_id and status = 'approved';
+    where id = p_claim_id and status = 'approved' and resolution = 'resend_next_day';
   get diagnostics v_count = row_count;
 
   -- Only true if THIS call actually flipped a row -- false (no error) if the
