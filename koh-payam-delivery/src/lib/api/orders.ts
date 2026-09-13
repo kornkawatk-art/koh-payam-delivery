@@ -1,6 +1,6 @@
 import { supabase } from '../supabase'
 import { getOrCreateShipDay } from './shipDays'
-import { linkBackordersToDay } from './backorders'
+import { linkBackordersToDay, syncShortageBackorders } from './backorders'
 import { logAction } from './audit'
 import { makeLinkToken } from '../token'
 import type { ParsedOrder, ParsedItem } from '../import/buildImport'
@@ -23,7 +23,10 @@ function itemRows(orderId: string, items: ParsedItem[]) {
 // Re-import is a non-destructive sync: brand-new orders are inserted, orders that
 // already exist for this ship day get their order-level makro fields refreshed and
 // their line items replaced from the file. Box counts, boat, status, timestamps,
-// link token, photos and claims are left untouched.
+// link token, photos and claims are left untouched. Shortage backorders DO get
+// refreshed (via syncShortageBackorders) for every order, new or synced — a
+// corrected shipped/shortage number from Makro must be reflected in the
+// backorder list too, not just on the order's own item table.
 export async function commitImport(
   shipDate: string,
   orders: ParsedOrder[],
@@ -66,6 +69,7 @@ export async function commitImport(
       const orderId = (ins as any).id
       const { error: e2 } = await supabase.from('order_items').insert(itemRows(orderId, o.items))
       if (e2) throw new Error(`สร้างรายการของ ${o.makroOrderNo} ไม่สำเร็จ: ${e2.message}`)
+      await syncShortageBackorders(orderId)
       created++
     } else {
       const { error: eU } = await supabase
@@ -85,6 +89,14 @@ export async function commitImport(
       if (eD) throw new Error(`ล้างรายการของ ${o.makroOrderNo} ไม่สำเร็จ: ${eD.message}`)
       const { error: e2 } = await supabase.from('order_items').insert(itemRows(existingId, o.items))
       if (e2) throw new Error(`sync รายการของ ${o.makroOrderNo} ไม่สำเร็จ: ${e2.message}`)
+      // Re-syncing an order's items can change which lines are short (Makro
+      // corrects a shipped/shortage number after the fact) — refresh this
+      // order's still-pending shortage backorders to match, the same way
+      // savePack already does on every pack-screen save. Safe to call
+      // unconditionally: it only touches this order's own still-*pending*
+      // shortage rows, never a row already marked fulfilled (see its own
+      // header comment in backorders.ts).
+      await syncShortageBackorders(existingId)
       synced++
     }
   }

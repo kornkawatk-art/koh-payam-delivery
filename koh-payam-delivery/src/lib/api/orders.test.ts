@@ -86,9 +86,11 @@ vi.mock('./shipDays', () => ({
   getOrCreateShipDay: vi.fn().mockResolvedValue({ id: 'sd1', boats: [] }),
 }))
 
+const linkBackordersToDay = vi.fn().mockResolvedValue(0)
+const syncShortageBackorders = vi.fn().mockResolvedValue(undefined)
 vi.mock('./backorders', () => ({
-  linkBackordersToDay: vi.fn().mockResolvedValue(0),
-  syncShortageBackorders: vi.fn().mockResolvedValue(undefined),
+  linkBackordersToDay: (...a: unknown[]) => linkBackordersToDay(...a),
+  syncShortageBackorders: (...a: unknown[]) => syncShortageBackorders(...a),
 }))
 
 const logAction = vi.fn().mockResolvedValue(undefined)
@@ -134,6 +136,8 @@ beforeEach(() => {
   state.searchResult = []
   state.searchError = null
   logAction.mockClear()
+  linkBackordersToDay.mockClear()
+  syncShortageBackorders.mockClear()
 })
 
 test('fresh import inserts orders + items and counts created', async () => {
@@ -163,6 +167,9 @@ test('fresh import inserts orders + items and counts created', async () => {
     item_remark: 'r',
     line_no: 1,
   })
+  // A freshly created order's shortage backorders are seeded immediately,
+  // not left to wait for someone to first open its pack screen.
+  expect(syncShortageBackorders).toHaveBeenCalledWith('new-1')
 })
 
 test('re-import of an existing order syncs without touching protected columns', async () => {
@@ -200,6 +207,30 @@ test('re-import of an existing order syncs without touching protected columns', 
   expect(state.deleted).toEqual([{ table: 'order_items', order_id: 'old1' }])
   const itemIns = state.inserted.find((i) => i.table === 'order_items')
   expect(itemIns.rows[0]).toMatchObject({ order_id: 'old1', product_name: 'x', status: 'short' })
+
+  // Re-syncing must refresh this order's shortage backorders too -- a
+  // corrected shipped/shortage number from Makro must not leave a stale
+  // (or missing) backorder row behind.
+  expect(syncShortageBackorders).toHaveBeenCalledWith('old1')
+})
+
+test('re-import calls syncShortageBackorders for every order, new and synced, before the once-per-day link pass', async () => {
+  state.existing = [{ id: 'old1', makro_order_no: 'PO-1' }]
+  const twoOrders = [
+    parsedOrders[0],
+    { ...parsedOrders[0], makroOrderNo: 'PO-2', customerName: 'B' },
+  ]
+  await commitImport('2026-10-01', twoOrders as any)
+  // PO-1 synced (existing id old1); PO-2 created (fresh id from the mocked
+  // insert -- PO-1's own order_items insert already pushed once, so PO-2's
+  // orders-insert lands as the 2nd row in the mock's insert log, hence 'new-2').
+  expect(syncShortageBackorders).toHaveBeenCalledWith('old1')
+  expect(syncShortageBackorders).toHaveBeenCalledWith('new-2')
+  expect(syncShortageBackorders).toHaveBeenCalledTimes(2)
+  // linkBackordersToDay runs once for the whole ship date, after every
+  // order's own backorders have already been refreshed -- not per order.
+  expect(linkBackordersToDay).toHaveBeenCalledTimes(1)
+  expect(linkBackordersToDay).toHaveBeenCalledWith('2026-10-01')
 })
 
 test('updateOrderStatus rejects an illegal transition', async () => {
