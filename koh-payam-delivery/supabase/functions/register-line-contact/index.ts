@@ -1,4 +1,7 @@
-// POST { idToken: string, phone: string } -> { ok: true }
+// POST { idToken: string, phone: string } -> { ok: true, pending: boolean }
+// `pending: true` means the phone already mapped to a DIFFERENT LINE account
+// and the request was staged for manager review instead of written straight
+// through (feature/line-contact-approval); the old mapping is untouched.
 //
 // Called once by the customer from the LIFF registration page
 // (src/routes/customer/LineRegister.tsx), opened inside LINE's in-app
@@ -186,12 +189,52 @@ Deno.serve(async (req) => {
 
     // Read before write purely so the audit row can say whether this replaced
     // an existing mapping — the one signal that distinguishes a first-time
-    // registration from a re-route of someone else's deliveries.
+    // registration from a re-route of someone else's deliveries. Also lets us
+    // detect a cross-account overwrite (existing.line_user_id !== verified.sub)
+    // so that case can be routed into manager approval instead of writing
+    // straight through (feature/line-contact-approval).
     const { data: existing } = await admin
       .from('line_contacts')
-      .select('id')
+      .select('id, line_user_id, display_name')
       .eq('phone', normalizedPhone)
       .maybeSingle()
+
+    const isCrossAccountOverwrite = Boolean(existing) && existing!.line_user_id !== verified.sub
+
+    if (isCrossAccountOverwrite) {
+      // A different LINE account is trying to claim a phone that already maps
+      // to someone else's LINE account. Don't touch line_user_id/display_name
+      // — stage the request for manager review instead, so the old LINE
+      // account keeps receiving order links until a manager decides. The
+      // pending line_user_id is deliberately left out of the audit meta below:
+      // it hasn't been reviewed yet, so recording it here would defeat the
+      // point of requiring a manager to look at it live on the page.
+      const { error } = await admin
+        .from('line_contacts')
+        .update({
+          pending_line_user_id: verified.sub,
+          pending_display_name: verified.name ?? null,
+          pending_requested_at: new Date().toISOString(),
+        })
+        .eq('phone', normalizedPhone)
+      if (error) {
+        console.error('register-line-contact', error)
+        return new Response(JSON.stringify({ error: 'ลงทะเบียนไม่สำเร็จ' }), {
+          status: 500,
+          headers: JSON_HEADERS,
+        })
+      }
+
+      await admin.from('audit_logs').insert({
+        user_id: null,
+        action: 'line_contact_pending_created',
+        entity_type: 'line_contact',
+        entity_id: normalizedPhone,
+        meta: { oldLineUserId: existing!.line_user_id },
+      })
+
+      return new Response(JSON.stringify({ ok: true, pending: true }), { headers: JSON_HEADERS })
+    }
 
     const { error } = await admin.from('line_contacts').upsert(
       {
@@ -220,7 +263,7 @@ Deno.serve(async (req) => {
       meta: { replacedExisting: Boolean(existing) },
     })
 
-    return new Response(JSON.stringify({ ok: true }), { headers: JSON_HEADERS })
+    return new Response(JSON.stringify({ ok: true, pending: false }), { headers: JSON_HEADERS })
   } catch (e) {
     // Log server-side only; never echo DB/env error text to the customer.
     console.error('register-line-contact', e)
