@@ -195,3 +195,18 @@ test('a failure loading the outstanding count does not blank the claims table or
   expect(await screen.findByText('PO-OVERDUE')).toBeInTheDocument()
   expect(await screen.findByText('PALM BEACH')).toBeInTheDocument()
 })
+
+test('switching filter tabs does not refetch or change the outstanding count (it is a standing total, not scoped to the active tab)', async () => {
+  renderPage()
+  await screen.findByText('ค้างอยู่ 2 รายการ')
+  expect(countOutstandingClaims).toHaveBeenCalledTimes(1)
+
+  await userEvent.click(screen.getByRole('button', { name: 'เปิด' }))
+  await userEvent.click(screen.getByRole('button', { name: 'อนุมัติ' }))
+  await userEvent.click(screen.getByRole('button', { name: 'ทั้งหมด' }))
+
+  // Still exactly one call, and the displayed number never changed --
+  // guards against a future edit accidentally wiring this effect to `filter`.
+  expect(countOutstandingClaims).toHaveBeenCalledTimes(1)
+  expect(screen.getByText('ค้างอยู่ 2 รายการ')).toBeInTheDocument()
+})
