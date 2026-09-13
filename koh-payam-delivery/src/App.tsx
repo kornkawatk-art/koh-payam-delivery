@@ -11,6 +11,7 @@ import BoatSetup from './routes/team/BoatSetup'
 import PierLoad from './routes/team/PierLoad'
 import ClaimsQueue from './routes/team/ClaimsQueue'
 import ClaimDetail from './routes/team/ClaimDetail'
+import LineContacts from './routes/team/LineContacts'
 import OrderDetail from './routes/team/OrderDetail'
 import PackOrder from './routes/team/PackOrder'
 import LabelSheet from './routes/team/LabelSheet'
@@ -99,6 +100,14 @@ export default function App() {
               element={
                 <RequireRole path="/claims">
                   <ClaimDetail />
+                </RequireRole>
+              }
+            />
+            <Route
+              path="/line-contacts"
+              element={
+                <RequireRole path="/line-contacts">
+                  <LineContacts />
                 </RequireRole>
               }
             />
