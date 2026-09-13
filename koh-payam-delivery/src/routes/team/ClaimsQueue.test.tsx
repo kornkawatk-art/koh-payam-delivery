@@ -4,8 +4,10 @@ import { MemoryRouter, Routes, Route } from 'react-router-dom'
 import ClaimsQueue from './ClaimsQueue'
 
 const listClaims = vi.fn()
+const countOutstandingClaims = vi.fn()
 vi.mock('../../lib/api/claims', () => ({
   listClaims: (...a: unknown[]) => listClaims(...a),
+  countOutstandingClaims: (...a: unknown[]) => countOutstandingClaims(...a),
 }))
 
 const listUnmatchedBackorders = vi.fn()
@@ -55,6 +57,7 @@ const rows = [
 beforeEach(() => {
   listClaims.mockReset().mockResolvedValue(rows)
   listUnmatchedBackorders.mockReset().mockResolvedValue([])
+  countOutstandingClaims.mockReset().mockResolvedValue(2)
 })
 
 const renderPage = () =>
@@ -101,7 +104,7 @@ test('changing the filter refetches with the chosen status', async () => {
   await userEvent.click(screen.getByRole('button', { name: 'เปิด' }))
   expect(listClaims).toHaveBeenLastCalledWith({ status: 'open' })
   await userEvent.click(screen.getByRole('button', { name: 'อนุมัติ' }))
-  expect(listClaims).toHaveBeenLastCalledWith({ status: 'approved' })
+  expect(listClaims).toHaveBeenLastCalledWith({ status: ['approved', 'closed'] })
   await userEvent.click(screen.getByRole('button', { name: 'ทั้งหมด' }))
   expect(listClaims).toHaveBeenLastCalledWith({})
 })
@@ -176,4 +179,34 @@ test('a failure loading claims does not blank the unmatched backorders table', a
   renderPage()
   await screen.findByText('โหลดคิวเคลมไม่สำเร็จ')
   expect(await screen.findByText('PALM BEACH')).toBeInTheDocument()
+})
+
+test('renders the outstanding-claims count returned by countOutstandingClaims', async () => {
+  countOutstandingClaims.mockReset().mockResolvedValue(5)
+  renderPage()
+  expect(await screen.findByText('ค้างอยู่ 5 รายการ')).toBeInTheDocument()
+})
+
+test('a failure loading the outstanding count does not blank the claims table or the unmatched-backorders section', async () => {
+  countOutstandingClaims.mockReset().mockRejectedValueOnce(new Error('nope'))
+  listUnmatchedBackorders.mockReset().mockResolvedValue(unmatched)
+  renderPage()
+  expect(await screen.findByText('โหลดจำนวนเคลมค้างอยู่ไม่สำเร็จ')).toBeInTheDocument()
+  expect(await screen.findByText('PO-OVERDUE')).toBeInTheDocument()
+  expect(await screen.findByText('PALM BEACH')).toBeInTheDocument()
+})
+
+test('switching filter tabs does not refetch or change the outstanding count (it is a standing total, not scoped to the active tab)', async () => {
+  renderPage()
+  await screen.findByText('ค้างอยู่ 2 รายการ')
+  expect(countOutstandingClaims).toHaveBeenCalledTimes(1)
+
+  await userEvent.click(screen.getByRole('button', { name: 'เปิด' }))
+  await userEvent.click(screen.getByRole('button', { name: 'อนุมัติ' }))
+  await userEvent.click(screen.getByRole('button', { name: 'ทั้งหมด' }))
+
+  // Still exactly one call, and the displayed number never changed --
+  // guards against a future edit accidentally wiring this effect to `filter`.
+  expect(countOutstandingClaims).toHaveBeenCalledTimes(1)
+  expect(screen.getByText('ค้างอยู่ 2 รายการ')).toBeInTheDocument()
 })

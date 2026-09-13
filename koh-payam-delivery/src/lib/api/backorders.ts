@@ -1,4 +1,5 @@
 import { supabase } from '../supabase'
+import { logAction } from './audit'
 
 export type BackorderRow = {
   id: string
@@ -87,6 +88,7 @@ export async function createResendBackorder(claimId: string): Promise<void> {
     qty: it.qty,
     status: 'pending',
     target_ship_date: null,
+    claim_id: claimId,
   }))
   const { error } = await supabase.from('backorders').insert(rows)
   if (error) throw new Error('สร้างรายการส่งชดเชยไม่สำเร็จ: ' + error.message)
@@ -201,6 +203,29 @@ export async function listRelatedBackordersForOrder(orderId: string): Promise<Ba
   return (data ?? []) as BackorderRow[]
 }
 
+// If every backorder row tied to this claim (via claim_id, set only by
+// createResendBackorder) is now fulfilled, the compensating shipment the
+// claim queued has been fully delivered -- close the claim. The actual write
+// is delegated to a security-definer RPC (0019_claim_closing.sql), because
+// claims' only write policy (claims_update_manager) requires is_manager(),
+// but this runs from a packer/pier session (markBackorderFulfilled is called
+// from the pack screen) -- a plain client-side update would match zero rows
+// under RLS and silently no-op instead of erroring. The RPC re-derives the
+// fulfilled check itself and returns whether it actually flipped the claim to
+// 'closed'; only log the audit entry when it says true, so a false/failed/
+// no-op RPC response never records a claim_auto_closed that didn't happen.
+// Caller (markBackorderFulfilled) wraps this in a best-effort try/catch;
+// nothing here needs to swallow its own errors -- let them propagate up to
+// that catch.
+async function closeClaimIfResendFulfilled(claimId: string): Promise<void> {
+  const { data: closed, error } = await supabase.rpc('close_resend_claim_if_fulfilled', {
+    p_claim_id: claimId,
+  })
+  if (error) throw new Error(error.message)
+  if (closed !== true) return
+  await logAction('claim_auto_closed', 'claim', claimId, { trigger: 'resend_fulfilled' })
+}
+
 export async function markBackorderFulfilled(id: string): Promise<void> {
   const { data: u } = await supabase.auth.getUser()
   const { error } = await supabase
@@ -208,4 +233,22 @@ export async function markBackorderFulfilled(id: string): Promise<void> {
     .update({ status: 'fulfilled', fulfilled_at: new Date().toISOString(), fulfilled_by: u.user?.id })
     .eq('id', id)
   if (error) throw new Error('อัปเดตรายการค้างส่งไม่สำเร็จ: ' + error.message)
+
+  // Best-effort: this backorder's own fulfillment write has already
+  // succeeded above and must be reported as a success to the packer
+  // regardless of whether this claim-closing side effect works -- mirrors
+  // ClaimDetail.tsx's evidence-photos loader precedent (secondary read/write
+  // failing must never surface as a failure of the primary action).
+  try {
+    const { data: row, error: rowErr } = await supabase
+      .from('backorders')
+      .select('claim_id')
+      .eq('id', id)
+      .single()
+    if (rowErr) console.warn('claim_id lookup failed', rowErr)
+    const claimId = (row as any)?.claim_id
+    if (claimId) await closeClaimIfResendFulfilled(claimId)
+  } catch (e) {
+    console.warn('claim auto-close check failed', e)
+  }
 }

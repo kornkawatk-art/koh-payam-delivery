@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { listClaims, type ClaimRow } from '../../lib/api/claims'
+import { listClaims, countOutstandingClaims, type ClaimRow } from '../../lib/api/claims'
 import { listUnmatchedBackorders, type UnmatchedBackorderRow } from '../../lib/api/backorders'
 import { Spinner } from '../../components/ui/Spinner'
 import { PageHeader } from '../../components/ui/PageHeader'
@@ -43,7 +43,13 @@ export default function ClaimsQueue() {
     let active = true
     setRows(null)
     setFailed(false)
-    listClaims(filter === 'all' ? {} : { status: filter })
+    // "อนุมัติ" also matches claims that have since auto-closed (refund closed
+    // instantly, or a resend_next_day claim's compensating shipment was fully
+    // delivered) -- a manager browsing this tab still sees the claim's full
+    // history in one place. "เปิด"/"ปฏิเสธ"/"ทั้งหมด" are unaffected.
+    const params =
+      filter === 'all' ? {} : { status: filter === 'approved' ? ['approved', 'closed'] : filter }
+    listClaims(params)
       .then((r) => {
         if (active) setRows(r)
       })
@@ -54,6 +60,26 @@ export default function ClaimsQueue() {
       active = false
     }
   }, [filter])
+
+  // Outstanding-claims count loads independently of the claims queue and the
+  // unmatched-backorders section: a failure here must not blank either of
+  // those (same cross-section failure isolation as the two effects above).
+  const [outstandingCount, setOutstandingCount] = useState<number | null>(null)
+  const [outstandingFailed, setOutstandingFailed] = useState(false)
+
+  useEffect(() => {
+    let active = true
+    countOutstandingClaims()
+      .then((n) => {
+        if (active) setOutstandingCount(n)
+      })
+      .catch(() => {
+        if (active) setOutstandingFailed(true)
+      })
+    return () => {
+      active = false
+    }
+  }, [])
 
   // Unmatched backorders load independently of the claims queue above: a
   // failure here must never blank the already-loaded claims table (and vice
@@ -81,6 +107,12 @@ export default function ClaimsQueue() {
   return (
     <div className="flex flex-col gap-5">
       <PageHeader title="คิวเคลม" />
+
+      {outstandingFailed ? (
+        <p className="alert alert-danger">โหลดจำนวนเคลมค้างอยู่ไม่สำเร็จ</p>
+      ) : outstandingCount !== null ? (
+        <p className="font-semibold">ค้างอยู่ {outstandingCount} รายการ</p>
+      ) : null}
 
       <div className="flex flex-wrap gap-2">
         {FILTERS.map((f) => (
