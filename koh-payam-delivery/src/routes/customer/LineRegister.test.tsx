@@ -81,6 +81,24 @@ test('trims the phone before sending it (defence in depth on top of the server-s
   expect(lastBody()).toEqual({ idToken: 'id-token-123', phone: '0812345678' })
 })
 
+test('a pending response (cross-account overwrite) shows the pending message, not success', async () => {
+  fetchMock.mockResolvedValueOnce({
+    ok: true,
+    status: 200,
+    json: () => Promise.resolve({ ok: true, pending: true }),
+  })
+  render(<LineRegister />)
+
+  const phoneInput = await screen.findByLabelText('เบอร์โทรศัพท์')
+  await userEvent.type(phoneInput, '0812345678')
+  await userEvent.click(screen.getByRole('button', { name: 'ลงทะเบียน' }))
+
+  expect(await screen.findByText(/คำขอกำลังรอตรวจสอบ/)).toBeInTheDocument()
+  expect(screen.queryByText(/ลงทะเบียนสำเร็จ/)).not.toBeInTheDocument()
+  // the form should not still be showing either
+  expect(screen.queryByLabelText('เบอร์โทรศัพท์')).not.toBeInTheDocument()
+})
+
 test('a failed registration shows a Thai error and does not crash', async () => {
   fetchMock.mockResolvedValueOnce({
     ok: false,

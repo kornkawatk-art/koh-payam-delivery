@@ -1,10 +1,14 @@
-import { render, screen } from '@testing-library/react'
+import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import LineContacts from './LineContacts'
 
 const listLineContacts = vi.fn()
+const listPendingLineContactRequests = vi.fn()
+const resolveLineContactRequest = vi.fn()
 vi.mock('../../lib/api/lineContacts', () => ({
   listLineContacts: (...a: unknown[]) => listLineContacts(...a),
+  listPendingLineContactRequests: (...a: unknown[]) => listPendingLineContactRequests(...a),
+  resolveLineContactRequest: (...a: unknown[]) => resolveLineContactRequest(...a),
 }))
 
 const rows = [
@@ -12,8 +16,19 @@ const rows = [
   { phone: '0899999999', displayName: 'Malee', createdAt: '2026-09-01T03:00:00.000Z' },
 ]
 
+const pendingRows = [
+  {
+    phone: '0888888888',
+    oldDisplayName: 'Somsri (old)',
+    pendingDisplayName: 'Somsri (new)',
+    requestedAt: '2026-09-12T03:00:00.000Z',
+  },
+]
+
 beforeEach(() => {
   listLineContacts.mockReset().mockResolvedValue(rows)
+  listPendingLineContactRequests.mockReset().mockResolvedValue([])
+  resolveLineContactRequest.mockReset().mockResolvedValue(undefined)
 })
 
 test('renders every contact row with phone, display name, and formatted date', async () => {
@@ -55,4 +70,101 @@ test('shows a Thai error on a load failure, with no crash', async () => {
   expect(
     await screen.findByText('โหลดรายชื่อผู้ลงทะเบียน LINE ไม่สำเร็จ'),
   ).toBeInTheDocument()
+})
+
+test('the pending-requests section is absent when there are no pending rows', async () => {
+  render(<LineContacts />)
+  await screen.findByText('0812345678')
+  expect(screen.queryByText('คำขอรออนุมัติ')).not.toBeInTheDocument()
+})
+
+test('shows a distinct Thai error when the pending-requests load fails, instead of looking like zero pending requests', async () => {
+  listPendingLineContactRequests.mockReset().mockRejectedValueOnce(new Error('nope'))
+  render(<LineContacts />)
+  expect(await screen.findByText('คำขอรออนุมัติ')).toBeInTheDocument()
+  expect(screen.getByText('โหลดคำขอรออนุมัติไม่สำเร็จ')).toBeInTheDocument()
+})
+
+test('renders a pending row with both display names, the phone, and formatted request date', async () => {
+  listPendingLineContactRequests.mockResolvedValue(pendingRows)
+  render(<LineContacts />)
+  expect(await screen.findByText('คำขอรออนุมัติ')).toBeInTheDocument()
+  expect(screen.getByText('0888888888')).toBeInTheDocument()
+  expect(screen.getByText('Somsri (old)')).toBeInTheDocument()
+  expect(screen.getByText('Somsri (new)')).toBeInTheDocument()
+  expect(screen.getAllByText(/2569/).length).toBeGreaterThan(0)
+})
+
+test('approve button calls resolveLineContactRequest(phone, "approve") and removes the row on success', async () => {
+  listPendingLineContactRequests.mockResolvedValueOnce(pendingRows).mockResolvedValueOnce([])
+  render(<LineContacts />)
+  await screen.findByText('0888888888')
+
+  await userEvent.click(screen.getByRole('button', { name: 'อนุมัติ' }))
+
+  expect(resolveLineContactRequest).toHaveBeenCalledWith('0888888888', 'approve')
+  await waitFor(() => expect(screen.queryByText('0888888888')).not.toBeInTheDocument())
+  expect(listLineContacts).toHaveBeenCalledTimes(2) // initial + refresh after decision
+})
+
+test('reject button calls resolveLineContactRequest(phone, "reject") and removes the row on success', async () => {
+  listPendingLineContactRequests.mockResolvedValueOnce(pendingRows).mockResolvedValueOnce([])
+  render(<LineContacts />)
+  await screen.findByText('0888888888')
+
+  await userEvent.click(screen.getByRole('button', { name: 'ปฏิเสธ' }))
+
+  expect(resolveLineContactRequest).toHaveBeenCalledWith('0888888888', 'reject')
+  await waitFor(() => expect(screen.queryByText('0888888888')).not.toBeInTheDocument())
+})
+
+test('deciding row A leaves only row A disabled while its call is in flight, unaffected by clicking row B', async () => {
+  const rowB = {
+    phone: '0877777777',
+    oldDisplayName: 'Boonmee (old)',
+    pendingDisplayName: 'Boonmee (new)',
+    requestedAt: '2026-09-12T04:00:00.000Z',
+  }
+  listPendingLineContactRequests.mockResolvedValue([...pendingRows, rowB])
+
+  let resolveA: () => void = () => {}
+  const aPromise = new Promise<void>((resolve) => {
+    resolveA = resolve
+  })
+  resolveLineContactRequest.mockImplementation((phone: string) =>
+    phone === pendingRows[0].phone ? aPromise : Promise.resolve(undefined),
+  )
+
+  render(<LineContacts />)
+  await screen.findByText('0888888888')
+  await screen.findByText('0877777777')
+
+  const approveButtons = screen.getAllByRole('button', { name: 'อนุมัติ' })
+  expect(approveButtons).toHaveLength(2)
+
+  // Click row A's approve -- its call stays pending (aPromise unresolved).
+  await userEvent.click(approveButtons[0])
+  expect(approveButtons[0]).toBeDisabled()
+
+  // While A is still in flight, click row B's approve (resolves immediately).
+  await userEvent.click(approveButtons[1])
+  await waitFor(() => expect(resolveLineContactRequest).toHaveBeenCalledWith('0877777777', 'approve'))
+
+  // Row A must still be disabled -- B's click/resolution must not re-enable it.
+  expect(approveButtons[0]).toBeDisabled()
+
+  resolveA()
+  await waitFor(() => expect(approveButtons[0]).not.toBeDisabled())
+})
+
+test('a failed decision shows a Thai error and keeps the row in the pending section', async () => {
+  listPendingLineContactRequests.mockResolvedValue(pendingRows)
+  resolveLineContactRequest.mockRejectedValueOnce(new Error('บันทึกผลคำขอไม่สำเร็จ: boom'))
+  render(<LineContacts />)
+  await screen.findByText('0888888888')
+
+  await userEvent.click(screen.getByRole('button', { name: 'อนุมัติ' }))
+
+  expect(await screen.findByText('บันทึกผลคำขอไม่สำเร็จ: boom')).toBeInTheDocument()
+  expect(screen.getByText('0888888888')).toBeInTheDocument()
 })
