@@ -158,23 +158,29 @@ SITE_URL=
 
 ---
 
-### A6. LINE Developers Console — เปิด Messaging API + สร้าง LIFF app (ต้องทำก่อนฟีเจอร์ "ส่งลิงก์ไลน์อัตโนมัติ" จะใช้งานได้จริง)
+### A6. LINE Developers Console — เปิด Messaging API + สร้าง LIFF app — **ทำเสร็จแล้ว**
 
-> ฟีเจอร์นี้ (ลงทะเบียนลูกค้าผ่าน LIFF + ส่งลิงก์ออเดอร์อัตโนมัติหลังตั้งค่าเรือประจำวัน) เขียนโค้ดเสร็จแล้วในฝั่งแอป แต่ **ยังใช้งานจริงไม่ได้จนกว่าทีมจะทำขั้นตอนนี้เอง** — ทีมพัฒนาไม่มีสิทธิ์เข้า LINE Developers Console ของร้าน
+> ฟีเจอร์นี้ (ลงทะเบียนลูกค้าผ่าน LIFF + ส่งลิงก์ออเดอร์อัตโนมัติหลังตั้งค่าเรือประจำวัน) ตั้งค่าเสร็จสมบูรณ์แล้วเมื่อ 2026-09-13 — เก็บขั้นตอนจริงที่ใช้ได้ไว้อ้างอิงกรณีต้องตั้งใหม่/ย้ายบัญชี (LINE เปลี่ยนขั้นตอนบ่อย ขั้นตอนด้านล่างคือของจริงที่ใช้ได้ ณ วันที่ทำ ไม่ใช่ตามเอกสาร LINE ที่อาจเก่ากว่านี้):
 
-1. ไปที่ https://developers.line.biz/console/ → ล็อกอินด้วยบัญชี LINE ที่ผูกกับ OA (LINE Official Account) ของร้านอยู่แล้ว
-2. เปิด **Messaging API** ให้ช่องทาง OA เดิม (ถ้ายังไม่เปิด): เลือก provider → **Create a Messaging API channel** ผูกกับ OA เดิม
-3. คัดลอก **Channel access token** (long-lived) จากแท็บ **Messaging API** ของช่องทางนั้น → เอาไปใส่ `LINE_CHANNEL_ACCESS_TOKEN` ด้านบน
-4. สร้าง **LIFF app** ใหม่ (แท็บ **LIFF** — จะอยู่ใน channel เดียวกับ Messaging API หรือเป็น LINE Login channel แยกอีกอันก็ได้):
-   - ⚠️ **LIFF app ต้องอยู่ภายใต้ provider เดียวกัน กับ Messaging API channel — คนละ provider จะส่งข้อความไม่ได้เลย** เพราะ LINE `userId` ผูกกับ provider: `userId` ที่ได้จาก LIFF ของ provider อื่นจะใช้ push เข้า OA นี้ไม่ได้ (LINE ตอบ 400 ทุกครั้ง) และจะไม่มีอะไรฟ้องนอกจาก "ส่งลิงก์ไลน์ 0 ฉบับ"
-   - **Endpoint URL:** `<โดเมนเว็บจริง>/liff/register` (เช่น `https://koh-payam.vercel.app/liff/register`)
-   - **Scope:** `openid`, `profile` (ใช้ `liff.getIDToken()`)
-   - **Size:** Full ก็พอ
-   - ⚠️ **ต้องคัดลอก 2 ค่า ที่คนละที่กัน — ไม่ใช่ค่าเดียวกันใส่ 2 ช่อง:**
-     - `VITE_LIFF_ID` = **LIFF ID** ของ LIFF app ที่เพิ่งสร้าง (อยู่ในแท็บ **LIFF** ตรงแถวของ app นั้น หน้าตาเป็น `1234567890-AbCdEfGh`) — ค่านี้ฝังในหน้าเว็บ ไม่ใช่ความลับ
-     - `LIFF_CHANNEL_ID` = **Channel ID** (ตัวเลขล้วน) ของ **channel ที่ LIFF app นี้สังกัดอยู่** ดูได้ที่แท็บ **Basic settings** ของ channel นั้น — edge function `register-line-contact` เอาไปใช้เป็น `client_id` ตอนตรวจสอบ id token กับ LINE ถ้าใส่ผิด/ใส่ LIFF ID แทน จะได้ 401 "ยืนยันตัวตน LINE ไม่สำเร็จ" ทุกครั้ง
+1. **หา Messaging API channel ที่ผูกกับ OA จริงก่อน** — ห้ามเดาจากชื่อ provider เฉยๆ วิธีเช็คให้ชัวร์:
+   - เข้า https://manager.line.biz/ (LINE Official Account Manager) → เลือก OA ตัวที่ลูกค้าแชทอยู่จริง → Settings (⚙️) → **Messaging API** → จะเห็น **Channel ID** ของ channel จริง (**ไม่มี Channel access token ในหน้านี้** — หน้านี้มีแค่ Channel ID/Secret/Webhook)
+   - เอา Channel ID นั้นไปเปิดตรงที่ `https://developers.line.biz/console/channel/<Channel ID>/` ใน Developers Console — จะเข้าถึง channel ได้ตรงแม้ provider ในลิสต์ฝั่งซ้ายจะดูไม่ตรงชื่อ/หา provider ไม่เจอในเมนู (ในทางปฏิบัติจริง เจอกรณี OA ชื่อร้านแต่ channel ทาง Developers Console ถูกจัดไว้ใต้ provider คนละชื่อไปเลย — เกิดจากสิทธิ์ผู้ดูแล OA กับสิทธิ์ Developers Console เป็นคนละระบบสิทธิ์กัน)
+2. คัดลอก **Channel access token** (long-lived) จากแท็บ **Messaging API** ของ channel นั้นใน Developers Console (เลื่อนผ่านส่วน Webhook — **ห้ามแตะ/แก้ Webhook เดิมเด็ดขาด** ถ้ามีแชทบอทเดิมทำงานอยู่แล้ว) → ใส่เป็น `LINE_CHANNEL_ACCESS_TOKEN`
+3. **สร้าง LIFF app — ปัจจุบัน LINE ไม่ให้เพิ่ม LIFF เข้า Messaging API channel ตรงๆ แล้ว** ต้องสร้าง **LINE Login channel แยกใหม่** (channel type ใหม่) ภายใต้ **provider เดียวกัน** กับ Messaging API channel (สำคัญ: provider เดียวกันเท่านั้น ถึงจะได้ userId ตรงกัน — คนละ provider ส่งข้อความไม่ได้เลย):
+   - Developers Console → provider เดียวกับ Messaging API channel → **Create a new channel → Create a LINE Login channel** → ตั้งชื่อ (เช่น "Koh Payam LIFF")
+   - เข้า channel ใหม่นี้ → แท็บ **LIFF** → **Add**:
+     - **Endpoint URL:** `<โดเมนเว็บจริง>/liff/register` (เช่น `https://koh-payam-delivery-omega.vercel.app/liff/register`)
+     - **Scope:** ติ๊ก `openid` และ `profile`
+     - **Size:** Full
+     - **Add friend option:** **Off** (ลูกค้าที่มาหน้านี้เป็นเพื่อนกับ OA อยู่แล้วเสมอ ไม่ต้องมีหน้าชวนเพิ่มเพื่อนซ้ำ)
+   - บันทึกแล้วจะได้ **LIFF ID** (หน้าตา `1234567890-AbCdEfGh`)
+4. คัดลอก 2 ค่านี้จาก **channel ใหม่ (LINE Login channel)** — คนละที่กับ Messaging API channel เดิม:
+   - `VITE_LIFF_ID` = LIFF ID จากขั้นที่ 3 — ค่านี้ฝังในหน้าเว็บ ไม่ใช่ความลับ **ต้องไปตั้งเป็น Environment Variable ใน Vercel เอง** (Vercel → โปรเจกต์ → Settings → Environment Variables → เพิ่ม `VITE_LIFF_ID`) **แล้ว Redeploy ใหม่ 1 ครั้ง** ค่าใหม่ถึงจะมีผล — คนละขั้นตอนกับ `supabase secrets set` ด้านล่าง (อันนั้นเป็น secret ฝั่ง edge function เท่านั้น ไม่ใช่ตัวแปรฝั่งเว็บ)
+   - `LIFF_CHANNEL_ID` = **Channel ID ของ LINE Login channel ใหม่นี้** (แท็บ **Basic settings** ของมันเอง — **ไม่ใช่** Channel ID ของ Messaging API channel เดิม แม้จะดูคล้ายกันก็ตาม สองอันนี้เป็นคนละเลขกันเสมอ) — edge function `register-line-contact` เอาไปใช้เป็น `client_id` ตอนตรวจสอบ id token กับ LINE ถ้าใส่ผิด (เช่นใส่ Channel ID ของ Messaging API channel แทน) จะได้ 401 "ยืนยันตัวตน LINE ไม่สำเร็จ" ทุกครั้ง
 5. ใส่ `SITE_URL` เป็นโดเมนเว็บจริง (ไม่มี `/` ท้าย) — `send-order-links` เอาไปต่อเป็น `<SITE_URL>/o/<token>` ตอนส่งลิงก์ทาง LINE
 6. รัน `supabase secrets set LIFF_CHANNEL_ID=... LINE_CHANNEL_ACCESS_TOKEN=... SITE_URL=...` (ดูขั้นที่ 4 ด้านล่าง) แล้ว `supabase functions deploy register-line-contact send-order-links`
+
+> ✅ **เช็คด่วนหลังตั้งค่า**: `curl -X GET https://api.line.me/v2/bot/info -H "Authorization: Bearer <LINE_CHANNEL_ACCESS_TOKEN>"` ต้องได้ `displayName`/`basicId` ของ OA จริงกลับมา ไม่ใช่ error — ถ้า error แปลว่า token ผิด/หมดอายุ
 
 > 🔧 **กู้คืนกรณีวันไหนถูกทำเครื่องหมายว่า "ส่งแล้ว" ทั้งที่ยังไม่ได้ส่งจริง** (เช่น เผลอ deploy ก่อนตั้ง secrets): ระบบส่งลิงก์ได้วันละครั้งเท่านั้น ถ้าต้องให้ส่งใหม่ ให้ล้างตัวกันซ้ำด้วย SQL ใน Supabase → SQL Editor แล้วกด **บันทึก** ที่หน้า "ตั้งค่าเรือประจำวัน" อีกครั้ง (ส่งได้เฉพาะ **วันปัจจุบัน** เท่านั้น — วันย้อนหลังระบบจะข้ามให้เงียบ ๆ เพราะลิงก์หมดอายุไปแล้ว):
 > ```sql
