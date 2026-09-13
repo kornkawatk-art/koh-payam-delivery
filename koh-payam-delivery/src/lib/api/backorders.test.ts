@@ -26,9 +26,13 @@ let claimRow: any = null
 // The row markBackorderFulfilled's claim_id lookup (`select('claim_id').eq('id', id).single()`)
 // resolves to -- null means "no claim_id", matching a shortage backorder.
 let backorderRow: any = null
-// Sibling rows for closeClaimIfResendFulfilled's `select('status').eq('claim_id', ...)` check.
-let siblingRows: any[] = []
-let siblingError: any = null
+let backorderRowError: any = null
+// closeClaimIfResendFulfilled now delegates the actual check + write to the
+// close_resend_claim_if_fulfilled RPC (0019_claim_closing.sql) -- these control
+// what that mocked rpc() call resolves to.
+let rpcResult: any = false
+let rpcError: any = null
+const rpcCalls: any[] = []
 
 vi.mock('../supabase', () => {
   const res = (data: any) => {
@@ -39,6 +43,10 @@ vi.mock('../supabase', () => {
   return {
     supabase: {
       auth: { getUser: () => Promise.resolve({ data: { user: { id: 'u1' } } }) },
+      rpc: (name: string, args: any) => {
+        rpcCalls.push([name, args])
+        return Promise.resolve({ data: rpcResult, error: rpcError })
+      },
       from: (t: string) => ({
         select: (sel: string) => ({
           or: (arg: string) => {
@@ -53,9 +61,10 @@ vi.mock('../supabase', () => {
             if (t === 'orders') return res(dayOrders)
             if (t === 'backorders') {
               if (col === 'id')
-                return { single: () => Promise.resolve({ data: backorderRow, error: null }) }
-              if (col === 'claim_id')
-                return Promise.resolve({ data: siblingRows, error: siblingError })
+                return {
+                  single: () =>
+                    Promise.resolve({ data: backorderRow, error: backorderRowError }),
+                }
               return res(
                 col === 'target_ship_date'
                   ? dayList
@@ -123,8 +132,10 @@ beforeEach(() => {
   unmatchedList = []
   claimRow = null
   backorderRow = null
-  siblingRows = []
-  siblingError = null
+  backorderRowError = null
+  rpcResult = false
+  rpcError = null
+  rpcCalls.length = 0
   logAction.mockClear()
 })
 
@@ -416,54 +427,65 @@ test('markBackorderFulfilled sets fulfilled status with actor and timestamp', as
   expect(u[4]).toBe('b9')
 })
 
-test('markBackorderFulfilled on a backorder with no claim_id: no claim update attempted', async () => {
+test('markBackorderFulfilled on a backorder with no claim_id: the close_resend_claim_if_fulfilled RPC is never called', async () => {
   backorderRow = { claim_id: null }
   await markBackorderFulfilled('b9')
   expect(calls.some((c) => c[0] === 'update' && c[1] === 'backorders')).toBe(true)
-  expect(calls.some((c) => c[0] === 'update' && c[1] === 'claims')).toBe(false)
+  expect(rpcCalls.length).toBe(0)
   expect(logAction).not.toHaveBeenCalled()
 })
 
-test('markBackorderFulfilled with a claim_id whose sibling rows are not all fulfilled yet: no claim update', async () => {
+// The "are all sibling backorders fulfilled" check itself now lives inside
+// the close_resend_claim_if_fulfilled Postgres function (0019_claim_closing.sql)
+// -- not-all-fulfilled is simulated here by the rpc simply resolving false,
+// exactly as it would for a real not-yet-fulfilled claim.
+test('markBackorderFulfilled with a claim_id whose RPC reports not-yet-fulfilled (resolves false): no audit log', async () => {
   backorderRow = { claim_id: 'c1' }
-  siblingRows = [{ status: 'fulfilled' }, { status: 'pending' }]
+  rpcResult = false
   await markBackorderFulfilled('b9')
-  expect(calls.some((c) => c[0] === 'update' && c[1] === 'claims')).toBe(false)
+  expect(rpcCalls).toEqual([['close_resend_claim_if_fulfilled', { p_claim_id: 'c1' }]])
   expect(logAction).not.toHaveBeenCalled()
 })
 
-test('markBackorderFulfilled closes the claim once every sibling backorder is fulfilled', async () => {
+test('markBackorderFulfilled logs the audit entry once the RPC reports the claim was actually closed (resolves true)', async () => {
   backorderRow = { claim_id: 'c1' }
-  siblingRows = [{ status: 'fulfilled' }, { status: 'fulfilled' }]
+  rpcResult = true
   await markBackorderFulfilled('b9')
-  const claimUpdate = calls.find((c) => c[0] === 'update' && c[1] === 'claims')
-  expect(claimUpdate).toBeTruthy()
-  expect(claimUpdate[2]).toEqual({ status: 'closed' })
-  // guarded with .eq('id', claimId).eq('status', 'approved')
-  expect(claimUpdate.slice(3)).toEqual(['id', 'c1', 'status', 'approved'])
+  expect(rpcCalls).toEqual([['close_resend_claim_if_fulfilled', { p_claim_id: 'c1' }]])
   expect(logAction).toHaveBeenCalledWith('claim_auto_closed', 'claim', 'c1', {
     trigger: 'resend_fulfilled',
   })
 })
 
-test('markBackorderFulfilled closes a single-item claim on its own fulfillment', async () => {
+// The RPC resolving false covers both "not actually fulfilled yet" and "this
+// call didn't win the race to flip it" (e.g. already closed by another call)
+// -- either way, no audit entry should be recorded.
+test('markBackorderFulfilled does not log an audit entry when the RPC resolves false (already closed or not fulfilled)', async () => {
   backorderRow = { claim_id: 'c1' }
-  siblingRows = [{ status: 'fulfilled' }]
+  rpcResult = false
   await markBackorderFulfilled('b9')
-  const claimUpdate = calls.find((c) => c[0] === 'update' && c[1] === 'claims')
-  expect(claimUpdate).toBeTruthy()
-  expect(claimUpdate[2]).toEqual({ status: 'closed' })
+  expect(logAction).not.toHaveBeenCalled()
 })
 
-test('markBackorderFulfilled swallows a failure in the claim-closing side path without throwing, and the backorder fulfillment write already succeeded', async () => {
+test('markBackorderFulfilled swallows an RPC error in the claim-closing side path without throwing, and the backorder fulfillment write already succeeded', async () => {
   const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
   backorderRow = { claim_id: 'c1' }
-  siblingError = { message: 'sibling lookup boom' }
+  rpcError = { message: 'rpc boom' }
   await expect(markBackorderFulfilled('b9')).resolves.toBeUndefined()
   const backorderUpdate = calls.find((c) => c[0] === 'update' && c[1] === 'backorders')
   expect(backorderUpdate).toBeTruthy()
-  expect(calls.some((c) => c[0] === 'update' && c[1] === 'claims')).toBe(false)
   expect(logAction).not.toHaveBeenCalled()
   expect(warnSpy).toHaveBeenCalled()
+  warnSpy.mockRestore()
+})
+
+test('markBackorderFulfilled warns (but does not throw) when the backorder claim_id lookup itself errors', async () => {
+  const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+  backorderRow = null
+  backorderRowError = { message: 'claim_id lookup boom' }
+  await expect(markBackorderFulfilled('b9')).resolves.toBeUndefined()
+  expect(rpcCalls.length).toBe(0)
+  expect(logAction).not.toHaveBeenCalled()
+  expect(warnSpy).toHaveBeenCalledWith('claim_id lookup failed', backorderRowError)
   warnSpy.mockRestore()
 })
