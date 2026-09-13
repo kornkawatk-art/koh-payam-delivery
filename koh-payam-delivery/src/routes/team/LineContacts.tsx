@@ -6,6 +6,7 @@ import {
   type LineContactRow,
   type PendingLineContactRow,
 } from '../../lib/api/lineContacts'
+import { ChatCircle } from '@phosphor-icons/react'
 import { Spinner } from '../../components/ui/Spinner'
 import { PageHeader } from '../../components/ui/PageHeader'
 import { formatDateTimeTH } from '../../lib/format'
@@ -78,7 +79,7 @@ export default function LineContacts() {
 
   return (
     <div className="flex flex-col gap-5">
-      <PageHeader title="ผู้ลงทะเบียน LINE" />
+      <PageHeader title="ผู้ลงทะเบียน LINE" icon={ChatCircle} accent="line" />
 
       {(pending.length > 0 || pendingFailed) && (
         <section className="flex flex-col gap-2">

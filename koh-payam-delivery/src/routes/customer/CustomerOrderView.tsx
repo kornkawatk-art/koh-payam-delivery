@@ -119,7 +119,17 @@ export default function CustomerOrderView() {
   const shell = (inner: ReactNode) => (
     <div className="min-h-screen bg-paper px-4 py-6 sm:py-10">
       <div className="mx-auto flex w-full max-w-xl flex-col gap-4">
-        {toggle}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-ink to-brand-ink text-xs font-semibold text-white">
+              KP
+            </span>
+            <span className="text-sm font-semibold text-ink">
+              {lang === 'th' ? 'เกาะพยาม' : 'Koh Payam'}
+            </span>
+          </div>
+          {toggle}
+        </div>
         {inner}
       </div>
     </div>

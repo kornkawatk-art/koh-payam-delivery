@@ -1,3 +1,5 @@
+import { Tray, Package, MapPin, CheckCircle, type Icon } from '@phosphor-icons/react'
+
 const LABEL: Record<string, string> = {
   imported: 'นำเข้าแล้ว',
   packed: 'แพ็คเสร็จ',
@@ -12,9 +14,20 @@ const TONE: Record<string, string> = {
   shipped: 'badge-ok',
 }
 
+// currentColor inherits each badge's own text tone above -- no extra color
+// wiring needed to keep the icon in sync with the pill it sits in.
+const STATUS_ICON: Record<string, Icon> = {
+  imported: Tray,
+  packed: Package,
+  at_pier: MapPin,
+  shipped: CheckCircle,
+}
+
 export function StatusBadge({ status }: { status: string }) {
+  const Icon = STATUS_ICON[status]
   return (
     <span className={`badge ${TONE[status] ?? 'badge-neutral'}`}>
+      {Icon && <Icon size={12} weight="fill" aria-hidden="true" />}
       {LABEL[status] ?? status}
     </span>
   )

@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import { listOrdersForDay } from '../../lib/api/shipDays'
 import { listBackordersForDay, type BackorderRow } from '../../lib/api/backorders'
 import { supabase } from '../../lib/supabase'
+import { House, Package, MapPin, CheckCircle, Warning, QrCode } from '@phosphor-icons/react'
 import { StatusBadge } from '../../components/ui/StatusBadge'
 import { Spinner } from '../../components/ui/Spinner'
 import { PageHeader } from '../../components/ui/PageHeader'
@@ -112,6 +113,8 @@ export default function DailyDashboard() {
     <div className="flex flex-col gap-5">
       <PageHeader
         title="งานวันนี้"
+        icon={House}
+        accent="indigo"
         actions={
           <input
             type="date"
@@ -122,14 +125,32 @@ export default function DailyDashboard() {
         }
       />
 
-      <p className="muted">
-        แพ็คแล้ว {counts.packed}/{counts.total} · ถึงท่าเรือ {counts.atPier} · ส่งแล้ว{' '}
-        {counts.shipped}
-      </p>
+      <div className="flex flex-wrap gap-2 text-sm">
+        <span className="inline-flex items-center gap-1.5 rounded-lg border border-line bg-surface px-3 py-1.5 shadow-card">
+          <Package size={14} className="text-accent-amber" aria-hidden="true" />
+          <span className="text-ink-soft">แพ็คแล้ว</span>
+          <span className="tnum font-semibold text-ink">
+            {counts.packed}/{counts.total}
+          </span>
+        </span>
+        <span className="inline-flex items-center gap-1.5 rounded-lg border border-line bg-surface px-3 py-1.5 shadow-card">
+          <MapPin size={14} className="text-accent-teal" aria-hidden="true" />
+          <span className="text-ink-soft">ถึงท่าเรือ</span>
+          <span className="tnum font-semibold text-ink">{counts.atPier}</span>
+        </span>
+        <span className="inline-flex items-center gap-1.5 rounded-lg border border-line bg-surface px-3 py-1.5 shadow-card">
+          <CheckCircle size={14} weight="fill" className="text-ok" aria-hidden="true" />
+          <span className="text-ink-soft">ส่งแล้ว</span>
+          <span className="tnum font-semibold text-ink">{counts.shipped}</span>
+        </span>
+      </div>
 
       {backorders.length > 0 && (
         <div className="alert alert-warn">
-          <p className="font-semibold">ของค้างส่ง {backorders.length} รายการรอส่งวันนี้</p>
+          <p className="flex items-center gap-1.5 font-semibold">
+            <Warning size={16} weight="fill" aria-hidden="true" />
+            ของค้างส่ง {backorders.length} รายการรอส่งวันนี้
+          </p>
           <ul className="mt-1.5 list-disc pl-5">
             {backorders.map((b) => (
               <li key={b.id}>
@@ -160,20 +181,7 @@ export default function DailyDashboard() {
           aria-label="สแกน QR ออเดอร์"
           onClick={() => setScanOpen((v) => !v)}
         >
-          <svg
-            className="h-4 w-4"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            aria-hidden="true"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              d="M4 8V6a2 2 0 0 1 2-2h2M4 16v2a2 2 0 0 0 2 2h2M20 8V6a2 2 0 0 0-2-2h-2M20 16v2a2 2 0 0 1-2 2h-2M4 12h16"
-            />
-          </svg>
+          <QrCode size={18} aria-hidden="true" />
         </button>
       </div>
 

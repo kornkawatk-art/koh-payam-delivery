@@ -8,6 +8,7 @@ import {
 } from '../../lib/api/orders'
 import { attachEvidencePhoto } from '../../lib/api/photos'
 import PhotoCapture from '../../components/PhotoCapture'
+import { MapPin } from '@phosphor-icons/react'
 import { PageHeader } from '../../components/ui/PageHeader'
 import { todayLocalISO, formatTHB } from '../../lib/format'
 
@@ -103,6 +104,8 @@ export default function PierLoad() {
       <div className="flex flex-col gap-4">
         <PageHeader
           title="ที่ท่าเรือ"
+          icon={MapPin}
+          accent="teal"
           actions={
             <input
               type="date"
