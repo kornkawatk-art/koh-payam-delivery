@@ -18,3 +18,10 @@ test('manager can access everything in NAV', () => {
   expect(canAccess('/claims', 'manager')).toBe(true)
   expect(canAccess('/import', 'manager')).toBe(true)
 })
+test('non-managers are denied the LINE contacts page', () => {
+  expect(canAccess('/line-contacts', 'packer')).toBe(false)
+  expect(canAccess('/line-contacts', 'pier')).toBe(false)
+})
+test('manager can access the LINE contacts page', () => {
+  expect(canAccess('/line-contacts', 'manager')).toBe(true)
+})

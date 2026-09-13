@@ -6,6 +6,7 @@ export const NAV: { path: string; label: string; roles: Role[] }[] = [
   { path: '/boats', label: 'ตั้งค่าเรือวันนี้', roles: ['pier', 'manager'] },
   { path: '/pier', label: 'ที่ท่าเรือ', roles: ['pier', 'manager'] },
   { path: '/claims', label: 'คิวเคลม', roles: ['manager'] },
+  { path: '/line-contacts', label: 'ผู้ลงทะเบียน LINE', roles: ['manager'] },
 ]
 
 export function canAccess(path: string, role: Role): boolean {
