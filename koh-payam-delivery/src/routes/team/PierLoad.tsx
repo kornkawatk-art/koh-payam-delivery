@@ -6,10 +6,16 @@ import {
   updateOrderStatus,
   listDistinctPierNames,
 } from '../../lib/api/orders'
-import { attachEvidencePhoto, removeEvidencePhoto } from '../../lib/api/photos'
+import {
+  attachEvidencePhoto,
+  removeEvidencePhoto,
+  listEvidencePhotos,
+  type ExistingPhoto,
+} from '../../lib/api/photos'
 import PhotoCapture from '../../components/PhotoCapture'
 import { MapPin } from '@phosphor-icons/react'
 import { PageHeader } from '../../components/ui/PageHeader'
+import { Spinner } from '../../components/ui/Spinner'
 import { todayLocalISO, formatTHB } from '../../lib/format'
 
 type Boat = { id: string; name: string }
@@ -36,6 +42,12 @@ export default function PierLoad() {
   const [orders, setOrders] = useState<PierOrder[]>([])
   const [sel, setSel] = useState<PierOrder | null>(null)
   const [photoCount, setPhotoCount] = useState(0)
+  // Photos already attached to `sel` from an earlier visit (e.g. the app was
+  // closed mid-handoff before "ส่งขึ้นเรือแล้ว" was pressed). Fetched once
+  // per selection and null while that fetch is in flight, so PhotoCapture
+  // doesn't mount (and lazily seed its thumbnails) before this arrives —
+  // PhotoCapture only seeds once, at its own mount.
+  const [initialPhotos, setInitialPhotos] = useState<ExistingPhoto[] | null>(null)
   const [photoBusy, setPhotoBusy] = useState(false)
   const [pierName, setPierName] = useState('')
   const [pierNames, setPierNames] = useState<string[]>([])
@@ -82,6 +94,7 @@ export default function PierLoad() {
       setMsg('ส่งขึ้นเรือแล้ว')
       setSel(null)
       setPhotoCount(0)
+      setInitialPhotos(null)
       setPhotoBusy(false)
       load()
     } catch (e) {
@@ -126,9 +139,18 @@ export default function PierLoad() {
               onClick={() => {
                 setSel(o)
                 setPhotoCount(0)
+                setInitialPhotos(null)
                 setPhotoBusy(false)
                 setPierName(o.pier_name ?? '')
                 setMsg(undefined)
+                listEvidencePhotos(o.id, 'handoff')
+                  .then((photos) => {
+                    setInitialPhotos(photos)
+                    setPhotoCount(photos.length)
+                  })
+                  .catch(() => setInitialPhotos([])) // fail open: an unrecoverable
+                  // fetch just means no photos are pre-shown -- the team member
+                  // can still attach fresh ones and the ship gate still works.
               }}
             >
               <span className="flex flex-col items-start">
@@ -201,10 +223,14 @@ export default function PierLoad() {
 
       <section>
         <p className="section-title mb-2">รูปหลักฐาน (สูงสุด 5)</p>
+        {initialPhotos === null ? (
+          <Spinner />
+        ) : (
         <PhotoCapture
           scope="evidence"
           orderId={sel.id}
           max={5}
+          initialPhotos={initialPhotos}
           onBusyChange={setPhotoBusy}
           onUploaded={async (key) => {
             try {
@@ -219,6 +245,7 @@ export default function PierLoad() {
             setPhotoCount((c) => Math.max(0, c - 1))
           }}
         />
+        )}
       </section>
 
       <button

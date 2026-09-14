@@ -29,12 +29,17 @@ vi.mock('../../components/PhotoCapture', () => ({
     onUploaded,
     onRemoved,
     onBusyChange,
+    initialPhotos,
   }: {
     onUploaded: (k: string) => void
     onRemoved?: (k: string) => void
     onBusyChange?: (busy: boolean) => void
+    initialPhotos?: { key: string; url: string }[]
   }) => (
     <>
+      {(initialPhotos ?? []).map((p) => (
+        <img key={p.key} src={p.url} alt="รูปที่อัปโหลด" />
+      ))}
       <button onClick={() => onUploaded('evidence/ord1/key-1.jpg')}>mock-upload</button>
       <button onClick={() => onRemoved?.('evidence/ord1/key-1.jpg')}>mock-remove</button>
       <button onClick={() => onBusyChange?.(true)}>mock-photo-busy</button>
@@ -272,6 +277,22 @@ test('a revisit seeds the pack-photo count from existing stage:"pack" photos', a
   renderPage()
   await screen.findByText('rice')
   expect(screen.getByRole('button', { name: 'บันทึก + แพ็คเสร็จ' })).toBeEnabled()
+})
+
+test('a revisit also shows the already-saved pack photo as a removable thumbnail (not just a count)', async () => {
+  getOrder.mockReset().mockResolvedValue({
+    ...order,
+    paper_box_count: 1,
+    evidence_photos: [
+      { id: 'e1', r2_key: 'evidence/ord1/a.jpg', stage: 'pack' },
+      { id: 'e2', r2_key: 'evidence/ord1/handoff.jpg', stage: 'handoff' }, // wrong stage -- excluded
+    ],
+  })
+  renderPage()
+  await screen.findByText('rice')
+  const imgs = screen.getAllByAltText('รูปที่อัปโหลด')
+  expect(imgs).toHaveLength(1)
+  expect(imgs[0]).toHaveAttribute('src', expect.stringContaining('evidence/ord1/a.jpg'))
 })
 
 test('"บันทึก + แพ็คเสร็จ" saves first, then marks the order packed', async () => {

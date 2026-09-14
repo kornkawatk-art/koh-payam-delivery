@@ -1,4 +1,9 @@
-import { requestUploadUrl, attachEvidencePhoto, removeEvidencePhoto } from './photos'
+import {
+  requestUploadUrl,
+  attachEvidencePhoto,
+  removeEvidencePhoto,
+  listEvidencePhotos,
+} from './photos'
 
 const ANON = `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`
 
@@ -10,6 +15,9 @@ const state = {
   inserts: [] as { table: string; row: any }[],
   deleteError: null as { message: string } | null,
   deletes: [] as { table: string; eqs: [string, any][] }[],
+  selectError: null as { message: string } | null,
+  selectData: [] as any[],
+  selects: [] as { table: string; sel: string; eqs: [string, any][] }[],
 }
 
 vi.mock('../supabase', () => ({
@@ -34,6 +42,19 @@ vi.mock('../supabase', () => ({
           },
         }
         state.deletes.push(entry)
+        return chain
+      },
+      select: (sel: string) => {
+        const entry = { table, sel, eqs: [] as [string, any][] }
+        const chain: any = {
+          eq: (col: string, val: any) => {
+            entry.eqs.push([col, val])
+            const p: any = Promise.resolve({ data: state.selectData, error: state.selectError })
+            p.eq = chain.eq
+            return p
+          },
+        }
+        state.selects.push(entry)
         return chain
       },
     }),
@@ -62,6 +83,9 @@ beforeEach(() => {
   state.inserts = []
   state.deleteError = null
   state.deletes = []
+  state.selectError = null
+  state.selectData = []
+  state.selects = []
 })
 
 afterEach(() => {
@@ -154,4 +178,33 @@ test('removeEvidencePhoto deletes the row matched on order_id + r2_key', async (
 test('removeEvidencePhoto throws a Thai error when the delete fails', async () => {
   state.deleteError = { message: 'boom' }
   await expect(removeEvidencePhoto('o1', 'k')).rejects.toThrow('ลบรูปไม่สำเร็จ: boom')
+})
+
+test('listEvidencePhotos selects r2_key filtered by order_id + stage and maps to {key, url}', async () => {
+  state.selectData = [{ r2_key: 'evidence/o1/a.jpg' }, { r2_key: 'evidence/o1/b.jpg' }]
+  const rows = await listEvidencePhotos('o1', 'handoff')
+  expect(state.selects).toEqual([
+    {
+      table: 'evidence_photos',
+      sel: 'r2_key',
+      eqs: [
+        ['order_id', 'o1'],
+        ['stage', 'handoff'],
+      ],
+    },
+  ])
+  expect(rows).toEqual([
+    { key: 'evidence/o1/a.jpg', url: expect.stringContaining('evidence/o1/a.jpg') },
+    { key: 'evidence/o1/b.jpg', url: expect.stringContaining('evidence/o1/b.jpg') },
+  ])
+})
+
+test('listEvidencePhotos returns an empty array when there are no rows', async () => {
+  state.selectData = []
+  expect(await listEvidencePhotos('o1', 'pack')).toEqual([])
+})
+
+test('listEvidencePhotos throws a Thai error when the query fails', async () => {
+  state.selectError = { message: 'boom' }
+  await expect(listEvidencePhotos('o1', 'pack')).rejects.toThrow('โหลดรูปหลักฐานไม่สำเร็จ: boom')
 })

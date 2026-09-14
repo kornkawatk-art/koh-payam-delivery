@@ -45,6 +45,19 @@ type Props = {
    * mirrors `onUploaded`'s own error-never-loses-state contract.
    */
   onRemoved?: (key: string) => void | Promise<void>
+  /**
+   * Photos already saved before this component mounted — e.g. a revisit to
+   * an order that was partially packed in an earlier session. Seeds the
+   * thumbnail list once, at mount, so an already-saved photo is immediately
+   * visible and removable via the same trash button as a newly uploaded
+   * one. Without this, PhotoCapture always starts empty and has no way to
+   * know a photo was already attached — the count elsewhere on the page may
+   * say "1 รูป" already saved, but there is nothing on screen to fix if
+   * that one photo turns out to be the wrong one. Changes to this prop
+   * after mount are ignored (never re-seeds/clobbers local additions or
+   * removals made during this visit).
+   */
+  initialPhotos?: { key: string; url: string }[]
   /** Finite cap on captured photos. Omit (or pass `Infinity`) for no cap. */
   max?: number
   /** Evidence stage tag, forwarded to the upload-url request. Default 'handoff'. */
@@ -90,12 +103,13 @@ export default function PhotoCapture({
   token,
   onUploaded,
   onRemoved,
+  initialPhotos,
   max,
   stage = 'handoff',
   onBusyChange,
 }: Props) {
-  const [keys, setKeys] = useState<string[]>([])
-  const [thumbs, setThumbs] = useState<string[]>([])
+  const [keys, setKeys] = useState<string[]>(() => initialPhotos?.map((p) => p.key) ?? [])
+  const [thumbs, setThumbs] = useState<string[]>(() => initialPhotos?.map((p) => p.url) ?? [])
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState('')
   // Which key currently shows the "ลบรูปนี้?" confirm row, and which key's

@@ -12,6 +12,8 @@ import PhotoCapture from '../../components/PhotoCapture'
 import { Spinner } from '../../components/ui/Spinner'
 import { PageHeader } from '../../components/ui/PageHeader'
 
+const R2 = import.meta.env.VITE_R2_PUBLIC_BASE_URL as string
+
 type ItemState = {
   id: string
   product_name: string
@@ -218,6 +220,9 @@ export default function PackOrder() {
             scope="evidence"
             stage="pack"
             orderId={id}
+            initialPhotos={(order.evidence_photos ?? [])
+              .filter((p: any) => p.stage === 'pack')
+              .map((p: any) => ({ key: p.r2_key, url: `${R2}/${p.r2_key}` }))}
             onBusyChange={setPhotoBusy}
             onUploaded={async (key) => {
               try {

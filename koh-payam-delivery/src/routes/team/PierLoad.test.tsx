@@ -10,6 +10,7 @@ const updateOrderStatus = vi.fn().mockResolvedValue(undefined)
 const listDistinctPierNames = vi.fn().mockResolvedValue([])
 const attachEvidencePhoto = vi.fn().mockResolvedValue(undefined)
 const removeEvidencePhoto = vi.fn().mockResolvedValue(undefined)
+const listEvidencePhotos = vi.fn().mockResolvedValue([])
 
 vi.mock('../../lib/api/shipDays', () => ({
   getOrCreateShipDay: (...a: unknown[]) => getOrCreateShipDay(...a),
@@ -24,18 +25,24 @@ vi.mock('../../lib/api/orders', () => ({
 vi.mock('../../lib/api/photos', () => ({
   attachEvidencePhoto: (...a: unknown[]) => attachEvidencePhoto(...a),
   removeEvidencePhoto: (...a: unknown[]) => removeEvidencePhoto(...a),
+  listEvidencePhotos: (...a: unknown[]) => listEvidencePhotos(...a),
 }))
 vi.mock('../../components/PhotoCapture', () => ({
   default: ({
     onUploaded,
     onRemoved,
     onBusyChange,
+    initialPhotos,
   }: {
     onUploaded: (k: string) => void
     onRemoved?: (k: string) => void
     onBusyChange?: (busy: boolean) => void
+    initialPhotos?: { key: string; url: string }[]
   }) => (
     <>
+      {(initialPhotos ?? []).map((p) => (
+        <img key={p.key} src={p.url} alt="รูปที่อัปโหลด" />
+      ))}
       <button onClick={() => onUploaded('evidence/o1/key-1.jpg')}>mock-upload</button>
       <button onClick={() => onRemoved?.('evidence/o1/key-1.jpg')}>mock-remove</button>
       <button onClick={() => onBusyChange?.(true)}>mock-photo-busy</button>
@@ -89,6 +96,7 @@ beforeEach(() => {
   updateOrderStatus.mockClear()
   attachEvidencePhoto.mockClear()
   removeEvidencePhoto.mockClear()
+  listEvidencePhotos.mockReset().mockResolvedValue([])
   listDistinctPierNames.mockReset().mockResolvedValue([])
 })
 
@@ -149,6 +157,30 @@ test('removing the only evidence photo calls removeEvidencePhoto(orderId, key) a
     expect(removeEvidencePhoto).toHaveBeenCalledWith('o1', 'evidence/o1/key-1.jpg'),
   )
   await waitFor(() => expect(ship).toBeDisabled())
+})
+
+test('a photo already saved from an earlier visit is shown and seeds the ship gate on selection, without needing a fresh upload', async () => {
+  listEvidencePhotos.mockReset().mockResolvedValue([
+    { key: 'evidence/o1/old.jpg', url: 'https://pub.example/evidence/o1/old.jpg' },
+  ])
+  render(<PierLoad />)
+  await userEvent.click(await screen.findByRole('button', { name: /PO-1/ }))
+
+  expect(listEvidencePhotos).toHaveBeenCalledWith('o1', 'handoff')
+  await screen.findByAltText('รูปที่อัปโหลด') // the pre-existing photo's thumbnail
+
+  await userEvent.click(screen.getByRole('button', { name: 'เรือ 2' }))
+  await waitFor(() => expect(screen.getByRole('button', { name: 'ส่งขึ้นเรือแล้ว' })).toBeEnabled())
+})
+
+test('a failed fetch of already-saved photos fails open (empty list) instead of blocking the screen', async () => {
+  listEvidencePhotos.mockReset().mockRejectedValue(new Error('boom'))
+  render(<PierLoad />)
+  await userEvent.click(await screen.findByRole('button', { name: /PO-1/ }))
+  await userEvent.click(await screen.findByRole('button', { name: 'เรือ 2' }))
+  // Still reachable and usable -- just no pre-existing photo shown.
+  await userEvent.click(screen.getByRole('button', { name: 'mock-upload' }))
+  await waitFor(() => expect(screen.getByRole('button', { name: 'ส่งขึ้นเรือแล้ว' })).toBeEnabled())
 })
 
 test('typing a pier name and shipping calls setOrderPierName then updateOrderStatus("shipped") in that order', async () => {
