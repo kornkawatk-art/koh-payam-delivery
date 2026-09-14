@@ -10,6 +10,7 @@ const listDistinctPackerNames = vi.fn().mockResolvedValue([])
 const listPendingBackordersForOrder = vi.fn().mockResolvedValue([])
 const markBackorderFulfilled = vi.fn().mockResolvedValue(undefined)
 const attachEvidencePhoto = vi.fn().mockResolvedValue(undefined)
+const removeEvidencePhoto = vi.fn().mockResolvedValue(undefined)
 
 vi.mock('../../lib/api/orders', () => ({
   getOrder: (...a: unknown[]) => getOrder(...a),
@@ -21,17 +22,21 @@ vi.mock('../../lib/api/pack', () => ({
 }))
 vi.mock('../../lib/api/photos', () => ({
   attachEvidencePhoto: (...a: unknown[]) => attachEvidencePhoto(...a),
+  removeEvidencePhoto: (...a: unknown[]) => removeEvidencePhoto(...a),
 }))
 vi.mock('../../components/PhotoCapture', () => ({
   default: ({
     onUploaded,
+    onRemoved,
     onBusyChange,
   }: {
     onUploaded: (k: string) => void
+    onRemoved?: (k: string) => void
     onBusyChange?: (busy: boolean) => void
   }) => (
     <>
       <button onClick={() => onUploaded('evidence/ord1/key-1.jpg')}>mock-upload</button>
+      <button onClick={() => onRemoved?.('evidence/ord1/key-1.jpg')}>mock-remove</button>
       <button onClick={() => onBusyChange?.(true)}>mock-photo-busy</button>
       <button onClick={() => onBusyChange?.(false)}>mock-photo-idle</button>
     </>
@@ -75,6 +80,7 @@ beforeEach(() => {
   savePack.mockClear()
   updateOrderStatus.mockClear()
   attachEvidencePhoto.mockClear()
+  removeEvidencePhoto.mockClear()
   listPendingBackordersForOrder.mockReset().mockResolvedValue([])
   markBackorderFulfilled.mockClear()
   listDistinctPackerNames.mockReset().mockResolvedValue([])
@@ -240,6 +246,21 @@ test('"บันทึก + แพ็คเสร็จ" is gated on a pack phot
 
   // plain "บันทึก" is never gated by photos/boxes
   expect(screen.getByRole('button', { name: 'บันทึก' })).toBeEnabled()
+})
+
+test('removing the only pack photo calls removeEvidencePhoto(orderId, key) and re-locks the "บันทึก + แพ็คเสร็จ" gate', async () => {
+  renderPage()
+  await screen.findByText('rice')
+  await satisfyPackGate()
+  const packBtn = screen.getByRole('button', { name: 'บันทึก + แพ็คเสร็จ' })
+  expect(packBtn).toBeEnabled()
+
+  await userEvent.click(screen.getByRole('button', { name: 'mock-remove' }))
+
+  await waitFor(() =>
+    expect(removeEvidencePhoto).toHaveBeenCalledWith('ord1', 'evidence/ord1/key-1.jpg'),
+  )
+  await waitFor(() => expect(packBtn).toBeDisabled())
 })
 
 test('a revisit seeds the pack-photo count from existing stage:"pack" photos', async () => {

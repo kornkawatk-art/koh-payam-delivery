@@ -9,6 +9,7 @@ const setOrderPierName = vi.fn().mockResolvedValue(undefined)
 const updateOrderStatus = vi.fn().mockResolvedValue(undefined)
 const listDistinctPierNames = vi.fn().mockResolvedValue([])
 const attachEvidencePhoto = vi.fn().mockResolvedValue(undefined)
+const removeEvidencePhoto = vi.fn().mockResolvedValue(undefined)
 
 vi.mock('../../lib/api/shipDays', () => ({
   getOrCreateShipDay: (...a: unknown[]) => getOrCreateShipDay(...a),
@@ -22,17 +23,21 @@ vi.mock('../../lib/api/orders', () => ({
 }))
 vi.mock('../../lib/api/photos', () => ({
   attachEvidencePhoto: (...a: unknown[]) => attachEvidencePhoto(...a),
+  removeEvidencePhoto: (...a: unknown[]) => removeEvidencePhoto(...a),
 }))
 vi.mock('../../components/PhotoCapture', () => ({
   default: ({
     onUploaded,
+    onRemoved,
     onBusyChange,
   }: {
     onUploaded: (k: string) => void
+    onRemoved?: (k: string) => void
     onBusyChange?: (busy: boolean) => void
   }) => (
     <>
       <button onClick={() => onUploaded('evidence/o1/key-1.jpg')}>mock-upload</button>
+      <button onClick={() => onRemoved?.('evidence/o1/key-1.jpg')}>mock-remove</button>
       <button onClick={() => onBusyChange?.(true)}>mock-photo-busy</button>
       <button onClick={() => onBusyChange?.(false)}>mock-photo-idle</button>
     </>
@@ -83,6 +88,7 @@ beforeEach(() => {
   setOrderPierName.mockClear()
   updateOrderStatus.mockClear()
   attachEvidencePhoto.mockClear()
+  removeEvidencePhoto.mockClear()
   listDistinctPierNames.mockReset().mockResolvedValue([])
 })
 
@@ -127,6 +133,22 @@ test('"ส่งขึ้นเรือแล้ว" is blocked until a boat is
 
   await userEvent.click(ship)
   expect(updateOrderStatus).toHaveBeenCalledWith('o1', 'shipped')
+})
+
+test('removing the only evidence photo calls removeEvidencePhoto(orderId, key) and re-blocks "ส่งขึ้นเรือแล้ว"', async () => {
+  render(<PierLoad />)
+  await userEvent.click(await screen.findByRole('button', { name: /PO-1/ }))
+  await userEvent.click(screen.getByRole('button', { name: 'เรือ 2' }))
+  await userEvent.click(screen.getByRole('button', { name: 'mock-upload' }))
+  const ship = screen.getByRole('button', { name: 'ส่งขึ้นเรือแล้ว' })
+  await waitFor(() => expect(ship).toBeEnabled())
+
+  await userEvent.click(screen.getByRole('button', { name: 'mock-remove' }))
+
+  await waitFor(() =>
+    expect(removeEvidencePhoto).toHaveBeenCalledWith('o1', 'evidence/o1/key-1.jpg'),
+  )
+  await waitFor(() => expect(ship).toBeDisabled())
 })
 
 test('typing a pier name and shipping calls setOrderPierName then updateOrderStatus("shipped") in that order', async () => {

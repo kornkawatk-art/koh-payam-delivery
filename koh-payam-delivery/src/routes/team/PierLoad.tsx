@@ -6,7 +6,7 @@ import {
   updateOrderStatus,
   listDistinctPierNames,
 } from '../../lib/api/orders'
-import { attachEvidencePhoto } from '../../lib/api/photos'
+import { attachEvidencePhoto, removeEvidencePhoto } from '../../lib/api/photos'
 import PhotoCapture from '../../components/PhotoCapture'
 import { MapPin } from '@phosphor-icons/react'
 import { PageHeader } from '../../components/ui/PageHeader'
@@ -213,6 +213,10 @@ export default function PierLoad() {
             } catch (e) {
               setMsg((e as Error).message)
             }
+          }}
+          onRemoved={async (key) => {
+            await removeEvidencePhoto(sel.id, key)
+            setPhotoCount((c) => Math.max(0, c - 1))
           }}
         />
       </section>

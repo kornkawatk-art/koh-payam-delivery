@@ -4,19 +4,25 @@ import CustomerClaimForm from './CustomerClaimForm'
 
 const fetchMock = vi.fn()
 
-// Stub PhotoCapture: a button that reports one uploaded key, plus two buttons
-// to simulate the onBusyChange callback firing while a photo is in flight.
+// Stub PhotoCapture: a button that reports one uploaded key, a button that
+// reports it removed again, plus two buttons to simulate the onBusyChange
+// callback firing while a photo is in flight.
 vi.mock('../../components/PhotoCapture', () => ({
   default: ({
     onUploaded,
+    onRemoved,
     onBusyChange,
   }: {
     onUploaded: (k: string) => void
+    onRemoved?: (k: string) => void
     onBusyChange?: (busy: boolean) => void
   }) => (
     <>
       <button type="button" onClick={() => onUploaded('k1')}>
         mock-upload
+      </button>
+      <button type="button" onClick={() => onRemoved?.('k1')}>
+        mock-remove
       </button>
       <button type="button" onClick={() => onBusyChange?.(true)}>
         mock-photo-busy
@@ -77,6 +83,20 @@ test('damaged: checking an item + qty + description + photo -> POSTs to submit-c
     items: [{ orderItemIndex: 0, qty: 1 }],
   })
   expect(body.photoKeys).toContain('k1')
+})
+
+test('removing a photo before submit excludes its key from photoKeys (fixes an uploaded-by-mistake photo)', async () => {
+  const onDone = vi.fn()
+  render(<CustomerClaimForm token="tok_abc" items={items} lang="en" onDone={onDone} />)
+
+  await userEvent.click(screen.getByRole('radio', { name: 'Damaged' }))
+  await userEvent.click(screen.getByRole('checkbox', { name: 'Rice 5kg' }))
+  await userEvent.click(screen.getByRole('button', { name: 'mock-upload' }))
+  await userEvent.click(screen.getByRole('button', { name: 'mock-remove' }))
+  await userEvent.click(screen.getByRole('button', { name: 'Submit' }))
+
+  await waitFor(() => expect(onDone).toHaveBeenCalled())
+  expect(lastBody().photoKeys).not.toContain('k1')
 })
 
 test('damaged: allows checking multiple products at once, same as missing_in_box', async () => {

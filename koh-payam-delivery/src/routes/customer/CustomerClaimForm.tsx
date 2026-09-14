@@ -191,6 +191,7 @@ export default function CustomerClaimForm({ token, items, lang, onDone }: Props)
           max={5}
           onBusyChange={setPhotoBusy}
           onUploaded={(k) => setKeys((ks) => [...ks, k])}
+          onRemoved={(k) => setKeys((ks) => ks.filter((kk) => kk !== k))}
         />
       </div>
 

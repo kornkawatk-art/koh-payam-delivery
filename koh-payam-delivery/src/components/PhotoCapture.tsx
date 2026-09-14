@@ -1,4 +1,5 @@
 import { useState, type ChangeEvent } from 'react'
+import { Trash } from '@phosphor-icons/react'
 import { compressImage } from '../lib/image'
 import { requestUploadUrl } from '../lib/api/photos'
 
@@ -35,6 +36,15 @@ type Props = {
   orderId?: string
   token?: string
   onUploaded: (key: string) => void
+  /**
+   * A photo was removed (the "ลบรูปนี้" confirm was tapped). Optional: when
+   * omitted, removal is purely local (thumbnail/count only) — correct for a
+   * scope whose keys aren't persisted until some later step (e.g. a claim,
+   * only written to `claim_photos` at final submit). When given and it
+   * throws/rejects, the photo is put back and the thrown message is shown —
+   * mirrors `onUploaded`'s own error-never-loses-state contract.
+   */
+  onRemoved?: (key: string) => void | Promise<void>
   /** Finite cap on captured photos. Omit (or pass `Infinity`) for no cap. */
   max?: number
   /** Evidence stage tag, forwarded to the upload-url request. Default 'handoff'. */
@@ -68,12 +78,18 @@ type Props = {
  * `n / max รูป`; when `max` is omitted the input never locks and the count
  * reads `n รูป`. Errors are shown in Thai and never lose the thumbnails
  * already captured.
+ *
+ * Each thumbnail carries a small trash-icon overlay to undo an accidental
+ * upload (wrong photo, blurry shot, etc.) — a single tap arms it (shows
+ * "ลบรูปนี้?" + confirm/cancel inline on that thumbnail only) so a stray tap
+ * elsewhere on the screen can't delete a correctly-attached photo.
  */
 export default function PhotoCapture({
   scope,
   orderId,
   token,
   onUploaded,
+  onRemoved,
   max,
   stage = 'handoff',
   onBusyChange,
@@ -82,6 +98,10 @@ export default function PhotoCapture({
   const [thumbs, setThumbs] = useState<string[]>([])
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState('')
+  // Which key currently shows the "ลบรูปนี้?" confirm row, and which key's
+  // removal is in flight (disables that thumbnail's buttons only).
+  const [confirmingKey, setConfirmingKey] = useState<string | null>(null)
+  const [removingKey, setRemovingKey] = useState<string | null>(null)
 
   function updateBusy(v: boolean) {
     setBusy(v)
@@ -161,6 +181,29 @@ export default function PhotoCapture({
     }
   }
 
+  async function confirmRemove(key: string) {
+    const i = keys.indexOf(key)
+    if (i === -1) return
+    const removedThumb = thumbs[i]
+    setConfirmingKey(null)
+    setRemovingKey(key)
+    setErr('')
+    // Optimistic: drop it immediately so the UI feels instant, put it back
+    // on failure (same "never lose what's already there" contract as a
+    // failed upload).
+    setKeys((k) => k.filter((kk) => kk !== key))
+    setThumbs((t) => t.filter((_, idx) => idx !== i))
+    try {
+      await onRemoved?.(key)
+    } catch (e) {
+      setKeys((k) => [...k.slice(0, i), key, ...k.slice(i)])
+      setThumbs((t) => [...t.slice(0, i), removedThumb, ...t.slice(i)])
+      setErr((e as Error).message || 'ลบรูปไม่สำเร็จ')
+    } finally {
+      setRemovingKey(null)
+    }
+  }
+
   return (
     <div className="flex flex-col gap-2">
       <p className="text-xs text-ink-faint">
@@ -199,14 +242,61 @@ export default function PhotoCapture({
       )}
       {err && <p className="text-sm text-danger-ink">{err}</p>}
       <div className="flex flex-wrap gap-2">
-        {thumbs.map((src, i) => (
-          <img
-            key={keys[i] ?? i}
-            src={src}
-            alt="รูปที่อัปโหลด"
-            className="h-20 w-20 rounded-lg border border-line object-cover"
-          />
-        ))}
+        {thumbs.map((src, i) => {
+          const key = keys[i]
+          const confirming = confirmingKey === key
+          const removing = removingKey === key
+          return (
+            <div key={key ?? i} className="flex flex-col items-center gap-1">
+              <div className="relative">
+                <img
+                  src={src}
+                  alt="รูปที่อัปโหลด"
+                  className="h-20 w-20 rounded-lg border border-line object-cover"
+                />
+                {!confirming && (
+                  <button
+                    type="button"
+                    aria-label="ลบรูปนี้"
+                    disabled={removing}
+                    onClick={() => setConfirmingKey(key)}
+                    className="absolute -right-1.5 -top-1.5 flex h-7 w-7 items-center justify-center rounded-full border border-line bg-surface text-danger-ink shadow-card transition-colors hover:bg-danger-soft disabled:opacity-50"
+                  >
+                    {removing ? (
+                      <svg className="h-3.5 w-3.5 animate-spin" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                        <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="3" opacity="0.25" />
+                        <path d="M21 12a9 9 0 0 0-9-9" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
+                      </svg>
+                    ) : (
+                      <Trash size={14} aria-hidden="true" />
+                    )}
+                  </button>
+                )}
+              </div>
+              {confirming && (
+                <div className="flex flex-col items-center gap-1 text-xs">
+                  <span className="font-medium text-danger-ink">ลบรูปนี้?</span>
+                  <div className="flex gap-1">
+                    <button
+                      type="button"
+                      onClick={() => confirmRemove(key)}
+                      className="btn btn-danger btn-sm !min-h-0 !py-1 !px-2 !text-xs"
+                    >
+                      ลบ
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setConfirmingKey(null)}
+                      className="btn btn-secondary btn-sm !min-h-0 !py-1 !px-2 !text-xs"
+                    >
+                      ยกเลิก
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )
+        })}
       </div>
     </div>
   )

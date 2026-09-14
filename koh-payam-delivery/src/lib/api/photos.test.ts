@@ -1,4 +1,4 @@
-import { requestUploadUrl, attachEvidencePhoto } from './photos'
+import { requestUploadUrl, attachEvidencePhoto, removeEvidencePhoto } from './photos'
 
 const ANON = `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`
 
@@ -8,6 +8,8 @@ const getUser = vi.fn()
 const state = {
   insertError: null as { message: string } | null,
   inserts: [] as { table: string; row: any }[],
+  deleteError: null as { message: string } | null,
+  deletes: [] as { table: string; eqs: [string, any][] }[],
 }
 
 vi.mock('../supabase', () => ({
@@ -20,6 +22,19 @@ vi.mock('../supabase', () => ({
       insert: (row: any) => {
         state.inserts.push({ table, row })
         return Promise.resolve({ error: state.insertError })
+      },
+      delete: () => {
+        const entry = { table, eqs: [] as [string, any][] }
+        const chain: any = {
+          eq: (col: string, val: any) => {
+            entry.eqs.push([col, val])
+            const p: any = Promise.resolve({ error: state.deleteError })
+            p.eq = chain.eq
+            return p
+          },
+        }
+        state.deletes.push(entry)
+        return chain
       },
     }),
   },
@@ -45,6 +60,8 @@ beforeEach(() => {
   getUser.mockReset().mockResolvedValue({ data: { user: { id: 'u1' } } })
   state.insertError = null
   state.inserts = []
+  state.deleteError = null
+  state.deletes = []
 })
 
 afterEach(() => {
@@ -119,4 +136,22 @@ test('attachEvidencePhoto defaults a missing note to null and stage to "handoff"
 test('attachEvidencePhoto throws a Thai error when the insert fails', async () => {
   state.insertError = { message: 'boom' }
   await expect(attachEvidencePhoto('o1', 'k')).rejects.toThrow('บันทึกรูปไม่สำเร็จ: boom')
+})
+
+test('removeEvidencePhoto deletes the row matched on order_id + r2_key', async () => {
+  await removeEvidencePhoto('o1', 'evidence/o1/u.jpg')
+  expect(state.deletes).toEqual([
+    {
+      table: 'evidence_photos',
+      eqs: [
+        ['order_id', 'o1'],
+        ['r2_key', 'evidence/o1/u.jpg'],
+      ],
+    },
+  ])
+})
+
+test('removeEvidencePhoto throws a Thai error when the delete fails', async () => {
+  state.deleteError = { message: 'boom' }
+  await expect(removeEvidencePhoto('o1', 'k')).rejects.toThrow('ลบรูปไม่สำเร็จ: boom')
 })
