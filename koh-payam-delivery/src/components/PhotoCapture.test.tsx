@@ -199,3 +199,69 @@ test('a failed URL request surfaces its Thai error', async () => {
   await userEvent.upload(input(), pickFile())
   expect(await screen.findByText('ขอลิงก์อัปโหลดรูปไม่สำเร็จ (403)')).toBeInTheDocument()
 })
+
+test('a thumbnail\'s remove button arms a confirm step instead of deleting immediately', async () => {
+  render(<PhotoCapture scope="evidence" orderId="o1" onUploaded={vi.fn()} onRemoved={vi.fn()} />)
+  await userEvent.upload(input(), pickFile())
+  await waitFor(() => expect(screen.getAllByRole('img')).toHaveLength(1))
+
+  await userEvent.click(screen.getByLabelText('ลบรูปนี้'))
+
+  expect(screen.getByText('ลบรูปนี้?')).toBeInTheDocument()
+  expect(screen.getAllByRole('img')).toHaveLength(1) // still there, not removed yet
+})
+
+test('cancelling the confirm step leaves the photo in place', async () => {
+  const onRemoved = vi.fn()
+  render(<PhotoCapture scope="evidence" orderId="o1" onUploaded={vi.fn()} onRemoved={onRemoved} />)
+  await userEvent.upload(input(), pickFile())
+  await waitFor(() => expect(screen.getAllByRole('img')).toHaveLength(1))
+
+  await userEvent.click(screen.getByLabelText('ลบรูปนี้'))
+  await userEvent.click(screen.getByText('ยกเลิก'))
+
+  expect(screen.queryByText('ลบรูปนี้?')).not.toBeInTheDocument()
+  expect(screen.getAllByRole('img')).toHaveLength(1)
+  expect(onRemoved).not.toHaveBeenCalled()
+  expect(screen.getByText('1 รูป')).toBeInTheDocument()
+})
+
+test('confirming remove drops the thumbnail, updates the count, and calls onRemoved with the key', async () => {
+  const onRemoved = vi.fn().mockResolvedValue(undefined)
+  render(<PhotoCapture scope="evidence" orderId="o1" onUploaded={vi.fn()} onRemoved={onRemoved} />)
+  await userEvent.upload(input(), pickFile())
+  await waitFor(() => expect(screen.getByText('1 รูป')).toBeInTheDocument())
+
+  await userEvent.click(screen.getByLabelText('ลบรูปนี้'))
+  await userEvent.click(screen.getByText('ลบ'))
+
+  await waitFor(() => expect(screen.queryAllByRole('img')).toHaveLength(0))
+  expect(screen.getByText('0 รูป')).toBeInTheDocument()
+  expect(onRemoved).toHaveBeenCalledWith('evidence/o1/key-1.jpg')
+})
+
+test('a failed onRemoved puts the photo back and shows a Thai error, matching a failed upload\'s never-lose-state contract', async () => {
+  const onRemoved = vi.fn().mockRejectedValue(new Error('ลบรูปไม่สำเร็จ: boom'))
+  render(<PhotoCapture scope="evidence" orderId="o1" onUploaded={vi.fn()} onRemoved={onRemoved} />)
+  await userEvent.upload(input(), pickFile())
+  await waitFor(() => expect(screen.getByText('1 รูป')).toBeInTheDocument())
+
+  await userEvent.click(screen.getByLabelText('ลบรูปนี้'))
+  await userEvent.click(screen.getByText('ลบ'))
+
+  expect(await screen.findByText('ลบรูปไม่สำเร็จ: boom')).toBeInTheDocument()
+  expect(screen.getAllByRole('img')).toHaveLength(1)
+  expect(screen.getByText('1 รูป')).toBeInTheDocument()
+})
+
+test('removal works locally with no onRemoved prop (e.g. a claim\'s photos, not yet persisted)', async () => {
+  render(<PhotoCapture scope="claim" token="t-1" onUploaded={vi.fn()} />)
+  await userEvent.upload(input(), pickFile())
+  await waitFor(() => expect(screen.getByText('1 รูป')).toBeInTheDocument())
+
+  await userEvent.click(screen.getByLabelText('ลบรูปนี้'))
+  await userEvent.click(screen.getByText('ลบ'))
+
+  await waitFor(() => expect(screen.getByText('0 รูป')).toBeInTheDocument())
+  expect(screen.queryAllByRole('img')).toHaveLength(0)
+})

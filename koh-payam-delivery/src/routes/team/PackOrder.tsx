@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { getOrder, updateOrderStatus } from '../../lib/api/orders'
 import { savePack, listDistinctPackerNames } from '../../lib/api/pack'
-import { attachEvidencePhoto } from '../../lib/api/photos'
+import { attachEvidencePhoto, removeEvidencePhoto } from '../../lib/api/photos'
 import {
   listPendingBackordersForOrder,
   markBackorderFulfilled,
@@ -226,6 +226,10 @@ export default function PackOrder() {
               } catch (e) {
                 setMsg((e as Error).message)
               }
+            }}
+            onRemoved={async (key) => {
+              await removeEvidencePhoto(id!, key)
+              setPackPhotoCount((c) => Math.max(0, c - 1))
             }}
           />
         </section>

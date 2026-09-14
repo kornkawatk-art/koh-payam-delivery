@@ -57,3 +57,25 @@ export async function attachEvidencePhoto(
   })
   if (error) throw new Error('บันทึกรูปไม่สำเร็จ: ' + error.message)
 }
+
+/**
+ * Undo an accidental attach (wrong photo uploaded during pack/pier) — deletes
+ * the evidence_photos row. `evidence_photos`' own `team_write` RLS policy
+ * (0007_hardening.sql, `for all` gated on is_team_member()) already permits
+ * any active team member to delete it; no policy change needed. A
+ * `before delete` trigger on this table (0007_hardening.sql,
+ * tg_queue_r2_key) already queues the row's r2_key into r2_delete_queue, so
+ * the underlying R2 object is cleaned up the same way an order/claim
+ * deletion's photos already are -- this function doesn't need to touch R2
+ * itself. Matched on (order_id, r2_key): each upload gets a fresh
+ * UUID-suffixed key (photo-upload-url), so this can never ambiguously
+ * delete more than the one row the caller means.
+ */
+export async function removeEvidencePhoto(orderId: string, r2Key: string): Promise<void> {
+  const { error } = await supabase
+    .from('evidence_photos')
+    .delete()
+    .eq('order_id', orderId)
+    .eq('r2_key', r2Key)
+  if (error) throw new Error('ลบรูปไม่สำเร็จ: ' + error.message)
+}
