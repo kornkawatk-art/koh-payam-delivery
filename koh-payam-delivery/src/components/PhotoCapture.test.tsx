@@ -265,3 +265,52 @@ test('removal works locally with no onRemoved prop (e.g. a claim\'s photos, not 
   await waitFor(() => expect(screen.getByText('0 รูป')).toBeInTheDocument())
   expect(screen.queryAllByRole('img')).toHaveLength(0)
 })
+
+test('initialPhotos seeds thumbnails on mount, counted toward max and removable like any other photo', async () => {
+  const onRemoved = vi.fn().mockResolvedValue(undefined)
+  render(
+    <PhotoCapture
+      scope="evidence"
+      orderId="o1"
+      max={2}
+      onUploaded={vi.fn()}
+      onRemoved={onRemoved}
+      initialPhotos={[{ key: 'evidence/o1/old.jpg', url: 'https://pub.example/evidence/o1/old.jpg' }]}
+    />,
+  )
+
+  expect(screen.getByText('1 / 2 รูป')).toBeInTheDocument()
+  const img = screen.getByRole('img')
+  expect(img).toHaveAttribute('src', 'https://pub.example/evidence/o1/old.jpg')
+
+  await userEvent.click(screen.getByLabelText('ลบรูปนี้'))
+  await userEvent.click(screen.getByText('ลบ'))
+
+  await waitFor(() => expect(screen.getByText('0 / 2 รูป')).toBeInTheDocument())
+  expect(onRemoved).toHaveBeenCalledWith('evidence/o1/old.jpg')
+})
+
+test('a prop change to initialPhotos after mount is ignored (never re-seeds/clobbers local state)', async () => {
+  const { rerender } = render(
+    <PhotoCapture
+      scope="evidence"
+      orderId="o1"
+      onUploaded={vi.fn()}
+      initialPhotos={[{ key: 'k1', url: 'https://pub.example/k1.jpg' }]}
+    />,
+  )
+  expect(screen.getByText('1 รูป')).toBeInTheDocument()
+
+  rerender(
+    <PhotoCapture
+      scope="evidence"
+      orderId="o1"
+      onUploaded={vi.fn()}
+      initialPhotos={[
+        { key: 'k1', url: 'https://pub.example/k1.jpg' },
+        { key: 'k2', url: 'https://pub.example/k2.jpg' },
+      ]}
+    />,
+  )
+  expect(screen.getByText('1 รูป')).toBeInTheDocument() // still 1, not re-seeded to 2
+})

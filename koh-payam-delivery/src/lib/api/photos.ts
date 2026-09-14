@@ -79,3 +79,27 @@ export async function removeEvidencePhoto(orderId: string, r2Key: string): Promi
     .eq('r2_key', r2Key)
   if (error) throw new Error('ลบรูปไม่สำเร็จ: ' + error.message)
 }
+
+export type ExistingPhoto = { key: string; url: string }
+
+/**
+ * Photos already saved for this order/stage, as `PhotoCapture`'s
+ * `initialPhotos` prop expects (key + a displayable R2 public URL). Used by
+ * screens that don't otherwise fetch per-order evidence_photos rows (e.g.
+ * PierLoad.tsx's order list is a lean column set) -- PackOrder.tsx already
+ * has them via `getOrder()`'s `evidence_photos(*)` and builds this shape
+ * inline instead of calling this.
+ */
+export async function listEvidencePhotos(
+  orderId: string,
+  stage: 'pack' | 'handoff',
+): Promise<ExistingPhoto[]> {
+  const { data, error } = await supabase
+    .from('evidence_photos')
+    .select('r2_key')
+    .eq('order_id', orderId)
+    .eq('stage', stage)
+  if (error) throw new Error('โหลดรูปหลักฐานไม่สำเร็จ: ' + error.message)
+  const base = import.meta.env.VITE_R2_PUBLIC_BASE_URL as string
+  return (data ?? []).map((r: any) => ({ key: r.r2_key, url: `${base}/${r.r2_key}` }))
+}
