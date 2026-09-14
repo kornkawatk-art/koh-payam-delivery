@@ -152,6 +152,14 @@
     @apply bg-danger text-white hover:bg-danger/90;
   }
 
+  .btn-ok {
+    @apply bg-ok text-white hover:bg-ok/90;
+  }
+
+  .btn-warn {
+    @apply bg-warn text-white hover:bg-warn/90;
+  }
+
   .btn-sm {
     @apply min-h-[2.25rem] px-3;
   }

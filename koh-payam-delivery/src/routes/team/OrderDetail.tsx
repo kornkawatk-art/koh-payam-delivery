@@ -1,23 +1,15 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link, useParams, useNavigate } from 'react-router-dom'
-import { getOrder, updateOrderStatus, regenTokenLink, deleteOrder } from '../../lib/api/orders'
+import { getOrder, regenTokenLink, deleteOrder } from '../../lib/api/orders'
 import {
   listRelatedBackordersForOrder,
   type BackorderRow,
 } from '../../lib/api/backorders'
-import { nextStatus, type OrderStatus } from '../../lib/status'
 import { StatusBadge } from '../../components/ui/StatusBadge'
 import { Spinner } from '../../components/ui/Spinner'
 import { ZoomableImage } from '../../components/ui/ZoomableImage'
 import { formatTHB } from '../../lib/format'
 import { useAuth } from '../../lib/auth'
-
-const STATUS_LABEL: Record<OrderStatus, string> = {
-  imported: 'นำเข้าแล้ว',
-  packed: 'แพ็คเสร็จ',
-  at_pier: 'ถึงท่าเรือ',
-  shipped: 'ส่งแล้ว',
-}
 
 export default function OrderDetail() {
   const { id } = useParams()
@@ -48,32 +40,11 @@ export default function OrderDetail() {
   if (!order) return <Spinner />
 
   const link = `${location.origin}/o/${order.link_token}`
-  const next = nextStatus(order.status as OrderStatus)
   const items: any[] = order.order_items ?? []
   const claims: any[] = order.claims ?? []
   const photos: any[] = order.evidence_photos ?? []
   const packPhotos = photos.filter((p) => p.stage === 'pack')
   const handoffPhotos = photos.filter((p) => p.stage !== 'pack')
-  // I4: moving an order to the pier / onto a boat requires a chosen boat AND at
-  // least one handoff evidence photo — both captured on the "ที่ท่าเรือ" screen.
-  // Pack-stage photos do not satisfy this gate.
-  const pierBlocked =
-    (next === 'at_pier' || next === 'shipped') &&
-    !(order.boat_id && handoffPhotos.length >= 1)
-
-  async function advance() {
-    if (!next) return
-    setBusy(true)
-    setMsg(undefined)
-    try {
-      await updateOrderStatus(id!, next)
-      load()
-    } catch (e) {
-      setMsg((e as Error).message)
-    } finally {
-      setBusy(false)
-    }
-  }
 
   async function regen() {
     setBusy(true)
@@ -116,22 +87,6 @@ export default function OrderDetail() {
           </h1>
           <StatusBadge status={order.status} />
         </div>
-        {next && (
-          <div className="flex flex-col items-start gap-1">
-            <button
-              className="btn btn-primary"
-              onClick={advance}
-              disabled={busy || pierBlocked}
-            >
-              เปลี่ยนเป็น {STATUS_LABEL[next]}
-            </button>
-            {pierBlocked && (
-              <p className="muted text-xs">
-                ต้องเลือกเรือและถ่ายรูปหลักฐานที่หน้า "ที่ท่าเรือ" ก่อน
-              </p>
-            )}
-          </div>
-        )}
       </header>
 
       {order.outstanding_amount != null && order.outstanding_amount > 0 && (
@@ -150,11 +105,17 @@ export default function OrderDetail() {
         คนแพ็ค: {order.packer_name || '—'} · คนลงเรือ: {order.pier_name || '—'}
       </p>
 
-      <div className="flex gap-4 text-sm">
-        <Link className="link" to={`/order/${id}/pack`}>
+      <div className="flex flex-col gap-2 sm:flex-row">
+        <Link
+          className="btn btn-ok min-h-[3.25rem] flex-1 text-lg"
+          to={`/order/${id}/pack`}
+        >
           แพ็คของ
         </Link>
-        <Link className="link" to={`/order/${id}/label`}>
+        <Link
+          className="btn btn-warn min-h-[3.25rem] flex-1 text-lg"
+          to={`/order/${id}/label`}
+        >
           ใบเขียนหน้าลัง
         </Link>
       </div>

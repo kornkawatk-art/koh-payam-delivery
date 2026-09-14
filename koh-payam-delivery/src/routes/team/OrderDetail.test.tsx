@@ -4,7 +4,6 @@ import { MemoryRouter, Routes, Route } from 'react-router-dom'
 import OrderDetail from './OrderDetail'
 
 const getOrder = vi.fn()
-const updateOrderStatus = vi.fn().mockResolvedValue(undefined)
 const regenTokenLink = vi.fn().mockResolvedValue('o_new')
 const deleteOrder = vi.fn().mockResolvedValue(undefined)
 const listRelatedBackordersForOrder = vi.fn().mockResolvedValue([])
@@ -12,7 +11,6 @@ const useAuthMock = vi.fn()
 
 vi.mock('../../lib/api/orders', () => ({
   getOrder: (...a: unknown[]) => getOrder(...a),
-  updateOrderStatus: (...a: unknown[]) => updateOrderStatus(...a),
   regenTokenLink: (...a: unknown[]) => regenTokenLink(...a),
   deleteOrder: (...a: unknown[]) => deleteOrder(...a),
 }))
@@ -51,7 +49,6 @@ const order = {
 
 beforeEach(() => {
   getOrder.mockReset().mockResolvedValue(order)
-  updateOrderStatus.mockClear()
   regenTokenLink.mockClear().mockResolvedValue('o_new')
   deleteOrder.mockClear().mockResolvedValue(undefined)
   listRelatedBackordersForOrder.mockReset().mockResolvedValue([])
@@ -79,6 +76,22 @@ test('shows the customer link and copies it to the clipboard', async () => {
   expect(await screen.findByText(link)).toBeInTheDocument()
   await userEvent.click(screen.getByRole('button', { name: 'คัดลอก' }))
   expect(navigator.clipboard.writeText).toHaveBeenCalledWith(link)
+})
+
+test('the manual status-advance button is gone -- แพ็คของ / ใบเขียนหน้าลัง are the only big action buttons, colored green/amber', async () => {
+  renderPage()
+  await screen.findByText(order.customer_name_en, { exact: false })
+  expect(screen.queryByText(/^เปลี่ยนเป็น /)).not.toBeInTheDocument()
+
+  const pack = screen.getByRole('link', { name: 'แพ็คของ' })
+  expect(pack).toHaveAttribute('href', '/order/ord1/pack')
+  expect(pack.className).toContain('btn-ok')
+  expect(pack.className).toContain('text-lg')
+
+  const label = screen.getByRole('link', { name: 'ใบเขียนหน้าลัง' })
+  expect(label).toHaveAttribute('href', '/order/ord1/label')
+  expect(label.className).toContain('btn-warn')
+  expect(label.className).toContain('text-lg')
 })
 
 test('shows the box/piece count summary line', async () => {
@@ -109,33 +122,6 @@ test('renders a Thai error when the order fails to load', async () => {
   expect(await screen.findByText('โหลดออเดอร์ไม่สำเร็จ')).toBeInTheDocument()
 })
 
-test('blocks the pier transition until a boat and an evidence photo exist', async () => {
-  getOrder
-    .mockReset()
-    .mockResolvedValue({ ...order, status: 'packed', boat_id: null, evidence_photos: [] })
-  renderPage()
-  const btn = await screen.findByRole('button', { name: 'เปลี่ยนเป็น ถึงท่าเรือ' })
-  expect(btn).toBeDisabled()
-  expect(
-    screen.getByText('ต้องเลือกเรือและถ่ายรูปหลักฐานที่หน้า "ที่ท่าเรือ" ก่อน'),
-  ).toBeInTheDocument()
-})
-
-test('allows the pier transition once a boat and handoff photo are present', async () => {
-  getOrder.mockReset().mockResolvedValue({
-    ...order,
-    status: 'packed',
-    boat_id: '1',
-    evidence_photos: [{ id: 'p1', r2_key: 'evidence/ord1/a.jpg', stage: 'handoff' }],
-  })
-  renderPage()
-  const btn = await screen.findByRole('button', { name: 'เปลี่ยนเป็น ถึงท่าเรือ' })
-  expect(btn).toBeEnabled()
-  expect(
-    screen.queryByText('ต้องเลือกเรือและถ่ายรูปหลักฐานที่หน้า "ที่ท่าเรือ" ก่อน'),
-  ).not.toBeInTheDocument()
-})
-
 test('shows the collect-cash alert when outstanding_amount > 0', async () => {
   getOrder.mockReset().mockResolvedValue({
     ...order,
@@ -153,21 +139,6 @@ test('hides the collect-cash alert when outstanding_amount is 0 or null', async 
   renderPage()
   await screen.findByText(order.customer_name_en, { exact: false })
   expect(screen.queryByText(/เก็บเงินปลายทาง/)).not.toBeInTheDocument()
-})
-
-test('a pack-stage photo alone does NOT open the pier gate', async () => {
-  getOrder.mockReset().mockResolvedValue({
-    ...order,
-    status: 'packed',
-    boat_id: '1',
-    evidence_photos: [{ id: 'p1', r2_key: 'evidence/ord1/pack.jpg', stage: 'pack' }],
-  })
-  renderPage()
-  const btn = await screen.findByRole('button', { name: 'เปลี่ยนเป็น ถึงท่าเรือ' })
-  expect(btn).toBeDisabled()
-  expect(
-    screen.getByText('ต้องเลือกเรือและถ่ายรูปหลักฐานที่หน้า "ที่ท่าเรือ" ก่อน'),
-  ).toBeInTheDocument()
 })
 
 test('a non-manager does not see the delete button', async () => {
