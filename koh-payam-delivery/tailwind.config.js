@@ -66,6 +66,7 @@ export default {
           rose: { DEFAULT: '#e11d48', soft: '#fff1f2' },
           line: { DEFAULT: '#06c755', soft: '#eafff2' },
           slate: { DEFAULT: '#475569', soft: '#f1f5f9' },
+          violet: { DEFAULT: '#7c3aed', soft: '#f5f3ff' },
         },
       },
       borderRadius: {

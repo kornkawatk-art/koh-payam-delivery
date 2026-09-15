@@ -13,6 +13,7 @@ import ClaimsQueue from './routes/team/ClaimsQueue'
 import ClaimDetail from './routes/team/ClaimDetail'
 import LineContacts from './routes/team/LineContacts'
 import AuditLog from './routes/team/AuditLog'
+import ShortageReport from './routes/team/ShortageReport'
 import OrderDetail from './routes/team/OrderDetail'
 import PackOrder from './routes/team/PackOrder'
 import LabelSheet from './routes/team/LabelSheet'
@@ -117,6 +118,14 @@ export default function App() {
               element={
                 <RequireRole path="/audit-log">
                   <AuditLog />
+                </RequireRole>
+              }
+            />
+            <Route
+              path="/shortage-report"
+              element={
+                <RequireRole path="/shortage-report">
+                  <ShortageReport />
                 </RequireRole>
               }
             />
