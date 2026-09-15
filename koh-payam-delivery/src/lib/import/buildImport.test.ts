@@ -117,7 +117,7 @@ test('buildImport keeps only payam orders that have line items', async () => {
   const { detail, order } = await fixtures()
   const r = buildImport(detail, order, DEFAULT_DETAIL_MAPPING, DEFAULT_ORDER_MAPPING)
 
-  expect(r.orders.map((o) => o.makroOrderNo).sort()).toEqual(['P-001', 'P-002', 'P-003'])
+  expect(r.orders.map((o) => o.makroOrderNo).sort()).toEqual(['P-001', 'P-002', 'P-003', 'P-006'])
   expect(r.skippedNoItems).toEqual(['P-005']) // payam ใน B แต่ไม่มีรายการใน A
   expect(r.skippedNotPayam).toBe(1) // P-004
   expect(r.cancelledLinesDropped).toBe(1) // P-002 line 100005
@@ -144,15 +144,97 @@ test('buildImport drops cancelled lines and re-numbers the rest', async () => {
   expect(p2.items.map((i) => i.lineNo)).toEqual([1, 2])
 })
 
-test('buildImport: shipped < ordered -> isShort with shortageQty from the file column', async () => {
+test('buildImport: weighed-goods tolerance -- a shortfall under 10% on a non-integer shipped qty is not a shortage', async () => {
   const { detail, order } = await fixtures()
   const r = buildImport(detail, order, DEFAULT_DETAIL_MAPPING, DEFAULT_ORDER_MAPPING)
   const p2 = r.orders.find((o) => o.makroOrderNo === 'P-002')!
   const tomato = p2.items.find((i) => i.productName === 'มะเขือเทศสด')!
-  expect(tomato.isShort).toBe(true)
+  // 6 ordered, 5.43 shipped -- shippedQty isn't a whole number (weighed), and
+  // the shortfall (0.57 / 6 = 9.5%) is under the 10% tolerance, so this is
+  // treated as fully shipped despite the file's own non-zero shortage column.
+  expect(tomato.isShort).toBe(false)
   expect(tomato.orderedQty).toBe(6)
   expect(tomato.shippedQty).toBe(5.43)
-  expect(tomato.shortageQty).toBeCloseTo(0.57, 5)
+  expect(tomato.shortageQty).toBe(0)
+})
+
+test('buildImport: shipped < ordered on a counted (integer) qty -> isShort with shortageQty from the file column', async () => {
+  const { detail, order } = await fixtures()
+  const r = buildImport(detail, order, DEFAULT_DETAIL_MAPPING, DEFAULT_ORDER_MAPPING)
+  const p6 = r.orders.find((o) => o.makroOrderNo === 'P-006')!
+  const diapers = p6.items.find((i) => i.productName === 'ผ้าอ้อมเด็ก')!
+  // 10 ordered, 7 shipped -- shippedQty IS a whole number (counted, not
+  // weighed), so the tolerance never applies: any shortfall still counts,
+  // even though 3/10 = 30% is nowhere near a small measurement variance.
+  expect(diapers.isShort).toBe(true)
+  expect(diapers.orderedQty).toBe(10)
+  expect(diapers.shippedQty).toBe(7)
+  expect(diapers.shortageQty).toBe(3)
+})
+
+test('buildImport: weighed-goods tolerance does not apply once the shortfall reaches 10%', async () => {
+  const { detail, order } = await fixtures()
+  const r = buildImport(detail, order, DEFAULT_DETAIL_MAPPING, DEFAULT_ORDER_MAPPING)
+  const p6 = r.orders.find((o) => o.makroOrderNo === 'P-006')!
+  const watermelon = p6.items.find((i) => i.productName === 'แตงโมลูก')!
+  // 6 ordered, 4.8 shipped -- weighed (non-integer), but the shortfall
+  // (1.2 / 6 = 20%) is well past the 10% tolerance, so it still counts as a
+  // real shortage -- the tolerance only forgives small variance, not any
+  // weighed shortfall regardless of size.
+  expect(watermelon.isShort).toBe(true)
+  expect(watermelon.shortageQty).toBeCloseTo(1.2, 5)
+})
+
+test('buildImport: a weighed shortfall right at the 10% boundary still counts as short (boundary is strict <)', () => {
+  const detailRows: RawRow[] = [
+    {
+      'Order Number': 'P-100',
+      'Item Id': '1',
+      'Product Name': 'สินค้าชั่ง',
+      'Order Quantity': '200',
+      'Shipped Quantity': '179.8', // (200 - 179.8) / 200 = 10.1% -- at/just past the 10% line, not < 0.1
+      'Shortage Quantity': '',
+      'Cancelled Quantity': '0',
+    },
+  ]
+  const orderRows: RawRow[] = [
+    {
+      'Order Number': 'P-100',
+      'Customer Name': 'TEST SHOP',
+      'Sub District': 'เกาะพยาม',
+      'Shipping Address': 'test address',
+    },
+  ]
+  const r = buildImport(detailRows, orderRows, DEFAULT_DETAIL_MAPPING, DEFAULT_ORDER_MAPPING)
+  const item = r.orders.find((o) => o.makroOrderNo === 'P-100')!.items[0]
+  expect(item.isShort).toBe(true)
+  expect(item.shortageQty).toBeCloseTo(20.2, 5)
+})
+
+test('buildImport: orderedQty of 0 never triggers the weighed tolerance division', () => {
+  const detailRows: RawRow[] = [
+    {
+      'Order Number': 'P-101',
+      'Item Id': '1',
+      'Product Name': 'สินค้าพิเศษ',
+      'Order Quantity': '0',
+      'Shipped Quantity': '0',
+      'Shortage Quantity': '',
+      'Cancelled Quantity': '0',
+    },
+  ]
+  const orderRows: RawRow[] = [
+    {
+      'Order Number': 'P-101',
+      'Customer Name': 'TEST SHOP',
+      'Sub District': 'เกาะพยาม',
+      'Shipping Address': 'test address',
+    },
+  ]
+  const r = buildImport(detailRows, orderRows, DEFAULT_DETAIL_MAPPING, DEFAULT_ORDER_MAPPING)
+  const item = r.orders.find((o) => o.makroOrderNo === 'P-101')!.items[0]
+  expect(item.isShort).toBe(false)
+  expect(item.shortageQty).toBe(0)
 })
 
 test('buildImport: short line with no shortage column value falls back to ordered - shipped', async () => {

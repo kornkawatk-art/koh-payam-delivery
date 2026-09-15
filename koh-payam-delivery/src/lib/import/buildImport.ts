@@ -257,7 +257,19 @@ export function buildImport(
       cancelledLinesDropped++
       continue
     }
-    const isShort = shippedQty < orderedQty
+    const rawShort = shippedQty < orderedQty
+    // Weighed-goods tolerance: Makro's export carries no unit/UOM column, so
+    // the only reliable signal that a line is sold by weight (as opposed to
+    // counted pieces) is that its actual shipped quantity isn't a whole
+    // number (e.g. 9.2 kg vs 9 ชิ้น) -- confirmed against the real file
+    // format, not guessed. A weighed line's shortfall under 10% of what was
+    // ordered is normal scale/measurement variance, not a real shortage; a
+    // counted line (always a whole number) gets no such tolerance -- any
+    // shortfall there still counts, however small.
+    const isWeighed = !Number.isInteger(shippedQty)
+    const shortfallPct = orderedQty > 0 ? (orderedQty - shippedQty) / orderedQty : 0
+    const withinWeighedTolerance = isWeighed && shortfallPct < 0.1
+    const isShort = rawShort && !withinWeighedTolerance
     // A line that is not short carries no shortage, regardless of the file column.
     let shortageQty = 0
     if (isShort) {

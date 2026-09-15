@@ -31,7 +31,7 @@ test('detectFileKind returns unknown for an unrelated file', () => {
 
 test('parses the order-detail fixture, one row per line keyed by header', async () => {
   const rows = await parseMakroFile(ab('src/test/fixtures/order-detail-sample.csv'))
-  expect(rows).toHaveLength(8)
+  expect(rows).toHaveLength(10)
   expect(detectFileKind(Object.keys(rows[0]))).toBe('detail')
   expect(rows[0]).toMatchObject({
     'Order Number': 'P-001',
@@ -49,7 +49,7 @@ test('parses the order-detail fixture, one row per line keyed by header', async 
 
 test('parses the order-export fixture with the address columns intact', async () => {
   const rows = await parseMakroFile(ab('src/test/fixtures/order-export-sample.csv'))
-  expect(rows).toHaveLength(5)
+  expect(rows).toHaveLength(6)
   expect(detectFileKind(Object.keys(rows[0]))).toBe('order')
   expect(rows[2]).toMatchObject({
     'Order Number': 'P-003',
