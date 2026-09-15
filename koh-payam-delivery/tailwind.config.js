@@ -65,6 +65,7 @@ export default {
           teal: { DEFAULT: '#0d9488', soft: '#f0fdfa' },
           rose: { DEFAULT: '#e11d48', soft: '#fff1f2' },
           line: { DEFAULT: '#06c755', soft: '#eafff2' },
+          slate: { DEFAULT: '#475569', soft: '#f1f5f9' },
         },
       },
       borderRadius: {

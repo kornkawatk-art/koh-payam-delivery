@@ -44,4 +44,10 @@ export const NAV_ACCENT_CLASSES: Record<
     activeBg: 'bg-accent-line-soft',
     activeText: 'text-accent-line',
   },
+  slate: {
+    icon: 'text-accent-slate',
+    chipBg: 'bg-accent-slate-soft',
+    activeBg: 'bg-accent-slate-soft',
+    activeText: 'text-accent-slate',
+  },
 }

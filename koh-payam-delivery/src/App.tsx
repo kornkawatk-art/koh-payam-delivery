@@ -12,6 +12,7 @@ import PierLoad from './routes/team/PierLoad'
 import ClaimsQueue from './routes/team/ClaimsQueue'
 import ClaimDetail from './routes/team/ClaimDetail'
 import LineContacts from './routes/team/LineContacts'
+import AuditLog from './routes/team/AuditLog'
 import OrderDetail from './routes/team/OrderDetail'
 import PackOrder from './routes/team/PackOrder'
 import LabelSheet from './routes/team/LabelSheet'
@@ -108,6 +109,14 @@ export default function App() {
               element={
                 <RequireRole path="/line-contacts">
                   <LineContacts />
+                </RequireRole>
+              }
+            />
+            <Route
+              path="/audit-log"
+              element={
+                <RequireRole path="/audit-log">
+                  <AuditLog />
                 </RequireRole>
               }
             />
