@@ -7,15 +7,17 @@ let ordersData: any[] = []
 let claimsData: any[] = []
 let shipDaysData: any[] = []
 let profilesData: any[] = []
+let ordersError: any = null
 
-function inTable(table: string, dataGetter: () => any[]) {
+function inTable(table: string, dataGetter: () => any[], errorGetter: () => any = () => null) {
   return {
     select: (sel: string) => {
       calls.push(['select', table, sel])
       return {
         in: (col: string, ids: any[]) => {
           calls.push(['in', table, col, ids])
-          return Promise.resolve({ data: dataGetter(), error: null })
+          const err = errorGetter()
+          return Promise.resolve(err ? { data: null, error: err } : { data: dataGetter(), error: null })
         },
       }
     },
@@ -30,21 +32,21 @@ vi.mock('../supabase', () => ({
           return {
             select: (sel: string) => {
               calls.push(['select', table, sel])
-              return {
+              const chain: any = {
                 order: (col: string, opts: any) => {
                   calls.push(['order', col, opts])
-                  return {
-                    limit: (n: number) => {
-                      calls.push(['limit', n])
-                      return Promise.resolve({ data: auditRows, error: auditError })
-                    },
-                  }
+                  return chain
+                },
+                limit: (n: number) => {
+                  calls.push(['limit', n])
+                  return Promise.resolve({ data: auditRows, error: auditError })
                 },
               }
+              return chain
             },
           }
         case 'orders':
-          return inTable(table, () => ordersData)
+          return inTable(table, () => ordersData, () => ordersError)
         case 'claims':
           return inTable(table, () => claimsData)
         case 'ship_days':
@@ -66,19 +68,23 @@ beforeEach(() => {
   claimsData = []
   shipDaysData = []
   profilesData = []
+  ordersError = null
 })
 
 // A single order + profile shared by most row templates below.
 const ORDER = { id: 'o1', makro_order_no: 'PO-1', ship_day_id: 'sd1' }
 const PROFILE = { id: 'u1', name: 'สมชาย' }
 
-test('query shape: selects the right columns, orders created_at desc, caps at 1000', async () => {
+test('query shape: selects the right columns, orders created_at desc then id desc as a tiebreaker, caps at 1000', async () => {
   auditRows = []
   await listAuditLogs()
   const sel = calls.find((c) => c[0] === 'select' && c[1] === 'audit_logs')
   expect(sel[2]).toBe('id, user_id, action, entity_type, entity_id, meta, created_at')
-  const ord = calls.find((c) => c[0] === 'order')
-  expect(ord).toEqual(['order', 'created_at', { ascending: false }])
+  const ordCalls = calls.filter((c) => c[0] === 'order')
+  expect(ordCalls).toEqual([
+    ['order', 'created_at', { ascending: false }],
+    ['order', 'id', { ascending: false }],
+  ])
   const lim = calls.find((c) => c[0] === 'limit')
   expect(lim).toEqual(['limit', 1000])
 })
@@ -530,4 +536,91 @@ test('no lookup queries fire at all when no row in the page needs them', async (
   expect(calls.find((c) => c[0] === 'select' && c[1] === 'claims')).toBeUndefined()
   expect(calls.find((c) => c[0] === 'select' && c[1] === 'ship_days')).toBeUndefined()
   expect(calls.find((c) => c[0] === 'select' && c[1] === 'profiles')).toBeUndefined()
+})
+
+test('a status_change row whose order can no longer be resolved (deleted) shows a Thai placeholder, never a raw id', async () => {
+  profilesData = [PROFILE]
+  ordersData = [] // the order lookup finds nothing -- deleted since
+  auditRows = [
+    {
+      id: 25,
+      user_id: 'u1',
+      action: 'status_change',
+      entity_type: 'order',
+      entity_id: 'o-deleted',
+      meta: { from: 'imported', to: 'packed' },
+      created_at: '2026-09-10T00:00:00.000Z',
+    },
+  ]
+  const rows = await listAuditLogs()
+  expect(rows[0].message).toBe(
+    'เปลี่ยนสถานะออเดอร์ (ออเดอร์ที่ถูกลบ) จาก "นำเข้าแล้ว" → "แพ็คเสร็จ" โดย สมชาย',
+  )
+  expect(rows[0].message).not.toContain('o-deleted')
+})
+
+test('a claim_submitted row whose claim/order can no longer be resolved shows the same Thai placeholder', async () => {
+  claimsData = [] // cascaded away along with its deleted order
+  auditRows = [
+    {
+      id: 26,
+      user_id: null,
+      action: 'claim_submitted',
+      entity_type: 'claim',
+      entity_id: 'c-deleted',
+      meta: { orderId: 'o-deleted' },
+      created_at: '2026-09-10T00:00:00.000Z',
+    },
+  ]
+  const rows = await listAuditLogs()
+  expect(rows[0].message).toBe('ลูกค้ายื่นเคลม — ออเดอร์ (ออเดอร์ที่ถูกลบ)')
+})
+
+test('the orders lookup is split into IN_BATCH_SIZE-sized chunks, not one unbounded .in() call', async () => {
+  const ids = Array.from({ length: 250 }, (_, i) => `o${i}`)
+  ordersData = ids.map((id) => ({ id, makro_order_no: `PO-${id}`, ship_day_id: null }))
+  auditRows = ids.map((id, i) => ({
+    id: 100 + i,
+    user_id: null,
+    action: 'regen_link',
+    entity_type: 'order',
+    entity_id: id,
+    meta: null,
+    created_at: '2026-09-10T00:00:00.000Z',
+  }))
+  const rows = await listAuditLogs()
+  const orderInCalls = calls.filter((c) => c[0] === 'in' && c[1] === 'orders')
+  // 250 ids at IN_BATCH_SIZE=100 -> 3 chunks (100, 100, 50), never one call
+  // with all 250 ids in it (the real risk this guards against: an
+  // oversized PostgREST request-line length on a busy shop's history).
+  expect(orderInCalls).toHaveLength(3)
+  expect(orderInCalls[0][3]).toHaveLength(100)
+  expect(orderInCalls[1][3]).toHaveLength(100)
+  expect(orderInCalls[2][3]).toHaveLength(50)
+  // Every row still resolves correctly regardless of which chunk it fell into.
+  expect(rows[0].message).toBe('สร้างลิงก์ลูกค้าใหม่ให้ออเดอร์ PO-o0')
+  expect(rows[249].message).toBe('สร้างลิงก์ลูกค้าใหม่ให้ออเดอร์ PO-o249')
+})
+
+test('a failed orders lookup chunk is logged and swallowed -- the page still renders with the deleted-order placeholder, not a thrown error', async () => {
+  const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+  try {
+    ordersError = { message: 'boom' }
+    auditRows = [
+      {
+        id: 27,
+        user_id: null,
+        action: 'regen_link',
+        entity_type: 'order',
+        entity_id: 'o1',
+        meta: null,
+        created_at: '2026-09-10T00:00:00.000Z',
+      },
+    ]
+    const rows = await listAuditLogs()
+    expect(rows[0].message).toBe('สร้างลิงก์ลูกค้าใหม่ให้ออเดอร์ (ออเดอร์ที่ถูกลบ)')
+    expect(warnSpy).toHaveBeenCalled()
+  } finally {
+    warnSpy.mockRestore()
+  }
 })

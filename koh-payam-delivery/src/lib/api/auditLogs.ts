@@ -26,6 +26,19 @@ const STATUS_LABEL: Record<string, string> = {
 type OrderLookup = { makro_order_no: string; ship_day_id: string | null }
 type BoatEntry = { id: string; name: string }
 
+// Postgres/PostgREST's request-line length limit means a single .in() with
+// hundreds of UUIDs (very plausible: near the 1000-row cap, a busy shop's
+// order-related actions alone can reference 200+ distinct orders) risks an
+// HTTP 414 that would otherwise silently degrade every affected row to a
+// raw id. Splitting into fixed-size batches keeps each request small
+// regardless of how many distinct ids this page of rows ends up needing.
+const IN_BATCH_SIZE = 100
+function chunk<T>(items: T[], size: number): T[][] {
+  const out: T[][] = []
+  for (let i = 0; i < items.length; i += size) out.push(items.slice(i, i + size))
+  return out
+}
+
 // Every action this app currently writes to audit_logs, and the plain-Thai
 // sentence it renders as -- see task-1-brief.md's template table (verified
 // against every real logAction(...)/raw insert call site). Lookups needed to
@@ -45,8 +58,13 @@ function buildMessage(
   // profile row itself can't be resolved (deleted account).
   const by = r.user_id ? ` โดย ${profileNameById.get(r.user_id) ?? 'ทีมงาน'}` : ''
 
-  const orderNo = (entityId: string) => orderById.get(entityId)?.makro_order_no ?? entityId
-  const claimOrderNo = (entityId: string) => claimOrderNoById.get(entityId) ?? entityId
+  // A raw UUID is never an acceptable fallback here (unlike the profile-name
+  // fallback above, which has a real "ทีมงาน" phrase to reach for) -- the
+  // one real, expected trigger is a manager-deleted order: deleteOrder()
+  // hard-deletes the row (and cascades claims with it) while its own prior
+  // audit_logs rows survive the 30-day retention window.
+  const orderNo = (entityId: string) => orderById.get(entityId)?.makro_order_no ?? '(ออเดอร์ที่ถูกลบ)'
+  const claimOrderNo = (entityId: string) => claimOrderNoById.get(entityId) ?? '(ออเดอร์ที่ถูกลบ)'
 
   switch (r.action) {
     case 'import':
@@ -135,6 +153,9 @@ export async function listAuditLogs(): Promise<AuditLogRow[]> {
     .from('audit_logs')
     .select('id, user_id, action, entity_type, entity_id, meta, created_at')
     .order('created_at', { ascending: false })
+    .order('id', { ascending: false }) // tiebreaker: rows written microseconds
+    // apart (e.g. claim_resolved immediately followed by claim_auto_closed)
+    // would otherwise sort nondeterministically against each other.
     .limit(1000)
   if (error) throw new Error('โหลดประวัติการใช้งานไม่สำเร็จ: ' + error.message)
   const rows = (data ?? []) as RawAuditLogRow[]
@@ -152,24 +173,36 @@ export async function listAuditLogs(): Promise<AuditLogRow[]> {
   }
 
   // One batched query per table actually referenced -- never N+1, and
-  // skipped entirely when this page of rows doesn't need it.
+  // skipped entirely when this page of rows doesn't need it. Each is further
+  // split into IN_BATCH_SIZE-id chunks (see chunk()'s comment) and any
+  // failed chunk is logged and simply left unresolved -- buildMessage's own
+  // fallbacks handle a missing entry, so one bad chunk degrades a few rows'
+  // wording rather than ever throwing out of listAuditLogs entirely.
   const orderById = new Map<string, OrderLookup>()
-  if (orderIds.size > 0) {
-    const { data: orders } = await supabase
+  for (const idsBatch of chunk(Array.from(orderIds), IN_BATCH_SIZE)) {
+    const { data: orders, error: ordersErr } = await supabase
       .from('orders')
       .select('id, makro_order_no, ship_day_id')
-      .in('id', Array.from(orderIds))
+      .in('id', idsBatch)
+    if (ordersErr) {
+      console.warn('listAuditLogs: orders lookup failed', ordersErr)
+      continue
+    }
     for (const o of (orders ?? []) as any[]) {
       orderById.set(o.id, { makro_order_no: o.makro_order_no, ship_day_id: o.ship_day_id })
     }
   }
 
   const claimOrderNoById = new Map<string, string | undefined>()
-  if (claimIds.size > 0) {
-    const { data: claims } = await supabase
+  for (const idsBatch of chunk(Array.from(claimIds), IN_BATCH_SIZE)) {
+    const { data: claims, error: claimsErr } = await supabase
       .from('claims')
       .select('id, orders(makro_order_no)')
-      .in('id', Array.from(claimIds))
+      .in('id', idsBatch)
+    if (claimsErr) {
+      console.warn('listAuditLogs: claims lookup failed', claimsErr)
+      continue
+    }
     for (const c of (claims ?? []) as any[]) {
       claimOrderNoById.set(c.id, c.orders?.makro_order_no)
     }
@@ -183,22 +216,30 @@ export async function listAuditLogs(): Promise<AuditLogRow[]> {
     if (shipDayId) shipDayIds.add(shipDayId)
   }
   const boatsByShipDay = new Map<string, BoatEntry[]>()
-  if (shipDayIds.size > 0) {
-    const { data: shipDays } = await supabase
+  for (const idsBatch of chunk(Array.from(shipDayIds), IN_BATCH_SIZE)) {
+    const { data: shipDays, error: shipDaysErr } = await supabase
       .from('ship_days')
       .select('id, boats')
-      .in('id', Array.from(shipDayIds))
+      .in('id', idsBatch)
+    if (shipDaysErr) {
+      console.warn('listAuditLogs: ship_days lookup failed', shipDaysErr)
+      continue
+    }
     for (const sd of (shipDays ?? []) as any[]) {
       boatsByShipDay.set(sd.id, sd.boats ?? [])
     }
   }
 
   const profileNameById = new Map<string, string>()
-  if (userIds.size > 0) {
-    const { data: profiles } = await supabase
+  for (const idsBatch of chunk(Array.from(userIds), IN_BATCH_SIZE)) {
+    const { data: profiles, error: profilesErr } = await supabase
       .from('profiles')
       .select('id, name')
-      .in('id', Array.from(userIds))
+      .in('id', idsBatch)
+    if (profilesErr) {
+      console.warn('listAuditLogs: profiles lookup failed', profilesErr)
+      continue
+    }
     for (const p of (profiles ?? []) as any[]) {
       profileNameById.set(p.id, p.name)
     }
