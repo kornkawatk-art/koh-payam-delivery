@@ -185,6 +185,58 @@ test('buildImport: weighed-goods tolerance does not apply once the shortfall rea
   expect(watermelon.shortageQty).toBeCloseTo(1.2, 5)
 })
 
+test('buildImport: a weighed shortfall right at the 10% boundary still counts as short (boundary is strict <)', () => {
+  const detailRows: RawRow[] = [
+    {
+      'Order Number': 'P-100',
+      'Item Id': '1',
+      'Product Name': 'สินค้าชั่ง',
+      'Order Quantity': '200',
+      'Shipped Quantity': '179.8', // (200 - 179.8) / 200 = 10.1% -- at/just past the 10% line, not < 0.1
+      'Shortage Quantity': '',
+      'Cancelled Quantity': '0',
+    },
+  ]
+  const orderRows: RawRow[] = [
+    {
+      'Order Number': 'P-100',
+      'Customer Name': 'TEST SHOP',
+      'Sub District': 'เกาะพยาม',
+      'Shipping Address': 'test address',
+    },
+  ]
+  const r = buildImport(detailRows, orderRows, DEFAULT_DETAIL_MAPPING, DEFAULT_ORDER_MAPPING)
+  const item = r.orders.find((o) => o.makroOrderNo === 'P-100')!.items[0]
+  expect(item.isShort).toBe(true)
+  expect(item.shortageQty).toBeCloseTo(20.2, 5)
+})
+
+test('buildImport: orderedQty of 0 never triggers the weighed tolerance division', () => {
+  const detailRows: RawRow[] = [
+    {
+      'Order Number': 'P-101',
+      'Item Id': '1',
+      'Product Name': 'สินค้าพิเศษ',
+      'Order Quantity': '0',
+      'Shipped Quantity': '0',
+      'Shortage Quantity': '',
+      'Cancelled Quantity': '0',
+    },
+  ]
+  const orderRows: RawRow[] = [
+    {
+      'Order Number': 'P-101',
+      'Customer Name': 'TEST SHOP',
+      'Sub District': 'เกาะพยาม',
+      'Shipping Address': 'test address',
+    },
+  ]
+  const r = buildImport(detailRows, orderRows, DEFAULT_DETAIL_MAPPING, DEFAULT_ORDER_MAPPING)
+  const item = r.orders.find((o) => o.makroOrderNo === 'P-101')!.items[0]
+  expect(item.isShort).toBe(false)
+  expect(item.shortageQty).toBe(0)
+})
+
 test('buildImport: short line with no shortage column value falls back to ordered - shipped', async () => {
   const { detail, order } = await fixtures()
   const r = buildImport(detail, order, DEFAULT_DETAIL_MAPPING, DEFAULT_ORDER_MAPPING)
