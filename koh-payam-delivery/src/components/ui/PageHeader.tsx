@@ -5,8 +5,10 @@ import { NAV_ACCENT_CLASSES } from '../../lib/navAccentStyles'
 
 /**
  * Consistent page heading: title on the left, optional controls on the right.
- * `icon`/`accent` are for the 6 top-level NAV destinations only (Dashboard,
- * Import, Boats, Pier, Claims, LINE contacts) -- pass both together to show
+ * `icon`/`accent` are for the top-level NAV destinations only (Dashboard,
+ * Import, Boats, Pier, Claims, LINE contacts, audit log, shortage report --
+ * see `src/lib/roles.ts`'s `NAV` array for the current full list) -- pass
+ * both together to show
  * the same identity color used for that destination in AppShell's sidebar,
  * so a manager recognizes "which section am I in" at a glance. Detail/
  * drill-down pages (order detail, claim detail, pack, label sheet) are not

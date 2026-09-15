@@ -5,6 +5,8 @@ import {
   MapPin,
   Flag,
   ChatCircle,
+  ClockCounterClockwise,
+  ChartBar,
   type Icon,
 } from '@phosphor-icons/react'
 
@@ -13,7 +15,15 @@ export type Role = 'packer' | 'pier' | 'manager'
 // One vivid identity color per destination (defined in tailwind.config.js
 // under `accent`) -- purely decorative wayfinding, never a status/semantic
 // meaning (that stays the ok/warn/danger/info tokens used elsewhere).
-export type NavAccent = 'indigo' | 'emerald' | 'amber' | 'teal' | 'rose' | 'line'
+export type NavAccent =
+  | 'indigo'
+  | 'emerald'
+  | 'amber'
+  | 'teal'
+  | 'rose'
+  | 'line'
+  | 'slate'
+  | 'violet'
 
 export const NAV: { path: string; label: string; roles: Role[]; icon: Icon; accent: NavAccent }[] =
   [
@@ -40,6 +50,20 @@ export const NAV: { path: string; label: string; roles: Role[]; icon: Icon; acce
       roles: ['manager'],
       icon: ChatCircle,
       accent: 'line',
+    },
+    {
+      path: '/audit-log',
+      label: 'ประวัติการใช้งาน',
+      roles: ['manager'],
+      icon: ClockCounterClockwise,
+      accent: 'slate',
+    },
+    {
+      path: '/shortage-report',
+      label: 'รายงานของขาด',
+      roles: ['manager'],
+      icon: ChartBar,
+      accent: 'violet',
     },
   ]
 
