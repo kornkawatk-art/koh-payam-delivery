@@ -68,6 +68,8 @@ const order = {
       qty_shipped: 1.5,
       item_remark: 'แยกถุง',
       status: 'short',
+      is_fresh: null, // pre-feature order -- no Dept data, table stays flat
+      packed: false,
     },
     {
       id: 'i2',
@@ -76,6 +78,8 @@ const order = {
       qty_shipped: 1,
       item_remark: '',
       status: 'ok',
+      is_fresh: null,
+      packed: false,
     },
   ],
 }
@@ -103,7 +107,7 @@ const renderPage = () =>
     </MemoryRouter>,
   )
 
-test('renders the makro items read-only (ordered / shipped / short badge / remark, no inputs)', async () => {
+test('renders the makro items read-only (ordered / shipped / short badge / remark) plus one pack-tick checkbox per line', async () => {
   renderPage()
   expect(await screen.findByText('rice')).toBeInTheDocument()
   // shipped quantity from the file is shown
@@ -113,9 +117,14 @@ test('renders the makro items read-only (ordered / shipped / short badge / remar
   expect(screen.getByText('แยกถุง')).toBeInTheDocument()
   // makro item code shown per line
   expect(screen.getByText('100001')).toBeInTheDocument()
-  // no per-item editing controls
-  expect(screen.queryByRole('checkbox')).not.toBeInTheDocument()
+  // the only per-item control is the pack-tick checkbox, one per line, unchecked
+  const checkboxes = screen.getAllByRole('checkbox')
+  expect(checkboxes).toHaveLength(2)
+  expect(checkboxes.every((c) => !(c as HTMLInputElement).checked)).toBe(true)
   expect(screen.queryByLabelText(/ของขาด/)).not.toBeInTheDocument()
+  // a pre-feature order (is_fresh null on every line) has no fresh/dry headers
+  expect(screen.queryByText(/ของสด/)).not.toBeInTheDocument()
+  expect(screen.queryByText(/ของแห้ง/)).not.toBeInTheDocument()
 })
 
 test('"บันทึก" records the box count via savePack', async () => {
@@ -133,6 +142,10 @@ test('"บันทึก" records the box count via savePack', async () => {
     foamCount: 0,
     pieceCount: 0,
     packerName: '',
+    itemPacked: [
+      { id: 'i1', packed: false },
+      { id: 'i2', packed: false },
+    ],
   })
   expect(updateOrderStatus).not.toHaveBeenCalled()
 })
@@ -158,6 +171,10 @@ test('typing into all three count fields passes the right pieceCount to savePack
     foamCount: 1,
     pieceCount: 5,
     packerName: '',
+    itemPacked: [
+      { id: 'i1', packed: false },
+      { id: 'i2', packed: false },
+    ],
   })
 
   // the read-only total line reflects all three
@@ -184,6 +201,10 @@ test('typing a packer name passes it through to savePack, and the pack gate is u
     foamCount: 0,
     pieceCount: 0,
     packerName: 'สมชาย',
+    itemPacked: [
+      { id: 'i1', packed: false },
+      { id: 'i2', packed: false },
+    ],
   })
 })
 
@@ -221,15 +242,18 @@ const satisfyPackGate = async () => {
       stage: 'pack',
     }),
   )
+  for (const cb of screen.getAllByRole('checkbox')) {
+    await userEvent.click(cb)
+  }
 }
 
-test('"บันทึก + แพ็คเสร็จ" is gated on a pack photo AND at least one box', async () => {
+test('"บันทึก + แพ็คเสร็จ" is gated on a pack photo AND at least one box AND every item ticked', async () => {
   renderPage()
   await screen.findByText('rice')
   const packBtn = screen.getByRole('button', { name: 'บันทึก + แพ็คเสร็จ' })
   expect(packBtn).toBeDisabled()
   expect(
-    screen.getByText('ต้องถ่ายรูปลังที่แพ็คเสร็จอย่างน้อย 1 รูป และกรอกจำนวนลัง/ชิ้นอย่างน้อย 1'),
+    screen.getByText('ต้องถ่ายรูปลังที่แพ็คเสร็จอย่างน้อย 1 รูป กรอกจำนวนลัง/ชิ้นอย่างน้อย 1 และติ๊กสินค้าครบทุกรายการ'),
   ).toBeInTheDocument()
 
   // a box count alone does not open the gate
@@ -238,14 +262,28 @@ test('"บันทึก + แพ็คเสร็จ" is gated on a pack phot
   await userEvent.type(paper, '2')
   expect(packBtn).toBeDisabled()
 
-  // a pack photo as well opens it
+  // a pack photo as well still isn't enough -- items aren't ticked yet
   await userEvent.click(screen.getByRole('button', { name: 'mock-upload' }))
-  await waitFor(() => expect(packBtn).toBeEnabled())
+  await waitFor(() =>
+    expect(attachEvidencePhoto).toHaveBeenCalledWith('ord1', 'evidence/ord1/key-1.jpg', {
+      stage: 'pack',
+    }),
+  )
+  expect(packBtn).toBeDisabled()
+
+  // ticking only one of the two items still isn't enough
+  const [cb1, cb2] = screen.getAllByRole('checkbox')
+  await userEvent.click(cb1)
+  expect(packBtn).toBeDisabled()
+
+  // ticking the last one opens it
+  await userEvent.click(cb2)
+  expect(packBtn).toBeEnabled()
   expect(
-    screen.queryByText('ต้องถ่ายรูปลังที่แพ็คเสร็จอย่างน้อย 1 รูป และกรอกจำนวนลัง/ชิ้นอย่างน้อย 1'),
+    screen.queryByText('ต้องถ่ายรูปลังที่แพ็คเสร็จอย่างน้อย 1 รูป กรอกจำนวนลัง/ชิ้นอย่างน้อย 1 และติ๊กสินค้าครบทุกรายการ'),
   ).not.toBeInTheDocument()
 
-  // plain "บันทึก" is never gated by photos/boxes
+  // plain "บันทึก" is never gated by photos/boxes/ticks
   expect(screen.getByRole('button', { name: 'บันทึก' })).toBeEnabled()
 })
 
@@ -258,10 +296,48 @@ test('a PO with only piece count (no paper/foam boxes) can still satisfy the pac
   const piece = screen.getByLabelText(/จำนวนชิ้น/)
   await userEvent.clear(piece)
   await userEvent.type(piece, '3')
-  expect(packBtn).toBeDisabled() // still needs the pack photo
+  expect(packBtn).toBeDisabled() // still needs the pack photo + item ticks
 
   await userEvent.click(screen.getByRole('button', { name: 'mock-upload' }))
-  await waitFor(() => expect(packBtn).toBeEnabled())
+  await waitFor(() =>
+    expect(attachEvidencePhoto).toHaveBeenCalledWith('ord1', 'evidence/ord1/key-1.jpg', {
+      stage: 'pack',
+    }),
+  )
+  for (const cb of screen.getAllByRole('checkbox')) {
+    await userEvent.click(cb)
+  }
+  expect(packBtn).toBeEnabled()
+})
+
+test('the "เลือกทั้งหมด"/"ล้างทั้งหมด" toggle checks or clears every item at once', async () => {
+  renderPage()
+  await screen.findByText('rice')
+  const toggleBtn = screen.getByRole('button', { name: 'เลือกทั้งหมด' })
+  const checkboxes = () => screen.getAllByRole('checkbox') as HTMLInputElement[]
+  expect(checkboxes().every((c) => !c.checked)).toBe(true)
+
+  await userEvent.click(toggleBtn)
+  expect(checkboxes().every((c) => c.checked)).toBe(true)
+  expect(screen.getByRole('button', { name: 'ล้างทั้งหมด' })).toBeInTheDocument()
+
+  await userEvent.click(screen.getByRole('button', { name: 'ล้างทั้งหมด' }))
+  expect(checkboxes().every((c) => !c.checked)).toBe(true)
+  expect(screen.getByRole('button', { name: 'เลือกทั้งหมด' })).toBeInTheDocument()
+})
+
+test('splits items under "ของสด"/"ของแห้ง" headers once the order carries Dept data', async () => {
+  getOrder.mockReset().mockResolvedValue({
+    ...order,
+    order_items: [
+      { ...order.order_items[0], is_fresh: true },
+      { ...order.order_items[1], is_fresh: false },
+    ],
+  })
+  renderPage()
+  await screen.findByText('rice')
+  expect(screen.getByText('ของสด (1)')).toBeInTheDocument()
+  expect(screen.getByText('ของแห้ง (1)')).toBeInTheDocument()
 })
 
 test('removing the only pack photo calls removeEvidencePhoto(orderId, key) and re-locks the "บันทึก + แพ็คเสร็จ" gate', async () => {
@@ -279,15 +355,33 @@ test('removing the only pack photo calls removeEvidencePhoto(orderId, key) and r
   await waitFor(() => expect(packBtn).toBeDisabled())
 })
 
-test('a revisit seeds the pack-photo count from existing stage:"pack" photos', async () => {
+test('a revisit seeds the pack-photo count AND each item\'s saved "packed" tick', async () => {
   getOrder.mockReset().mockResolvedValue({
     ...order,
     paper_box_count: 1,
     evidence_photos: [{ id: 'e1', r2_key: 'evidence/ord1/a.jpg', stage: 'pack' }],
+    order_items: order.order_items.map((it) => ({ ...it, packed: true })),
   })
   renderPage()
   await screen.findByText('rice')
+  const checkboxes = screen.getAllByRole('checkbox') as HTMLInputElement[]
+  expect(checkboxes.every((c) => c.checked)).toBe(true)
   expect(screen.getByRole('button', { name: 'บันทึก + แพ็คเสร็จ' })).toBeEnabled()
+})
+
+test('a revisit where only some items were previously ticked leaves the pack gate closed', async () => {
+  getOrder.mockReset().mockResolvedValue({
+    ...order,
+    paper_box_count: 1,
+    evidence_photos: [{ id: 'e1', r2_key: 'evidence/ord1/a.jpg', stage: 'pack' }],
+    order_items: [
+      { ...order.order_items[0], packed: true },
+      { ...order.order_items[1], packed: false },
+    ],
+  })
+  renderPage()
+  await screen.findByText('rice')
+  expect(screen.getByRole('button', { name: 'บันทึก + แพ็คเสร็จ' })).toBeDisabled()
 })
 
 test('a revisit also shows the already-saved pack photo as a removable thumbnail (not just a count)', async () => {

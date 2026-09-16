@@ -237,6 +237,78 @@ test('buildImport: orderedQty of 0 never triggers the weighed tolerance division
   expect(item.shortageQty).toBe(0)
 })
 
+// --- isFresh (Dept-based fresh/dry classification) -------------------------
+
+test('buildImport: Dept 1-5 is fresh, Dept 6+ is dry (real fixture rows)', async () => {
+  const { detail, order } = await fixtures()
+  const r = buildImport(detail, order, DEFAULT_DETAIL_MAPPING, DEFAULT_ORDER_MAPPING)
+  const p2 = r.orders.find((o) => o.makroOrderNo === 'P-002')!
+  const eggs = p2.items.find((i) => i.productName === 'ไข่ไก่ เบอร์ 2')! // Dept 5
+  const tomato = p2.items.find((i) => i.productName === 'มะเขือเทศสด')! // Dept 1
+  expect(eggs.isFresh).toBe(true)
+  expect(tomato.isFresh).toBe(true)
+
+  const p3 = r.orders.find((o) => o.makroOrderNo === 'P-003')!
+  const oil = p3.items.find((i) => i.productName === 'น้ำมันพืช 1L')! // Dept 6
+  expect(oil.isFresh).toBe(false)
+
+  const p6 = r.orders.find((o) => o.makroOrderNo === 'P-006')!
+  const diapers = p6.items.find((i) => i.productName === 'ผ้าอ้อมเด็ก')! // Dept 10
+  expect(diapers.isFresh).toBe(false)
+})
+
+test('buildImport: a blank Dept column value defaults to dry, not a crash', async () => {
+  const { detail, order } = await fixtures()
+  const r = buildImport(detail, order, DEFAULT_DETAIL_MAPPING, DEFAULT_ORDER_MAPPING)
+  const p3 = r.orders.find((o) => o.makroOrderNo === 'P-003')!
+  const detergent = p3.items.find((i) => i.productName === 'ผงซักฟอก 3kg')! // Dept blank
+  expect(detergent.isFresh).toBe(false)
+})
+
+test('buildImport: an unmapped Dept column (dm.dept empty) defaults every line to dry', () => {
+  const detailRows: RawRow[] = [
+    {
+      'Order Number': 'P-102',
+      'Item Id': '1',
+      'Product Name': 'สินค้าทดสอบ',
+      'Order Quantity': '5',
+      'Shipped Quantity': '5',
+      'Shortage Quantity': '0',
+      'Cancelled Quantity': '0',
+      Dept: '1', // present in the file, but dm.dept below doesn't point at it
+    },
+  ]
+  const orderRows: RawRow[] = [
+    {
+      'Order Number': 'P-102',
+      'Customer Name': 'TEST SHOP',
+      'Sub District': 'เกาะพยาม',
+      'Shipping Address': 'test address',
+    },
+  ]
+  const r = buildImport(detailRows, orderRows, { ...DEFAULT_DETAIL_MAPPING, dept: '' }, DEFAULT_ORDER_MAPPING)
+  const item = r.orders.find((o) => o.makroOrderNo === 'P-102')!.items[0]
+  expect(item.isFresh).toBe(false)
+})
+
+test('validateMapping: a detail file with every column except Dept -> no problems (soft-optional)', () => {
+  const problems = validateMapping(
+    'detail',
+    [
+      'Order Number',
+      'Item Id',
+      'Product Name',
+      'Order Quantity',
+      'Shipped Quantity',
+      'Shortage Quantity',
+      'Cancelled Quantity',
+      'Item Remark',
+    ],
+    DEFAULT_DETAIL_MAPPING,
+  )
+  expect(problems).toEqual([])
+})
+
 test('buildImport: short line with no shortage column value falls back to ordered - shipped', async () => {
   const { detail, order } = await fixtures()
   const r = buildImport(detail, order, DEFAULT_DETAIL_MAPPING, DEFAULT_ORDER_MAPPING)

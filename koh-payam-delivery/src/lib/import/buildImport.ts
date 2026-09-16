@@ -11,6 +11,7 @@ export type DetailMapping = {
   cancelledQty: string
   itemRemark: string
   itemId: string
+  dept: string
 }
 
 export type OrderMapping = {
@@ -35,6 +36,7 @@ export const DEFAULT_DETAIL_MAPPING: DetailMapping = {
   cancelledQty: 'Cancelled Quantity',
   itemRemark: 'Item Remark',
   itemId: 'Item Id',
+  dept: 'Dept',
 }
 
 export const DEFAULT_ORDER_MAPPING: OrderMapping = {
@@ -59,6 +61,7 @@ export const FIELD_LABELS_DETAIL: Record<keyof DetailMapping, string> = {
   cancelledQty: 'จำนวนที่ยกเลิก',
   itemRemark: 'หมายเหตุรายการ',
   itemId: 'รหัสสินค้า',
+  dept: 'แผนก (Dept)',
 }
 
 export const FIELD_LABELS_ORDER: Record<keyof OrderMapping, string> = {
@@ -96,6 +99,10 @@ const ORDER_SOFT: (keyof OrderMapping)[] = [
   'outstandingAmount',
   'customerPhone',
 ]
+// Dept exists in the real Makro OrderDetailExport but must never block import
+// if a future/older file variant lacks it -- an unclassified line just
+// defaults to dry (see the isFresh computation below), it never blocks.
+const DETAIL_SOFT: (keyof DetailMapping)[] = ['dept']
 
 // --- Parsed shapes ------------------------------------------------------------
 
@@ -108,6 +115,7 @@ export type ParsedItem = {
   itemRemark: string
   lineNo: number
   isShort: boolean
+  isFresh: boolean
 }
 
 export type ParsedOrder = {
@@ -195,6 +203,7 @@ export function validateMapping(
   const problems: string[] = []
   for (const key of Object.keys(labels)) {
     if (kind === 'order' && (ORDER_SOFT as string[]).includes(key)) continue
+    if (kind === 'detail' && (DETAIL_SOFT as string[]).includes(key)) continue
     const col = (m[key] ?? '').trim()
     if (!col) {
       if (required.includes(key)) problems.push(`ยังไม่ได้เลือกคอลัมน์สำหรับ "${labels[key]}"`)
@@ -276,6 +285,16 @@ export function buildImport(
       shortageQty = dm.shortageQty ? toNum(r[dm.shortageQty]) : 0
       if (shortageQty <= 0) shortageQty = Math.max(0, orderedQty - shippedQty)
     }
+    // Fresh/dry: Makro's OrderDetailExport carries a "Dept" column (not
+    // previously mapped) that reliably says which department a line came
+    // from -- verified against a real export file: Dept 1-5 are fruit,
+    // meat, seafood, bakery, and dairy/frozen/noodles (all fresh); Dept 6+
+    // (snacks, dry grocery, drinks, household, pet food, appliances, ...)
+    // are dry. A blank or unparseable Dept (e.g. an appliance line with no
+    // department at all) defaults to dry, not "unknown" -- this is purely
+    // a display grouping, so a safe default beats a third UI state.
+    const deptNum = dm.dept ? Number((r[dm.dept] ?? '').trim()) : NaN
+    const isFresh = Number.isInteger(deptNum) && deptNum >= 1 && deptNum <= 5
     const list = itemsByOrder.get(orderNo) ?? []
     list.push({
       productName: (r[dm.product] ?? '').trim(),
@@ -286,6 +305,7 @@ export function buildImport(
       itemRemark: dm.itemRemark ? (r[dm.itemRemark] ?? '').trim() : '',
       lineNo: list.length + 1,
       isShort,
+      isFresh,
     })
     itemsByOrder.set(orderNo, list)
   }

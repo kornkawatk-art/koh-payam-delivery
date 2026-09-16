@@ -2,6 +2,7 @@ import { savePack } from './pack'
 
 const calls: any[] = []
 const syncShortageBackorders = vi.fn().mockResolvedValue(undefined)
+let itemUpdateError: { message: string } | null = null
 
 vi.mock('./backorders', () => ({
   syncShortageBackorders: (...a: unknown[]) => syncShortageBackorders(...a),
@@ -17,6 +18,10 @@ vi.mock('../supabase', () => ({
           calls.push(['update', t, patch, { [col]: val }])
           return Promise.resolve({ error: null })
         },
+        in: (col: string, vals: any[]) => {
+          calls.push(['update', t, patch, { [col]: vals }])
+          return Promise.resolve({ error: itemUpdateError })
+        },
       }),
     }),
   },
@@ -24,16 +29,18 @@ vi.mock('../supabase', () => ({
 
 beforeEach(() => {
   calls.length = 0
+  itemUpdateError = null
   syncShortageBackorders.mockClear()
 })
 
-test('savePack writes only the box counts + packer name and re-syncs shortage backorders', async () => {
+test('savePack writes only the box counts + packer name and re-syncs shortage backorders when no items are given', async () => {
   const out = await savePack({
     orderId: 'ord1',
     paperCount: 3,
     foamCount: 1,
     pieceCount: 2,
     packerName: 'สมชาย',
+    itemPacked: [],
   })
   expect(out).toBeUndefined()
 
@@ -58,6 +65,7 @@ test('savePack writes packer_name as null when only whitespace is typed', async 
     foamCount: 0,
     pieceCount: 0,
     packerName: '   ',
+    itemPacked: [],
   })
 
   expect(calls).toEqual([
@@ -68,4 +76,53 @@ test('savePack writes packer_name as null when only whitespace is typed', async 
       { id: 'ord1' },
     ],
   ])
+})
+
+test('savePack batches item ticks into one packed=true update and one packed=false update', async () => {
+  await savePack({
+    orderId: 'ord1',
+    paperCount: 1,
+    foamCount: 0,
+    pieceCount: 0,
+    packerName: '',
+    itemPacked: [
+      { id: 'i1', packed: true },
+      { id: 'i2', packed: false },
+      { id: 'i3', packed: true },
+    ],
+  })
+
+  const itemCalls = calls.filter((c) => c[1] === 'order_items')
+  expect(itemCalls).toEqual([
+    ['update', 'order_items', { packed: true }, { id: ['i1', 'i3'] }],
+    ['update', 'order_items', { packed: false }, { id: ['i2'] }],
+  ])
+})
+
+test('savePack skips the packed=true (or =false) call entirely when every item lands in the other bucket', async () => {
+  await savePack({
+    orderId: 'ord1',
+    paperCount: 1,
+    foamCount: 0,
+    pieceCount: 0,
+    packerName: '',
+    itemPacked: [{ id: 'i1', packed: true }],
+  })
+
+  const itemCalls = calls.filter((c) => c[1] === 'order_items')
+  expect(itemCalls).toEqual([['update', 'order_items', { packed: true }, { id: ['i1'] }]])
+})
+
+test('savePack throws a Thai error if the item-packed update fails', async () => {
+  itemUpdateError = { message: 'boom' }
+  await expect(
+    savePack({
+      orderId: 'ord1',
+      paperCount: 1,
+      foamCount: 0,
+      pieceCount: 0,
+      packerName: '',
+      itemPacked: [{ id: 'i1', packed: true }],
+    }),
+  ).rejects.toThrow('บันทึกสถานะแพ็คสินค้าไม่สำเร็จ')
 })

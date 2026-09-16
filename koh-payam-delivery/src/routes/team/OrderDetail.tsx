@@ -41,6 +41,12 @@ export default function OrderDetail() {
 
   const link = `${location.origin}/o/${order.link_token}`
   const items: any[] = order.order_items ?? []
+  // Same fresh/dry split as the pack screen: only shown once this order's
+  // items actually carry Dept data (an order imported before this feature
+  // existed has every line's is_fresh at null and stays flat).
+  const showFreshDrySplit = items.some((it) => it.is_fresh != null)
+  const freshItems = items.filter((it) => it.is_fresh === true)
+  const dryItems = items.filter((it) => it.is_fresh !== true)
   const claims: any[] = order.claims ?? []
   const photos: any[] = order.evidence_photos ?? []
   const packPhotos = photos.filter((p) => p.stage === 'pack')
@@ -142,6 +148,7 @@ export default function OrderDetail() {
           <table className="data-table">
             <thead>
               <tr>
+                <th>แพ็ค</th>
                 <th>รหัสสินค้า</th>
                 <th>สินค้า</th>
                 <th>สั่ง</th>
@@ -151,18 +158,32 @@ export default function OrderDetail() {
               </tr>
             </thead>
             <tbody>
-              {items.map((it) => (
-                <tr key={it.id}>
-                  <td className="tnum">{it.makro_item_id}</td>
-                  <td>{it.product_name}</td>
-                  <td className="tnum">{it.qty_ordered}</td>
-                  <td className="tnum">{it.qty_shipped}</td>
-                  <td>
-                    {it.status === 'short' && <span className="badge badge-warn">ขาด</span>}
-                  </td>
-                  <td>{it.item_remark}</td>
-                </tr>
-              ))}
+              {showFreshDrySplit ? (
+                <>
+                  {freshItems.length > 0 && (
+                    <tr>
+                      <td colSpan={7} className="bg-paper text-xs font-semibold text-ink-soft">
+                        ของสด ({freshItems.length})
+                      </td>
+                    </tr>
+                  )}
+                  {freshItems.map((it) => (
+                    <OrderDetailItemRow key={it.id} item={it} />
+                  ))}
+                  {dryItems.length > 0 && (
+                    <tr>
+                      <td colSpan={7} className="bg-paper text-xs font-semibold text-ink-soft">
+                        ของแห้ง ({dryItems.length})
+                      </td>
+                    </tr>
+                  )}
+                  {dryItems.map((it) => (
+                    <OrderDetailItemRow key={it.id} item={it} />
+                  ))}
+                </>
+              ) : (
+                items.map((it) => <OrderDetailItemRow key={it.id} item={it} />)
+              )}
             </tbody>
           </table>
         </div>
@@ -286,5 +307,27 @@ export default function OrderDetail() {
 
       {msg && <p className="muted">{msg}</p>}
     </div>
+  )
+}
+
+function OrderDetailItemRow({ item: it }: { item: any }) {
+  return (
+    <tr>
+      <td>
+        <input
+          type="checkbox"
+          aria-label={`แพ็คแล้ว: ${it.product_name}`}
+          checked={!!it.packed}
+          disabled
+          readOnly
+        />
+      </td>
+      <td className="tnum">{it.makro_item_id}</td>
+      <td>{it.product_name}</td>
+      <td className="tnum">{it.qty_ordered}</td>
+      <td className="tnum">{it.qty_shipped}</td>
+      <td>{it.status === 'short' && <span className="badge badge-warn">ขาด</span>}</td>
+      <td>{it.item_remark}</td>
+    </tr>
   )
 }
