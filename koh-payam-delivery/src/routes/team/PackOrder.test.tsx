@@ -229,9 +229,7 @@ test('"บันทึก + แพ็คเสร็จ" is gated on a pack phot
   const packBtn = screen.getByRole('button', { name: 'บันทึก + แพ็คเสร็จ' })
   expect(packBtn).toBeDisabled()
   expect(
-    screen.getByText(
-      'ต้องถ่ายรูปลังที่แพ็คเสร็จอย่างน้อย 1 รูป และกรอกจำนวนลังอย่างน้อย 1 ลัง',
-    ),
+    screen.getByText('ต้องถ่ายรูปลังที่แพ็คเสร็จอย่างน้อย 1 รูป และกรอกจำนวนลัง/ชิ้นอย่างน้อย 1'),
   ).toBeInTheDocument()
 
   // a box count alone does not open the gate
@@ -244,13 +242,26 @@ test('"บันทึก + แพ็คเสร็จ" is gated on a pack phot
   await userEvent.click(screen.getByRole('button', { name: 'mock-upload' }))
   await waitFor(() => expect(packBtn).toBeEnabled())
   expect(
-    screen.queryByText(
-      'ต้องถ่ายรูปลังที่แพ็คเสร็จอย่างน้อย 1 รูป และกรอกจำนวนลังอย่างน้อย 1 ลัง',
-    ),
+    screen.queryByText('ต้องถ่ายรูปลังที่แพ็คเสร็จอย่างน้อย 1 รูป และกรอกจำนวนลัง/ชิ้นอย่างน้อย 1'),
   ).not.toBeInTheDocument()
 
   // plain "บันทึก" is never gated by photos/boxes
   expect(screen.getByRole('button', { name: 'บันทึก' })).toBeEnabled()
+})
+
+test('a PO with only piece count (no paper/foam boxes) can still satisfy the pack gate', async () => {
+  renderPage()
+  await screen.findByText('rice')
+  const packBtn = screen.getByRole('button', { name: 'บันทึก + แพ็คเสร็จ' })
+  expect(packBtn).toBeDisabled()
+
+  const piece = screen.getByLabelText(/จำนวนชิ้น/)
+  await userEvent.clear(piece)
+  await userEvent.type(piece, '3')
+  expect(packBtn).toBeDisabled() // still needs the pack photo
+
+  await userEvent.click(screen.getByRole('button', { name: 'mock-upload' }))
+  await waitFor(() => expect(packBtn).toBeEnabled())
 })
 
 test('removing the only pack photo calls removeEvidencePhoto(orderId, key) and re-locks the "บันทึก + แพ็คเสร็จ" gate', async () => {

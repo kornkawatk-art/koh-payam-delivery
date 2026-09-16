@@ -86,8 +86,10 @@ export default function PackOrder() {
   }
 
   // I: marking an order packed needs at least one "packed box" evidence photo
-  // AND at least one box counted. The plain "บันทึก" save stays ungated.
-  const packGateBlocked = !(packPhotoCount >= 1 && paper + foam >= 1)
+  // AND at least one item counted -- some POs ship as loose pieces with no
+  // paper/foam box at all, so the count can come from any of the three
+  // fields. The plain "บันทึก" save stays ungated.
+  const packGateBlocked = !(packPhotoCount >= 1 && paper + foam + piece >= 1)
   // A photo can take real time on a weak connection; block both save actions
   // while one is still uploading so a user can't navigate away mid-upload and
   // think it was lost (it wasn't — it just hadn't landed yet).
@@ -243,7 +245,7 @@ export default function PackOrder() {
             บันทึก
           </button>
           <button
-            className="btn btn-primary"
+            className="btn btn-ok"
             onClick={() => save(true)}
             disabled={saveBlocked || packGateBlocked}
           >
@@ -255,7 +257,7 @@ export default function PackOrder() {
         )}
         {!saveBlocked && packGateBlocked && (
           <p className="muted text-xs">
-            ต้องถ่ายรูปลังที่แพ็คเสร็จอย่างน้อย 1 รูป และกรอกจำนวนลังอย่างน้อย 1 ลัง
+            ต้องถ่ายรูปลังที่แพ็คเสร็จอย่างน้อย 1 รูป และกรอกจำนวนลัง/ชิ้นอย่างน้อย 1
           </p>
         )}
         {msg && <p className="muted">{msg}</p>}

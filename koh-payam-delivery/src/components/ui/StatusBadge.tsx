@@ -2,14 +2,14 @@ import { Tray, Package, MapPin, CheckCircle, type Icon } from '@phosphor-icons/r
 
 const LABEL: Record<string, string> = {
   imported: 'นำเข้าแล้ว',
-  packed: 'แพ็คเสร็จ',
+  packed: 'แพ็คแล้ว',
   at_pier: 'ถึงท่าเรือ',
   shipped: 'ส่งแล้ว',
 }
 
 const TONE: Record<string, string> = {
   imported: 'badge-neutral',
-  packed: 'badge-warn',
+  packed: 'badge-ok',
   at_pier: 'badge-brand',
   shipped: 'badge-ok',
 }
