@@ -41,6 +41,8 @@ const order = {
       qty_shipped: 2,
       status: 'ok',
       item_remark: '',
+      is_fresh: null,
+      packed: false,
     },
   ],
   claims: [],
@@ -105,6 +107,40 @@ test('shows the makro item code per line item', async () => {
   renderPage()
   expect(await screen.findByText('rice')).toBeInTheDocument()
   expect(screen.getByText('100001')).toBeInTheDocument()
+})
+
+test('shows a disabled, read-only pack-tick checkbox per item reflecting its saved "packed" value', async () => {
+  getOrder.mockReset().mockResolvedValue({
+    ...order,
+    order_items: [{ ...order.order_items[0], packed: true }],
+  })
+  renderPage()
+  await screen.findByText('rice')
+  const cb = screen.getByRole('checkbox') as HTMLInputElement
+  expect(cb.checked).toBe(true)
+  expect(cb).toBeDisabled()
+})
+
+test('an order with no Dept data on any item (is_fresh null, or the field simply absent) stays flat -- no ของสด/ของแห้ง headers', async () => {
+  renderPage()
+  await screen.findByText('rice')
+  expect(screen.queryByText(/ของสด/)).not.toBeInTheDocument()
+  expect(screen.queryByText(/ของแห้ง/)).not.toBeInTheDocument()
+})
+
+test('splits items under ของสด/ของแห้ง headers once the order carries Dept data', async () => {
+  getOrder.mockReset().mockResolvedValue({
+    ...order,
+    order_items: [
+      { ...order.order_items[0], id: 'i1', product_name: 'rice', is_fresh: false },
+      { ...order.order_items[0], id: 'i2', product_name: 'tomato', is_fresh: true },
+    ],
+  })
+  renderPage()
+  await screen.findByText('rice')
+  expect(screen.getByText('ของสด (1)')).toBeInTheDocument()
+  expect(screen.getByText('ของแห้ง (1)')).toBeInTheDocument()
+  expect(screen.getByText('tomato')).toBeInTheDocument()
 })
 
 test('"สร้างลิงก์ใหม่" regenerates the token then refetches', async () => {

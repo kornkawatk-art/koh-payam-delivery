@@ -19,6 +19,7 @@ const state = {
   updateData: [{ id: 'o1' }] as any[],
   searchResult: [] as any[],
   searchError: null as null | { message: string },
+  oldItems: [] as any[],
 }
 
 vi.mock('../supabase', () => {
@@ -31,6 +32,11 @@ vi.mock('../supabase', () => {
         // in this file (which is always followed by .in()/.single()/etc.).
         if (col === 'makro_order_no') {
           return Promise.resolve({ data: state.searchResult, error: state.searchError })
+        }
+        // commitImport's packed-carry-forward read: select(...).eq('order_id', ...)
+        // also terminates the chain with no further call.
+        if (col === 'order_id') {
+          return Promise.resolve({ data: state.oldItems, error: null })
         }
         return b
       },
@@ -118,6 +124,7 @@ const parsedOrders = [
         itemRemark: 'r',
         lineNo: 1,
         isShort: true,
+        isFresh: false,
       },
     ],
   },
@@ -135,6 +142,7 @@ beforeEach(() => {
   state.updateData = [{ id: 'o1' }]
   state.searchResult = []
   state.searchError = null
+  state.oldItems = []
   logAction.mockClear()
   linkBackordersToDay.mockClear()
   syncShortageBackorders.mockClear()
@@ -166,6 +174,8 @@ test('fresh import inserts orders + items and counts created', async () => {
     makro_item_id: '100001',
     item_remark: 'r',
     line_no: 1,
+    is_fresh: false,
+    packed: false, // a brand-new order has no prior tick to carry forward
   })
   // A freshly created order's shortage backorders are seeded immediately,
   // not left to wait for someone to first open its pack screen.
@@ -212,6 +222,40 @@ test('re-import of an existing order syncs without touching protected columns', 
   // corrected shipped/shortage number from Makro must not leave a stale
   // (or missing) backorder row behind.
   expect(syncShortageBackorders).toHaveBeenCalledWith('old1')
+})
+
+test('re-import carries the "packed" tick forward for a line matched by makro_item_id', async () => {
+  state.existing = [{ id: 'old1', makro_order_no: 'PO-1' }]
+  state.oldItems = [{ makro_item_id: '100001', product_name: 'old name', packed: true }]
+  await commitImport('2026-10-01', parsedOrders as any)
+  const itemIns = state.inserted.find((i) => i.table === 'order_items')
+  // matched on makro_item_id ('100001') despite the product_name differing
+  // (Makro can rename a product between exports) -- the tick still carries.
+  expect(itemIns.rows[0]).toMatchObject({ makro_item_id: '100001', packed: true })
+})
+
+test('re-import does not carry a tick forward for a line with no matching old row', async () => {
+  state.existing = [{ id: 'old1', makro_order_no: 'PO-1' }]
+  state.oldItems = [{ makro_item_id: '999999', product_name: 'unrelated', packed: true }]
+  await commitImport('2026-10-01', parsedOrders as any)
+  const itemIns = state.inserted.find((i) => i.table === 'order_items')
+  expect(itemIns.rows[0]).toMatchObject({ makro_item_id: '100001', packed: false })
+})
+
+test('re-import skips the carry-forward (defaults to unpacked) when two old rows share the same key', async () => {
+  // A data gap Makro's own export can produce for real (e.g. two old rows
+  // both missing Item Id with the same product name) collapses to one
+  // ambiguous map entry -- must not let either row's tick "win" and leak
+  // onto the new line, since that could silently mark a line as already
+  // packed without it ever being re-verified.
+  state.existing = [{ id: 'old1', makro_order_no: 'PO-1' }]
+  state.oldItems = [
+    { makro_item_id: '100001', product_name: 'a', packed: true },
+    { makro_item_id: '100001', product_name: 'b', packed: true },
+  ]
+  await commitImport('2026-10-01', parsedOrders as any)
+  const itemIns = state.inserted.find((i) => i.table === 'order_items')
+  expect(itemIns.rows[0]).toMatchObject({ makro_item_id: '100001', packed: false })
 })
 
 test('re-import calls syncShortageBackorders for every order, new and synced, before the once-per-day link pass', async () => {
