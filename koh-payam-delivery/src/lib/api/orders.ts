@@ -98,8 +98,22 @@ export async function commitImport(
         .from('order_items')
         .select('makro_item_id,product_name,packed')
         .eq('order_id', existingId)
+      // Skip any key two old rows share (blank makro_item_id + identical
+      // product_name is a real Makro data gap, not just theoretical) -- an
+      // ambiguous match could leak one item's tick onto an unrelated line,
+      // silently letting the pack gate think that line was re-verified when
+      // it wasn't. Losing the carried-forward tick for those rows (falling
+      // back to the column's own default: unpacked) is the safe direction;
+      // a false "already packed" is not.
+      const keyCounts = new Map<string, number>()
+      for (const r of oldItems ?? []) {
+        const k = (r as any).makro_item_id || (r as any).product_name
+        keyCounts.set(k, (keyCounts.get(k) ?? 0) + 1)
+      }
       const packedByKey = new Map<string, boolean>(
-        (oldItems ?? []).map((r: any) => [r.makro_item_id || r.product_name, !!r.packed]),
+        (oldItems ?? [])
+          .filter((r: any) => keyCounts.get(r.makro_item_id || r.product_name) === 1)
+          .map((r: any) => [r.makro_item_id || r.product_name, !!r.packed]),
       )
       const { error: eD } = await supabase.from('order_items').delete().eq('order_id', existingId)
       if (eD) throw new Error(`ล้างรายการของ ${o.makroOrderNo} ไม่สำเร็จ: ${eD.message}`)

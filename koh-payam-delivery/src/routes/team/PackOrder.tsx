@@ -11,6 +11,7 @@ import {
 import PhotoCapture from '../../components/PhotoCapture'
 import { Spinner } from '../../components/ui/Spinner'
 import { PageHeader } from '../../components/ui/PageHeader'
+import { splitFreshDry } from '../../lib/freshDry'
 
 const R2 = import.meta.env.VITE_R2_PUBLIC_BASE_URL as string
 
@@ -112,12 +113,7 @@ export default function PackOrder() {
     setPackedIds((s) => (s.size === items.length ? new Set() : new Set(items.map((it) => it.id))))
   }
 
-  // Fresh/dry split only shows once this order's items actually carry Dept
-  // data -- an order imported before this feature existed has every line's
-  // is_fresh at null and stays flat (see 0020_item_fresh_and_packed.sql).
-  const showFreshDrySplit = items.some((it) => it.is_fresh != null)
-  const freshItems = items.filter((it) => it.is_fresh === true)
-  const dryItems = items.filter((it) => it.is_fresh !== true)
+  const { show: showFreshDrySplit, fresh: freshItems, dry: dryItems } = splitFreshDry(items)
   // A photo can take real time on a weak connection; block both save actions
   // while one is still uploading so a user can't navigate away mid-upload and
   // think it was lost (it wasn't — it just hadn't landed yet).

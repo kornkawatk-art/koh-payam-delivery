@@ -9,6 +9,7 @@ import { StatusBadge } from '../../components/ui/StatusBadge'
 import { Spinner } from '../../components/ui/Spinner'
 import { ZoomableImage } from '../../components/ui/ZoomableImage'
 import { formatTHB } from '../../lib/format'
+import { splitFreshDry } from '../../lib/freshDry'
 import { useAuth } from '../../lib/auth'
 
 export default function OrderDetail() {
@@ -41,12 +42,7 @@ export default function OrderDetail() {
 
   const link = `${location.origin}/o/${order.link_token}`
   const items: any[] = order.order_items ?? []
-  // Same fresh/dry split as the pack screen: only shown once this order's
-  // items actually carry Dept data (an order imported before this feature
-  // existed has every line's is_fresh at null and stays flat).
-  const showFreshDrySplit = items.some((it) => it.is_fresh != null)
-  const freshItems = items.filter((it) => it.is_fresh === true)
-  const dryItems = items.filter((it) => it.is_fresh !== true)
+  const { show: showFreshDrySplit, fresh: freshItems, dry: dryItems } = splitFreshDry(items)
   const claims: any[] = order.claims ?? []
   const photos: any[] = order.evidence_photos ?? []
   const packPhotos = photos.filter((p) => p.stage === 'pack')

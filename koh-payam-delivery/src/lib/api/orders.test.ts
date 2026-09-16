@@ -242,6 +242,22 @@ test('re-import does not carry a tick forward for a line with no matching old ro
   expect(itemIns.rows[0]).toMatchObject({ makro_item_id: '100001', packed: false })
 })
 
+test('re-import skips the carry-forward (defaults to unpacked) when two old rows share the same key', async () => {
+  // A data gap Makro's own export can produce for real (e.g. two old rows
+  // both missing Item Id with the same product name) collapses to one
+  // ambiguous map entry -- must not let either row's tick "win" and leak
+  // onto the new line, since that could silently mark a line as already
+  // packed without it ever being re-verified.
+  state.existing = [{ id: 'old1', makro_order_no: 'PO-1' }]
+  state.oldItems = [
+    { makro_item_id: '100001', product_name: 'a', packed: true },
+    { makro_item_id: '100001', product_name: 'b', packed: true },
+  ]
+  await commitImport('2026-10-01', parsedOrders as any)
+  const itemIns = state.inserted.find((i) => i.table === 'order_items')
+  expect(itemIns.rows[0]).toMatchObject({ makro_item_id: '100001', packed: false })
+})
+
 test('re-import calls syncShortageBackorders for every order, new and synced, before the once-per-day link pass', async () => {
   state.existing = [{ id: 'old1', makro_order_no: 'PO-1' }]
   const twoOrders = [
