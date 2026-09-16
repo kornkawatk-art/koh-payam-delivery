@@ -98,6 +98,15 @@ export default function DailyDashboard() {
       : r
   }, [rows, q])
 
+  // Not-yet-packed orders float to the top so the packing queue for the day
+  // is obvious at a glance; everything past "packed" (packed/at_pier/shipped
+  // -- same grouping as the counts.packed tile above) sinks below a divider.
+  const notPacked = useMemo(() => filtered.filter((o) => o.status === 'imported'), [filtered])
+  const packedOrAhead = useMemo(
+    () => filtered.filter((o) => o.status !== 'imported'),
+    [filtered],
+  )
+
   if (failed)
     return (
       <div className="flex flex-col items-start gap-3">
@@ -212,35 +221,52 @@ export default function DailyDashboard() {
               </tr>
             </thead>
             <tbody>
-              {filtered.map((o) => (
-                <tr key={o.id}>
-                  <td className="whitespace-nowrap">
-                    <Link className="link" to={`/order/${o.id}`}>
-                      {o.makro_order_no}
-                    </Link>
+              {notPacked.length > 0 && (
+                <tr>
+                  <td colSpan={7} className="bg-paper text-xs font-semibold text-ink-soft">
+                    ยังไม่แพ็ค ({notPacked.length})
                   </td>
-                  <td>{o.customer_name_en}</td>
-                  <td>
-                    <StatusBadge status={o.status} />
-                    {o.outstanding_amount > 0 && (
-                      <span className="badge badge-warn ml-1.5">เก็บเงิน</span>
-                    )}
-                    {groupedPhones.has((o.customer_phone ?? '').trim()) && (
-                      <span className="badge badge-neutral ml-1.5">หลาย PO</span>
-                    )}
-                  </td>
-                  <td className="tnum">
-                    {o.paper_box_count + o.foam_box_count + o.piece_count}
-                  </td>
-                  <td className="whitespace-nowrap">{o.boat_id ?? '—'}</td>
-                  <td>{o.packer_name || '—'}</td>
-                  <td>{o.pier_name || '—'}</td>
                 </tr>
+              )}
+              {notPacked.map((o) => (
+                <OrderRow key={o.id} order={o} grouped={groupedPhones.has((o.customer_phone ?? '').trim())} />
+              ))}
+              {packedOrAhead.length > 0 && (
+                <tr>
+                  <td colSpan={7} className="bg-paper text-xs font-semibold text-ink-soft">
+                    แพ็คแล้ว ({packedOrAhead.length})
+                  </td>
+                </tr>
+              )}
+              {packedOrAhead.map((o) => (
+                <OrderRow key={o.id} order={o} grouped={groupedPhones.has((o.customer_phone ?? '').trim())} />
               ))}
             </tbody>
           </table>
         </div>
       )}
     </div>
+  )
+}
+
+function OrderRow({ order: o, grouped }: { order: any; grouped: boolean }) {
+  return (
+    <tr>
+      <td className="whitespace-nowrap">
+        <Link className="link" to={`/order/${o.id}`}>
+          {o.makro_order_no}
+        </Link>
+      </td>
+      <td>{o.customer_name_en}</td>
+      <td>
+        <StatusBadge status={o.status} />
+        {o.outstanding_amount > 0 && <span className="badge badge-warn ml-1.5">เก็บเงิน</span>}
+        {grouped && <span className="badge badge-neutral ml-1.5">หลาย PO</span>}
+      </td>
+      <td className="tnum">{o.paper_box_count + o.foam_box_count + o.piece_count}</td>
+      <td className="whitespace-nowrap">{o.boat_id ?? '—'}</td>
+      <td>{o.packer_name || '—'}</td>
+      <td>{o.pier_name || '—'}</td>
+    </tr>
   )
 }

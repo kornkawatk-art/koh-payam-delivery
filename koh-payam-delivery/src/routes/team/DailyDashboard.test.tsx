@@ -227,6 +227,62 @@ test('shows a หลาย PO badge only on rows sharing a customer_phone with a
   expect(within(row3).queryByText('หลาย PO')).not.toBeInTheDocument()
 })
 
+test('splits the table into "ยังไม่แพ็ค" (not-yet-packed) on top and "แพ็คแล้ว" below, each under its own divider', async () => {
+  vi.mocked(listOrdersForDay).mockResolvedValueOnce([
+    {
+      id: '1',
+      makro_order_no: 'PO-1',
+      customer_name_en: 'ALREADY PACKED',
+      status: 'packed',
+      boat_id: null,
+      paper_box_count: 1,
+      foam_box_count: 0,
+      piece_count: 0,
+      outstanding_amount: 0,
+    },
+    {
+      id: '2',
+      makro_order_no: 'PO-2',
+      customer_name_en: 'NOT PACKED YET',
+      status: 'imported',
+      boat_id: null,
+      paper_box_count: 0,
+      foam_box_count: 0,
+      piece_count: 0,
+      outstanding_amount: 0,
+    },
+    {
+      id: '3',
+      makro_order_no: 'PO-3',
+      customer_name_en: 'ON THE PIER',
+      status: 'at_pier',
+      boat_id: '1',
+      paper_box_count: 2,
+      foam_box_count: 0,
+      piece_count: 0,
+      outstanding_amount: 0,
+    },
+  ])
+  renderPage()
+  await screen.findByText('NOT PACKED YET')
+
+  const table = screen.getByRole('table')
+  const cellText = Array.from(table.querySelectorAll('td, th')).map((c) => c.textContent)
+  const idxNotPackedHeader = cellText.indexOf('ยังไม่แพ็ค (1)')
+  const idxNotPackedYet = cellText.indexOf('NOT PACKED YET')
+  const idxPackedHeader = cellText.indexOf('แพ็คแล้ว (2)')
+  const idxAlreadyPacked = cellText.indexOf('ALREADY PACKED')
+  const idxOnThePier = cellText.indexOf('ON THE PIER')
+
+  expect(idxNotPackedHeader).toBeGreaterThanOrEqual(0)
+  expect(idxPackedHeader).toBeGreaterThanOrEqual(0)
+  // "ยังไม่แพ็ค" section (header + its row) comes entirely before "แพ็คแล้ว"
+  expect(idxNotPackedHeader).toBeLessThan(idxNotPackedYet)
+  expect(idxNotPackedYet).toBeLessThan(idxPackedHeader)
+  expect(idxPackedHeader).toBeLessThan(idxAlreadyPacked)
+  expect(idxPackedHeader).toBeLessThan(idxOnThePier)
+})
+
 test('load fails → Thai error + retry re-invokes the loader', async () => {
   vi.mocked(listOrdersForDay).mockRejectedValueOnce(new Error('nope'))
   renderPage()
