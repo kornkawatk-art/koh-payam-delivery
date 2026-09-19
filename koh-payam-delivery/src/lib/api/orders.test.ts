@@ -2,6 +2,7 @@ import {
   commitImport,
   deleteOrder,
   findOrdersByMakroOrderNo,
+  listOrdersForCustomerDay,
   regenTokenLink,
   setOrderPierName,
   updateOrderStatus,
@@ -20,13 +21,24 @@ const state = {
   searchResult: [] as any[],
   searchError: null as null | { message: string },
   oldItems: [] as any[],
+  customerDayRows: [] as any[],
+  customerDayError: null as null | { message: string },
+  customerDayCalls: [] as any[],
 }
 
 vi.mock('../supabase', () => {
   const builder = (table: string) => {
     const b: any = {
-      select: () => b,
-      eq: (col: string) => {
+      select: (cols?: string) => {
+        state.customerDayCalls.push(['select', table, cols])
+        return b
+      },
+      order: (col: string) => {
+        state.customerDayCalls.push(['order', col])
+        return Promise.resolve({ data: state.customerDayRows, error: state.customerDayError })
+      },
+      eq: (col: string, val?: unknown) => {
+        state.customerDayCalls.push(['eq', col, val])
         // findOrdersByMakroOrderNo awaits select(...).eq('makro_order_no', ...)
         // directly with no further chain call, unlike every other eq() usage
         // in this file (which is always followed by .in()/.single()/etc.).
@@ -143,6 +155,9 @@ beforeEach(() => {
   state.searchResult = []
   state.searchError = null
   state.oldItems = []
+  state.customerDayRows = []
+  state.customerDayError = null
+  state.customerDayCalls = []
   logAction.mockClear()
   linkBackordersToDay.mockClear()
   syncShortageBackorders.mockClear()
@@ -384,4 +399,22 @@ test('findOrdersByMakroOrderNo returns [] (not an error) when nothing matches', 
 test('findOrdersByMakroOrderNo throws a Thai error on a real Supabase error', async () => {
   state.searchError = { message: 'boom' }
   await expect(findOrdersByMakroOrderNo('PO-1')).rejects.toThrow(/ค้นหาออเดอร์ไม่สำเร็จ/)
+})
+
+test('listOrdersForCustomerDay filters by ship date + phone, orders by order number, and embeds items + photos', async () => {
+  state.customerDayRows = [{ id: 'a' }, { id: 'b' }]
+  const rows = await listOrdersForCustomerDay('2026-10-01', '0811111111')
+  expect(rows).toEqual([{ id: 'a' }, { id: 'b' }])
+  const c = state.customerDayCalls
+  expect(c).toContainEqual(['select', 'orders', '*, order_items(*), evidence_photos(*)'])
+  expect(c).toContainEqual(['eq', 'ship_date', '2026-10-01'])
+  expect(c).toContainEqual(['eq', 'customer_phone', '0811111111'])
+  expect(c).toContainEqual(['order', 'makro_order_no'])
+})
+
+test('listOrdersForCustomerDay throws a Thai error on failure', async () => {
+  state.customerDayError = { message: 'boom' }
+  await expect(listOrdersForCustomerDay('2026-10-01', '0811111111')).rejects.toThrow(
+    'โหลดออเดอร์ของลูกค้าไม่สำเร็จ',
+  )
 })

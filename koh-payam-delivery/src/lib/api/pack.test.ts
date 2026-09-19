@@ -1,4 +1,4 @@
-import { savePack } from './pack'
+import { savePack, savePackGroup } from './pack'
 
 const calls: any[] = []
 const syncShortageBackorders = vi.fn().mockResolvedValue(undefined)
@@ -49,7 +49,13 @@ test('savePack writes only the box counts + packer name and re-syncs shortage ba
     [
       'update',
       'orders',
-      { paper_box_count: 3, foam_box_count: 1, piece_count: 2, packer_name: 'สมชาย' },
+      {
+        paper_box_count: 3,
+        foam_box_count: 1,
+        piece_count: 2,
+        packer_name: 'สมชาย',
+        packed_with_order_id: null, // real boxes recorded -> no longer riding on another PO
+      },
       { id: 'ord1' },
     ],
   ])
@@ -72,7 +78,13 @@ test('savePack writes packer_name as null when only whitespace is typed', async 
     [
       'update',
       'orders',
-      { paper_box_count: 1, foam_box_count: 0, piece_count: 0, packer_name: null },
+      {
+        paper_box_count: 1,
+        foam_box_count: 0,
+        piece_count: 0,
+        packer_name: null,
+        packed_with_order_id: null,
+      },
       { id: 'ord1' },
     ],
   ])
@@ -125,4 +137,63 @@ test('savePack throws a Thai error if the item-packed update fails', async () =>
       itemPacked: [{ id: 'i1', packed: true }],
     }),
   ).rejects.toThrow('บันทึกสถานะแพ็คสินค้าไม่สำเร็จ')
+})
+
+test('savePack with zero boxes/pieces leaves packed_with_order_id alone (a plain save must not drop the link)', async () => {
+  await savePack({
+    orderId: 'ord2',
+    paperCount: 0,
+    foamCount: 0,
+    pieceCount: 0,
+    packerName: '',
+    itemPacked: [],
+  })
+  expect(calls).toEqual([
+    ['update', 'orders', { paper_box_count: 0, foam_box_count: 0, piece_count: 0, packer_name: null }, { id: 'ord2' }],
+  ])
+})
+
+test('savePackGroup records boxes on the primary, zeros + links the others, ticks items, syncs every PO', async () => {
+  await savePackGroup({
+    primaryId: 'p1',
+    otherIds: ['p2', 'p3'],
+    paperCount: 3,
+    foamCount: 1,
+    pieceCount: 0,
+    packerName: ' สมชาย ',
+    itemPacked: [
+      { id: 'i1', packed: true },
+      { id: 'i2', packed: true },
+    ],
+  })
+  expect(calls).toEqual([
+    [
+      'update',
+      'orders',
+      { paper_box_count: 3, foam_box_count: 1, piece_count: 0, packer_name: 'สมชาย', packed_with_order_id: null },
+      { id: 'p1' },
+    ],
+    [
+      'update',
+      'orders',
+      { paper_box_count: 0, foam_box_count: 0, piece_count: 0, packer_name: 'สมชาย', packed_with_order_id: 'p1' },
+      { id: ['p2', 'p3'] },
+    ],
+    ['update', 'order_items', { packed: true }, { id: ['i1', 'i2'] }],
+  ])
+  expect(syncShortageBackorders.mock.calls.map((c) => c[0])).toEqual(['p1', 'p2', 'p3'])
+})
+
+test('savePackGroup with no other POs skips the linked-orders update', async () => {
+  await savePackGroup({
+    primaryId: 'p1',
+    otherIds: [],
+    paperCount: 1,
+    foamCount: 0,
+    pieceCount: 0,
+    packerName: '',
+    itemPacked: [],
+  })
+  expect(calls).toHaveLength(1)
+  expect(calls[0][3]).toEqual({ id: 'p1' })
 })

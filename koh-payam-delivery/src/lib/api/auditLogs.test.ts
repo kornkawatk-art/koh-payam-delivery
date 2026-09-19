@@ -256,6 +256,26 @@ test('action: pack_saved', async () => {
   )
 })
 
+test('action: pack_group_saved names the primary order and how many POs were packed together', async () => {
+  ordersData = [ORDER]
+  profilesData = [PROFILE]
+  auditRows = [
+    {
+      id: 70,
+      user_id: 'u1',
+      action: 'pack_group_saved',
+      entity_type: 'order',
+      entity_id: 'o1',
+      meta: { orderIds: ['o1', 'o2', 'o3'], paperCount: 4, foamCount: 0, pieceCount: 2, packerName: 'X' },
+      created_at: '2026-09-10T00:00:00.000Z',
+    },
+  ]
+  const rows = await listAuditLogs()
+  expect(rows[0].message).toBe(
+    'บันทึกแพ็ครวม 3 ออเดอร์ของลูกค้าเดียวกัน (ออเดอร์หลัก PO-1) — ลังกระดาษ 4 · ลังโฟม 0 · ชิ้น 2 โดย สมชาย',
+  )
+})
+
 test('action: claim_submitted resolves the order number via the claims->orders join, no "โดย" clause', async () => {
   claimsData = [{ id: 'c1', orders: { makro_order_no: 'PO-1' } }]
   auditRows = [

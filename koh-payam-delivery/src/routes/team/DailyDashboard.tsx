@@ -3,12 +3,22 @@ import { Link, useNavigate } from 'react-router-dom'
 import { listOrdersForDay } from '../../lib/api/shipDays'
 import { listBackordersForDay, type BackorderRow } from '../../lib/api/backorders'
 import { supabase } from '../../lib/supabase'
-import { House, Package, MapPin, CheckCircle, Warning, QrCode } from '@phosphor-icons/react'
+import {
+  House,
+  Package,
+  MapPin,
+  CheckCircle,
+  Warning,
+  QrCode,
+  CaretDown,
+  CaretRight,
+} from '@phosphor-icons/react'
 import { StatusBadge } from '../../components/ui/StatusBadge'
 import { Spinner } from '../../components/ui/Spinner'
 import { PageHeader } from '../../components/ui/PageHeader'
 import QrOrderScanner from '../../components/QrOrderScanner'
 import { todayLocalISO } from '../../lib/format'
+import { groupByPhone, entryOrders, entryHasUnpacked, type DayEntry } from '../../lib/groupOrders'
 
 export default function DailyDashboard() {
   const navigate = useNavigate()
@@ -67,45 +77,30 @@ export default function DailyDashboard() {
     }
   }, [rows])
 
-  // Orders that share a non-blank customer_phone with at least one other row
-  // in the same day are "grouped" — the customer split one purchase across
-  // multiple POs that ship together. Derived client-side from `rows`, not
-  // `filtered`, so the grouping badge is unaffected by the search box.
-  const groupedPhones = useMemo(() => {
-    const r = rows ?? []
-    const counts = new Map<string, number>()
-    for (const o of r) {
-      const phone = (o.customer_phone ?? '').trim()
-      if (!phone) continue
-      counts.set(phone, (counts.get(phone) ?? 0) + 1)
-    }
-    return new Set(
-      Array.from(counts.entries())
-        .filter(([, count]) => count > 1)
-        .map(([phone]) => phone),
-    )
-  }, [rows])
+  // One entry per customer: POs sharing a phone on this day collapse into a
+  // group row (see groupByPhone). Grouped from ALL rows -- the search box then
+  // keeps any entry with a matching PO, so a group never loses members to it.
+  const entries = useMemo(() => groupByPhone<any>(rows ?? []), [rows])
 
   const filtered = useMemo(() => {
-    const r = rows ?? []
     const s = q.trim().toLowerCase()
     return s
-      ? r.filter(
-          (o) =>
-            o.customer_name_en.toLowerCase().includes(s) ||
-            o.makro_order_no.toLowerCase().includes(s),
+      ? entries.filter((e) =>
+          entryOrders(e).some(
+            (o) =>
+              o.customer_name_en.toLowerCase().includes(s) ||
+              o.makro_order_no.toLowerCase().includes(s),
+          ),
         )
-      : r
-  }, [rows, q])
+      : entries
+  }, [entries, q])
 
-  // Not-yet-packed orders float to the top so the packing queue for the day
+  // Not-yet-packed entries float to the top so the packing queue for the day
   // is obvious at a glance; everything past "packed" (packed/at_pier/shipped
   // -- same grouping as the counts.packed tile above) sinks below a divider.
-  const notPacked = useMemo(() => filtered.filter((o) => o.status === 'imported'), [filtered])
-  const packedOrAhead = useMemo(
-    () => filtered.filter((o) => o.status !== 'imported'),
-    [filtered],
-  )
+  // A customer group stays on top while any of its POs is still just imported.
+  const notPacked = useMemo(() => filtered.filter((e) => entryHasUnpacked(e)), [filtered])
+  const packedOrAhead = useMemo(() => filtered.filter((e) => !entryHasUnpacked(e)), [filtered])
 
   if (failed)
     return (
@@ -228,8 +223,8 @@ export default function DailyDashboard() {
                   </td>
                 </tr>
               )}
-              {notPacked.map((o) => (
-                <OrderRow key={o.id} order={o} grouped={groupedPhones.has((o.customer_phone ?? '').trim())} />
+              {notPacked.map((e) => (
+                <EntryRows key={entryKey(e)} entry={e} date={date} />
               ))}
               {packedOrAhead.length > 0 && (
                 <tr>
@@ -238,8 +233,8 @@ export default function DailyDashboard() {
                   </td>
                 </tr>
               )}
-              {packedOrAhead.map((o) => (
-                <OrderRow key={o.id} order={o} grouped={groupedPhones.has((o.customer_phone ?? '').trim())} />
+              {packedOrAhead.map((e) => (
+                <EntryRows key={entryKey(e)} entry={e} date={date} />
               ))}
             </tbody>
           </table>
@@ -249,10 +244,77 @@ export default function DailyDashboard() {
   )
 }
 
-function OrderRow({ order: o, grouped }: { order: any; grouped: boolean }) {
+function entryKey(e: DayEntry<any>) {
+  return e.kind === 'single' ? e.order.id : `g-${e.phone}`
+}
+
+const uniq = (xs: (string | null | undefined)[]) =>
+  Array.from(new Set(xs.filter((x): x is string => !!x)))
+
+function EntryRows({ entry, date }: { entry: DayEntry<any>; date: string }) {
+  if (entry.kind === 'single') return <OrderRow order={entry.order} />
+  return <GroupRows group={entry} date={date} />
+}
+
+function GroupRows({
+  group,
+  date,
+}: {
+  group: Extract<DayEntry<any>, { kind: 'group' }>
+  date: string
+}) {
+  const [open, setOpen] = useState(false)
+  const os = group.orders
+  const packed = os.filter((o) => o.status !== 'imported').length
+  const boats = uniq(os.map((o) => o.boat_id))
+  return (
+    <>
+      <tr className="bg-brand-soft/40">
+        <td className="whitespace-nowrap">
+          <button
+            type="button"
+            className="inline-flex items-center gap-1.5 font-medium"
+            aria-expanded={open}
+            aria-label={`${open ? 'ยุบ' : 'ขยาย'}ออเดอร์ของ ${group.name}`}
+            onClick={() => setOpen((v) => !v)}
+          >
+            {open ? <CaretDown size={14} aria-hidden="true" /> : <CaretRight size={14} aria-hidden="true" />}
+            <span className="badge badge-brand">{os.length} PO</span>
+          </button>
+        </td>
+        <td>
+          <span className="font-medium">{group.name}</span>
+          <Link
+            className="btn btn-ok btn-sm ml-2"
+            to={`/customer/${date}/${encodeURIComponent(group.phone)}/pack`}
+          >
+            แพ็ครวม
+          </Link>
+        </td>
+        <td>
+          <span className={`badge ${packed === os.length ? 'badge-ok' : 'badge-neutral'}`}>
+            แพ็คแล้ว {packed}/{os.length}
+          </span>
+          {os.some((o) => o.outstanding_amount > 0) && (
+            <span className="badge badge-warn ml-1.5">เก็บเงิน</span>
+          )}
+        </td>
+        <td className="tnum">
+          {os.reduce((n, o) => n + o.paper_box_count + o.foam_box_count + o.piece_count, 0)}
+        </td>
+        <td className="whitespace-nowrap">{boats.length ? boats.join(', ') : '—'}</td>
+        <td>{uniq(os.map((o) => o.packer_name)).join(', ') || '—'}</td>
+        <td>{uniq(os.map((o) => o.pier_name)).join(', ') || '—'}</td>
+      </tr>
+      {open && os.map((o) => <OrderRow key={o.id} order={o} indent />)}
+    </>
+  )
+}
+
+function OrderRow({ order: o, indent }: { order: any; indent?: boolean }) {
   return (
     <tr>
-      <td className="whitespace-nowrap">
+      <td className={`whitespace-nowrap ${indent ? 'pl-8' : ''}`}>
         <Link className="link" to={`/order/${o.id}`}>
           {o.makro_order_no}
         </Link>
@@ -261,7 +323,6 @@ function OrderRow({ order: o, grouped }: { order: any; grouped: boolean }) {
       <td>
         <StatusBadge status={o.status} />
         {o.outstanding_amount > 0 && <span className="badge badge-warn ml-1.5">เก็บเงิน</span>}
-        {grouped && <span className="badge badge-neutral ml-1.5">หลาย PO</span>}
       </td>
       <td className="tnum">{o.paper_box_count + o.foam_box_count + o.piece_count}</td>
       <td className="whitespace-nowrap">{o.boat_id ?? '—'}</td>

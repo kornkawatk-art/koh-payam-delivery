@@ -209,6 +209,20 @@ test('the packer-name subtitle renders on the picker list when present and is ab
   expect(await screen.findByText('คนแพ็ค: สมชาย')).toBeInTheDocument()
 })
 
+test('a PO packed together with another is labelled with that PO on the picker list', async () => {
+  listOrdersForDay.mockReset().mockResolvedValue([
+    { ...orders[0], packed_with: { makro_order_no: 'PO-9' } },
+  ])
+  render(<PierLoad />)
+  expect(await screen.findByText('แพ็ครวมกับ PO-9')).toBeInTheDocument()
+})
+
+test('an ordinary PO shows no packed-together label on the picker list', async () => {
+  render(<PierLoad />)
+  await screen.findByRole('button', { name: /PO-1/ })
+  expect(screen.queryByText(/แพ็ครวมกับ/)).not.toBeInTheDocument()
+})
+
 test('the packer-name subtitle is omitted entirely when packer_name is null', async () => {
   render(<PierLoad />)
   await screen.findByRole('button', { name: /PO-1/ })

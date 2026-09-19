@@ -32,6 +32,7 @@ type PierOrder = {
   payment_method: string | null
   packer_name: string | null
   pier_name: string | null
+  packed_with?: { makro_order_no: string } | null
 }
 
 const ACTIVE = ['packed', 'at_pier']
@@ -159,6 +160,9 @@ export default function PierLoad() {
                 </span>
                 {o.packer_name && (
                   <span className="muted text-xs">คนแพ็ค: {o.packer_name}</span>
+                )}
+                {o.packed_with?.makro_order_no && (
+                  <span className="muted text-xs">แพ็ครวมกับ {o.packed_with.makro_order_no}</span>
                 )}
               </span>
               <span className="badge badge-neutral">

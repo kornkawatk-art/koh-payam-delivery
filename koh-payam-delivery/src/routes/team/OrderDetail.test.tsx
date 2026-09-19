@@ -109,6 +109,24 @@ test('shows the makro item code per line item', async () => {
   expect(screen.getByText('100001')).toBeInTheDocument()
 })
 
+test('a PO packed together with another links to that PO and says where its boxes are recorded', async () => {
+  getOrder.mockReset().mockResolvedValue({
+    ...order,
+    packed_with_order_id: 'ord9',
+    packed_with: { makro_order_no: 'PO-9' },
+  })
+  renderPage()
+  const link = await screen.findByRole('link', { name: 'PO-9' })
+  expect(link).toHaveAttribute('href', '/order/ord9')
+  expect(screen.getByText(/ลัง\/ชิ้น\/รูปตอนแพ็คบันทึกไว้ที่ออเดอร์นั้น/)).toBeInTheDocument()
+})
+
+test('an ordinary PO shows no packed-together notice', async () => {
+  renderPage()
+  await screen.findByText('rice')
+  expect(screen.queryByText(/แพ็ครวมกับออเดอร์/)).not.toBeInTheDocument()
+})
+
 test('shows a disabled, read-only pack-tick checkbox per item reflecting its saved "packed" value', async () => {
   getOrder.mockReset().mockResolvedValue({
     ...order,

@@ -178,53 +178,111 @@ test('shows a เก็บเงิน badge only on rows with outstanding_amoun
   expect(within(row3).queryByText('เก็บเงิน')).not.toBeInTheDocument()
 })
 
-test('shows a หลาย PO badge only on rows sharing a customer_phone with another row', async () => {
-  vi.mocked(listOrdersForDay).mockResolvedValueOnce([
-    {
-      id: '1',
-      makro_order_no: 'PO-1',
-      customer_name_en: 'BLUE VIEW',
-      status: 'packed',
-      boat_id: null,
-      paper_box_count: 2,
-      foam_box_count: 0,
-      piece_count: 0,
-      outstanding_amount: 0,
-      customer_phone: '0826289533',
-    },
-    {
-      id: '2',
-      makro_order_no: 'PO-2',
-      customer_name_en: 'BLUE VIEW ANNEX',
-      status: 'packed',
-      boat_id: null,
-      paper_box_count: 1,
-      foam_box_count: 1,
-      piece_count: 0,
-      outstanding_amount: 0,
-      customer_phone: '0826289533',
-    },
-    {
-      id: '3',
-      makro_order_no: 'PO-3',
-      customer_name_en: 'SUNSET',
-      status: 'shipped',
-      boat_id: '1',
-      paper_box_count: 3,
-      foam_box_count: 0,
-      piece_count: 0,
-      outstanding_amount: 0,
-      customer_phone: null,
-    },
-  ])
+const groupOrders = () => [
+  {
+    id: '1',
+    makro_order_no: 'PO-1',
+    customer_name_en: 'BLUE VIEW',
+    status: 'packed',
+    boat_id: null,
+    paper_box_count: 2,
+    foam_box_count: 0,
+    piece_count: 0,
+    outstanding_amount: 0,
+    customer_phone: '0826289533',
+    packer_name: 'สมชาย',
+  },
+  {
+    id: '2',
+    makro_order_no: 'PO-2',
+    customer_name_en: 'BLUE VIEW ANNEX',
+    status: 'imported',
+    boat_id: null,
+    paper_box_count: 0,
+    foam_box_count: 0,
+    piece_count: 3,
+    outstanding_amount: 100,
+    customer_phone: '0826289533',
+  },
+  {
+    id: '3',
+    makro_order_no: 'PO-3',
+    customer_name_en: 'SUNSET',
+    status: 'shipped',
+    boat_id: '1',
+    paper_box_count: 3,
+    foam_box_count: 0,
+    piece_count: 0,
+    outstanding_amount: 0,
+    customer_phone: null,
+  },
+]
+
+test('POs sharing a customer_phone collapse into one group row (N PO, progress, summed boxes) with a link to the combined pack page', async () => {
+  vi.mocked(listOrdersForDay).mockResolvedValueOnce(groupOrders())
   renderPage()
-  await screen.findByText('BLUE VIEW')
-  const row1 = screen.getByText('PO-1').closest('tr')!
-  const row2 = screen.getByText('PO-2').closest('tr')!
-  const row3 = screen.getByText('PO-3').closest('tr')!
-  expect(within(row1).getByText('หลาย PO')).toBeInTheDocument()
-  expect(within(row2).getByText('หลาย PO')).toBeInTheDocument()
-  expect(within(row3).queryByText('หลาย PO')).not.toBeInTheDocument()
+  await screen.findByText('SUNSET')
+  const badge = screen.getByText('2 PO')
+  const row = badge.closest('tr')!
+  expect(within(row).getByText('แพ็คแล้ว 1/2')).toBeInTheDocument()
+  expect(within(row).getByText('เก็บเงิน')).toBeInTheDocument()
+  expect(within(row).getByText('5')).toBeInTheDocument() // PO-1: 2 boxes, PO-2: 3 pieces
+  expect(within(row).getByRole('link', { name: 'แพ็ครวม' })).toHaveAttribute(
+    'href',
+    expect.stringMatching(/^\/customer\/\d{4}-\d{2}-\d{2}\/0826289533\/pack$/),
+  )
+  // collapsed by default: the member POs are hidden, the lone PO-3 is a normal row
+  expect(screen.queryByRole('link', { name: 'PO-1' })).not.toBeInTheDocument()
+  expect(screen.getByRole('link', { name: 'PO-3' })).toBeInTheDocument()
+})
+
+test('expanding a group shows its member POs with links to their own detail pages', async () => {
+  vi.mocked(listOrdersForDay).mockResolvedValueOnce(groupOrders())
+  renderPage()
+  await screen.findByText('SUNSET')
+  await userEvent.click(screen.getByRole('button', { name: /ขยายออเดอร์ของ/ }))
+  expect(screen.getByRole('link', { name: 'PO-1' })).toHaveAttribute('href', '/order/1')
+  expect(screen.getByRole('link', { name: 'PO-2' })).toHaveAttribute('href', '/order/2')
+  await userEvent.click(screen.getByRole('button', { name: /ยุบออเดอร์ของ/ }))
+  expect(screen.queryByRole('link', { name: 'PO-1' })).not.toBeInTheDocument()
+})
+
+test('a group stays under "ยังไม่แพ็ค" while any PO is still imported, and moves to "แพ็คแล้ว" once all are past it', async () => {
+  vi.mocked(listOrdersForDay).mockResolvedValueOnce(groupOrders())
+  const { unmount } = renderPage()
+  await screen.findByText('SUNSET')
+  let cells = Array.from(screen.getByRole('table').querySelectorAll('td, th')).map((c) => c.textContent)
+  expect(cells.indexOf('ยังไม่แพ็ค (1)')).toBeLessThan(cells.findIndex((c) => c?.includes('2 PO')))
+  expect(cells.findIndex((c) => c?.includes('2 PO'))).toBeLessThan(cells.indexOf('แพ็คแล้ว (1)'))
+  unmount()
+
+  vi.mocked(listOrdersForDay).mockResolvedValueOnce(
+    groupOrders().map((o) => (o.id === '2' ? { ...o, status: 'packed' } : o)),
+  )
+  renderPage()
+  await screen.findByText('SUNSET')
+  cells = Array.from(screen.getByRole('table').querySelectorAll('td, th')).map((c) => c.textContent)
+  expect(cells.indexOf('ยังไม่แพ็ค (1)')).toBe(-1)
+  expect(cells.indexOf('แพ็คแล้ว (2)')).toBeGreaterThanOrEqual(0)
+})
+
+test('searching a member PO number keeps the whole group visible', async () => {
+  vi.mocked(listOrdersForDay).mockResolvedValueOnce(groupOrders())
+  renderPage()
+  await screen.findByText('SUNSET')
+  await userEvent.type(screen.getByPlaceholderText(/ค้นหาชื่อลูกค้า/), 'PO-2')
+  expect(screen.getByText('2 PO')).toBeInTheDocument()
+  expect(screen.queryByText('SUNSET')).not.toBeInTheDocument()
+})
+
+test('orders with a blank phone are never grouped, even with the same customer name', async () => {
+  vi.mocked(listOrdersForDay).mockResolvedValueOnce(
+    groupOrders().map((o) => ({ ...o, customer_phone: '', customer_name_en: 'SAME' })),
+  )
+  renderPage()
+  await screen.findByRole('link', { name: 'PO-1' })
+  expect(screen.queryByText(/\d+ PO$/)).not.toBeInTheDocument()
+  expect(screen.getByRole('link', { name: 'PO-2' })).toBeInTheDocument()
 })
 
 test('splits the table into "ยังไม่แพ็ค" (not-yet-packed) on top and "แพ็คแล้ว" below, each under its own divider', async () => {

@@ -30,7 +30,7 @@ test('queries the orders table filtered by ship_date', async () => {
   const rows = await listOrdersForDay('2026-10-01')
   expect(from).toHaveBeenCalledWith('orders')
   expect(select).toHaveBeenCalledWith(
-    'id,makro_order_no,customer_name_en,status,boat_id,paper_box_count,foam_box_count,piece_count,sub_district,outstanding_amount,payment_method,customer_phone,packer_name,pier_name',
+    'id,makro_order_no,customer_name_en,status,boat_id,paper_box_count,foam_box_count,piece_count,sub_district,outstanding_amount,payment_method,customer_phone,packer_name,pier_name,packed_with_order_id,packed_with:orders!packed_with_order_id(makro_order_no)',
   )
   expect(eq).toHaveBeenCalledWith('ship_date', '2026-10-01')
   expect(rows).toEqual([{ id: '1' }])

@@ -15,7 +15,7 @@ import { splitFreshDry } from '../../lib/freshDry'
 
 const R2 = import.meta.env.VITE_R2_PUBLIC_BASE_URL as string
 
-type ItemState = {
+export type ItemState = {
   id: string
   product_name: string
   makro_item_id: string | null
@@ -327,14 +327,20 @@ export default function PackOrder() {
   )
 }
 
-function PackItemRow({
+export function PackItemRow({
   item: it,
   checked,
   onToggle,
+  orderNo,
+  disabled,
 }: {
   item: ItemState
   checked: boolean
   onToggle: (id: string) => void
+  // Combined pack page only: which PO this line came from, and whether it is
+  // read-only because that PO is already packed.
+  orderNo?: string
+  disabled?: boolean
 }) {
   return (
     <tr>
@@ -343,9 +349,13 @@ function PackItemRow({
           type="checkbox"
           aria-label={`แพ็คแล้ว: ${it.product_name}`}
           checked={checked}
+          disabled={disabled}
           onChange={() => onToggle(it.id)}
         />
       </td>
+      {orderNo !== undefined && (
+        <td className="whitespace-nowrap text-xs text-ink-soft">{orderNo}</td>
+      )}
       <td className="tnum">{it.makro_item_id}</td>
       <td>{it.product_name}</td>
       <td className="tnum">{it.qty_ordered}</td>
