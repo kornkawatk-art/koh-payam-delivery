@@ -38,6 +38,8 @@ export default function PierGroup({
   // handoff photo keys already recorded on each PO
   const [photoKeys, setPhotoKeys] = useState<Record<string, string[]>>({})
   const [photoBusy, setPhotoBusy] = useState(false)
+  // per-PO evidence inserts still in flight (PhotoCapture does not await onUploaded)
+  const [attaching, setAttaching] = useState(0)
   const [pierName, setPierName] = useState('')
   const [pierNames, setPierNames] = useState<string[]>([])
   const [msg, setMsg] = useState<string>()
@@ -85,48 +87,64 @@ export default function PierGroup({
       ? ready[0].boat_id
       : null
   const outstanding = ready.reduce((n, o) => n + (o.outstanding_amount > 0 ? o.outstanding_amount : 0), 0)
-  const canShip = ready.length > 0 && !!boatId && allKeys.length >= 1 && !photoBusy && !busy
+  const canShip =
+    ready.length > 0 && !!boatId && allKeys.length >= 1 && !photoBusy && attaching === 0 && !busy
 
   async function chooseBoat(id: string) {
     setMsg(undefined)
     try {
       const n = await setOrderBoats(readyIds, id)
+      if (n < readyIds.length) {
+        // Some POs were shipped/changed elsewhere: re-read the truth instead of
+        // marking every local PO as on this boat.
+        setMsg(`เลือกเรือให้ได้ ${n} จาก ${readyIds.length} ออเดอร์ (บางออเดอร์ถูกส่งไปแล้ว)`)
+        setOrders(await listOrdersForCustomerDay(date, phone))
+        return
+      }
       setOrders((os) =>
         (os ?? []).map((o) => (READY.includes(o.status) ? { ...o, boat_id: id, status: 'at_pier' } : o)),
       )
-      if (n < readyIds.length)
-        setMsg(`เลือกเรือให้ได้ ${n} จาก ${readyIds.length} ออเดอร์ (บางออเดอร์ถูกส่งไปแล้ว) กรุณาโหลดหน้าใหม่`)
     } catch (e) {
       setMsg((e as Error).message)
     }
   }
 
-  async function addPhoto(key: string) {
-    const failedNos: string[] = []
-    for (const o of ready) {
-      try {
-        await attachEvidencePhoto(o.id, key, { stage: 'handoff' })
-        setPhotoKeys((k) => ({ ...k, [o.id]: [...(k[o.id] ?? []), key] }))
-      } catch {
-        failedNos.push(o.makro_order_no)
-      }
-    }
-    if (failedNos.length > 0)
-      setMsg(`แนบรูปให้ ${failedNos.join(', ')} ไม่สำเร็จ — ระบบจะลองแนบซ้ำตอนกดส่งขึ้นเรือ`)
+  function recordKey(orderId: string, key: string) {
+    setPhotoKeys((k) => ({ ...k, [orderId]: [...(k[orderId] ?? []).filter((x) => x !== key), key] }))
   }
 
+  async function addPhoto(key: string) {
+    setAttaching((n) => n + 1)
+    try {
+      const failedNos: string[] = []
+      for (const o of ready) {
+        try {
+          await attachEvidencePhoto(o.id, key, { stage: 'handoff' })
+          recordKey(o.id, key)
+        } catch {
+          failedNos.push(o.makro_order_no)
+        }
+      }
+      if (failedNos.length === ready.length) setMsg('แนบรูปไม่สำเร็จ กรุณาลบรูปนี้แล้วถ่ายใหม่')
+      else if (failedNos.length > 0)
+        setMsg(`แนบรูปให้ ${failedNos.join(', ')} ไม่สำเร็จ — ระบบจะลองแนบซ้ำตอนกดส่งขึ้นเรือ`)
+    } finally {
+      setAttaching((n) => n - 1)
+    }
+  }
+
+  // Forget the key only on the POs where the delete actually succeeded, so the
+  // local state never claims a photo is gone while the database still has it.
   async function dropPhoto(key: string) {
     let firstError: Error | null = null
     for (const o of ready) {
       try {
         await removeEvidencePhoto(o.id, key)
+        setPhotoKeys((k) => ({ ...k, [o.id]: (k[o.id] ?? []).filter((x) => x !== key) }))
       } catch (e) {
         firstError = firstError ?? (e as Error)
       }
     }
-    setPhotoKeys((k) =>
-      Object.fromEntries(Object.entries(k).map(([id, keys]) => [id, keys.filter((x) => x !== key)])),
-    )
     if (firstError) throw firstError
   }
 
@@ -139,8 +157,10 @@ export default function PierGroup({
       // attach that failed earlier), so every order link shows the full set.
       for (const o of ready)
         for (const key of allKeys)
-          if (!(photoKeys[o.id] ?? []).includes(key))
+          if (!(photoKeys[o.id] ?? []).includes(key)) {
             await attachEvidencePhoto(o.id, key, { stage: 'handoff' })
+            recordKey(o.id, key) // so a retry after a later failure never inserts it twice
+          }
       for (const o of ready) {
         await setOrderPierName(o.id, pierName)
         await updateOrderStatus(o.id, 'shipped')
@@ -149,7 +169,7 @@ export default function PierGroup({
       onShipped(`ส่งขึ้นเรือแล้ว ${done.length} ออเดอร์ของ ${customerName}`)
     } catch (e) {
       setMsg(
-        `ส่งขึ้นเรือแล้ว ${done.length}/${ready.length} ออเดอร์ แล้วเกิดข้อผิดพลาด: ${(e as Error).message} — กดส่งขึ้นเรือแล้วอีกครั้งเพื่อทำต่อ`,
+        `ส่งขึ้นเรือแล้ว ${done.length} ออเดอร์ (เหลืออีก ${ready.length - done.length}) แล้วเกิดข้อผิดพลาด: ${(e as Error).message} — กดส่งขึ้นเรือแล้วอีกครั้งเพื่อทำต่อ`,
       )
       setOrders((os) => (os ?? []).map((o) => (done.includes(o.id) ? { ...o, status: 'shipped' } : o)))
     } finally {
@@ -250,7 +270,7 @@ export default function PierGroup({
           >
             ส่งขึ้นเรือแล้ว ({ready.length} ออเดอร์)
           </button>
-          {photoBusy && (
+          {(photoBusy || attaching > 0) && (
             <p className="muted text-xs">กำลังอัปโหลดรูป กรุณารอสักครู่ก่อนส่งขึ้นเรือ</p>
           )}
         </>

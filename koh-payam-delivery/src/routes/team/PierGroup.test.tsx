@@ -41,7 +41,7 @@ vi.mock('../../components/PhotoCapture', () => ({
         <img key={p.key} src={p.url} alt="รูปที่อัปโหลด" />
       ))}
       <button onClick={() => onUploaded('evidence/new.jpg')}>mock-upload</button>
-      <button onClick={() => void onRemoved?.('evidence/a.jpg')}>mock-remove</button>
+      <button onClick={() => void Promise.resolve(onRemoved?.('evidence/a.jpg')).catch(() => {})}>mock-remove</button>
       <button onClick={() => onBusyChange?.(true)}>mock-photo-busy</button>
     </>
   ),
@@ -206,7 +206,7 @@ test('a failure part-way reports how many were shipped and a retry only handles 
   await screen.findByText('PO-1')
   await readyForShip()
   await userEvent.click(screen.getByRole('button', { name: /ส่งขึ้นเรือแล้ว/ }))
-  expect(await screen.findByText(/ส่งขึ้นเรือแล้ว 1\/2 ออเดอร์ แล้วเกิดข้อผิดพลาด: boom/)).toBeInTheDocument()
+  expect(await screen.findByText(/ส่งขึ้นเรือแล้ว 1 ออเดอร์ \(เหลืออีก 1\) แล้วเกิดข้อผิดพลาด: boom/)).toBeInTheDocument()
   expect(onShipped).not.toHaveBeenCalled()
 
   // PO-1 is out of the group now; PO-2 is what's left
@@ -264,4 +264,94 @@ test('shows a Thai error when loading fails, and "back" calls onBack', async () 
   await screen.findByText('PO-1')
   await userEvent.click(screen.getByRole('button', { name: '← กลับ' }))
   expect(onBack).toHaveBeenCalled()
+})
+
+test('a ship retry after a failure does NOT insert a top-up photo a second time', async () => {
+  listOrdersForCustomerDay.mockResolvedValue(
+    orders().map((o) =>
+      o.id === 'o1'
+        ? { ...o, boat_id: '2', status: 'at_pier', evidence_photos: [{ id: 'e', r2_key: 'evidence/a.jpg', stage: 'handoff' }] }
+        : o.id === 'o2'
+          ? { ...o, boat_id: '2', status: 'at_pier' } // needs the top-up
+          : o,
+    ),
+  )
+  // first attempt: o1 ships, then o2's pier name fails -> retry
+  setOrderPierName
+    .mockReset()
+    .mockResolvedValueOnce(undefined)
+    .mockRejectedValueOnce(new Error('boom'))
+    .mockResolvedValue(undefined)
+  renderPanel()
+  await screen.findByText('PO-1')
+  await userEvent.click(screen.getByRole('button', { name: /ส่งขึ้นเรือแล้ว/ }))
+  expect(await screen.findByText(/แล้วเกิดข้อผิดพลาด: boom/)).toBeInTheDocument()
+  expect(attachEvidencePhoto).toHaveBeenCalledTimes(1) // (o2, a.jpg) topped up once
+  await userEvent.click(screen.getByRole('button', { name: /ส่งขึ้นเรือแล้ว/ }))
+  await waitFor(() => expect(onShipped).toHaveBeenCalled())
+  expect(attachEvidencePhoto).toHaveBeenCalledTimes(1) // still once: not duplicated on retry
+})
+
+test('ship stays disabled while the per-PO photo inserts of a fresh upload are still in flight', async () => {
+  const releases: (() => void)[] = []
+  attachEvidencePhoto.mockReset().mockImplementation(
+    () => new Promise<void>((res) => releases.push(res)),
+  )
+  renderPanel()
+  await screen.findByText('PO-1')
+  await userEvent.click(screen.getByRole('button', { name: 'เรือ 2' }))
+  await waitFor(() => expect(setOrderBoats).toHaveBeenCalled())
+  await userEvent.click(screen.getByRole('button', { name: 'mock-upload' }))
+  await waitFor(() => expect(releases).toHaveLength(1)) // o1's insert pending
+  expect(screen.getByRole('button', { name: /ส่งขึ้นเรือแล้ว/ })).toBeDisabled()
+  releases[0]() // o1 done -> o2 starts
+  await waitFor(() => expect(releases).toHaveLength(2))
+  expect(screen.getByRole('button', { name: /ส่งขึ้นเรือแล้ว/ })).toBeDisabled() // o2 still pending
+  releases[1]()
+  await waitFor(() => expect(screen.getByRole('button', { name: /ส่งขึ้นเรือแล้ว/ })).toBeEnabled())
+})
+
+test('if removing a photo fails on some POs, the key stays counted for those POs (state matches the database)', async () => {
+  listOrdersForCustomerDay.mockResolvedValue(
+    orders().map((o) =>
+      ['o1', 'o2'].includes(o.id)
+        ? { ...o, boat_id: '2', status: 'at_pier', evidence_photos: [{ id: 'e', r2_key: 'evidence/a.jpg', stage: 'handoff' }] }
+        : o,
+    ),
+  )
+  removeEvidencePhoto
+    .mockReset()
+    .mockResolvedValueOnce(undefined)
+    .mockRejectedValueOnce(new Error('nope'))
+    .mockResolvedValue(undefined)
+  renderPanel()
+  await screen.findByText('PO-1')
+  await userEvent.click(screen.getByRole('button', { name: 'mock-remove' }))
+  await waitFor(() => expect(removeEvidencePhoto).toHaveBeenCalledTimes(2))
+  // o2 still has it, so the photo is still shown and shipping is still allowed
+  expect(screen.getAllByAltText('รูปที่อัปโหลด')).toHaveLength(1)
+  expect(screen.getByRole('button', { name: /ส่งขึ้นเรือแล้ว/ })).toBeEnabled()
+  // retrying the removal clears the rest
+  await userEvent.click(screen.getByRole('button', { name: 'mock-remove' }))
+  await waitFor(() => expect(screen.queryByAltText('รูปที่อัปโหลด')).not.toBeInTheDocument())
+  expect(screen.getByRole('button', { name: /ส่งขึ้นเรือแล้ว/ })).toBeDisabled()
+})
+
+test('when every per-PO attach fails, it tells the user to remove and retake the photo (not "retry at ship")', async () => {
+  attachEvidencePhoto.mockReset().mockRejectedValue(new Error('offline'))
+  renderPanel()
+  await screen.findByText('PO-1')
+  await userEvent.click(screen.getByRole('button', { name: 'mock-upload' }))
+  expect(await screen.findByText('แนบรูปไม่สำเร็จ กรุณาลบรูปนี้แล้วถ่ายใหม่')).toBeInTheDocument()
+})
+
+test('a boat shortfall re-reads the orders instead of marking every PO as on that boat', async () => {
+  setOrderBoats.mockResolvedValue(1)
+  renderPanel()
+  await screen.findByText('PO-1')
+  const before = listOrdersForCustomerDay.mock.calls.length
+  await userEvent.click(screen.getByRole('button', { name: 'เรือ 1' }))
+  await waitFor(() => expect(listOrdersForCustomerDay.mock.calls.length).toBe(before + 1))
+  // server data still has no boat on the POs -> nothing highlighted
+  expect(screen.getByRole('button', { name: 'เรือ 1' }).className).not.toContain('bg-ink')
 })

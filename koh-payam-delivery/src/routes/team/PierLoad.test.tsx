@@ -359,3 +359,24 @@ test('opening a customer row shows the group panel for that customer and phone',
   await userEvent.click(screen.getByRole('button', { name: '← กลับ' }))
   expect(await screen.findByRole('button', { name: /BLUE VIEW/ })).toBeInTheDocument()
 })
+
+test('POs with no phone never group, even with identical customer names', async () => {
+  listOrdersForDay.mockReset().mockResolvedValue([
+    mate('a', 'PO-A', 'packed', { customer_phone: null }),
+    mate('b', 'PO-B', 'packed', { customer_phone: '' }),
+  ])
+  render(<PierLoad />)
+  expect(await screen.findByRole('button', { name: /PO-A · BLUE VIEW/ })).toBeInTheDocument()
+  expect(screen.getByRole('button', { name: /PO-B · BLUE VIEW/ })).toBeInTheDocument()
+  expect(screen.queryByText(/\d+ PO$/)).not.toBeInTheDocument()
+})
+
+test('a shipped sibling does not count as waiting: one ready PO + one shipped PO stays a plain row with no waiting note', async () => {
+  listOrdersForDay.mockReset().mockResolvedValue([
+    mate('a', 'PO-A', 'packed'),
+    mate('d', 'PO-D', 'shipped'),
+  ])
+  render(<PierLoad />)
+  expect(await screen.findByRole('button', { name: /PO-A · BLUE VIEW/ })).toBeInTheDocument()
+  expect(screen.queryByText(/ยังรอแพ็ค/)).not.toBeInTheDocument()
+})
