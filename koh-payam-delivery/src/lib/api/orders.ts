@@ -210,6 +210,23 @@ export async function setOrderBoat(orderId: string, boatId: string) {
   await logAction('boat_set', 'order', orderId, { boatId })
 }
 
+// Same as setOrderBoat for every PO of one customer shipped together. Only POs
+// still packed/at_pier are touched (anything already shipped is left alone);
+// returns how many were updated so the caller can flag a shortfall.
+export async function setOrderBoats(orderIds: string[], boatId: string): Promise<number> {
+  const { data, error } = await supabase
+    .from('orders')
+    .update({ boat_id: boatId, status: 'at_pier' })
+    .in('id', orderIds)
+    .in('status', ['packed', 'at_pier'])
+    .select('id')
+  if (error) throw new Error('บันทึกเรือไม่สำเร็จ: ' + error.message)
+  if (!data || data.length === 0)
+    throw new Error('บันทึกเรือไม่สำเร็จ (ออเดอร์อาจถูกส่งไปแล้ว)')
+  for (const row of data as { id: string }[]) await logAction('boat_set', 'order', row.id, { boatId })
+  return data.length
+}
+
 export async function setOrderPierName(orderId: string, pierName: string): Promise<void> {
   const { data, error } = await supabase
     .from('orders')
