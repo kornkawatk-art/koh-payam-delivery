@@ -11,12 +11,16 @@ const listDistinctPierNames = vi.fn().mockResolvedValue([])
 const attachEvidencePhoto = vi.fn().mockResolvedValue(undefined)
 const removeEvidencePhoto = vi.fn().mockResolvedValue(undefined)
 const listEvidencePhotos = vi.fn().mockResolvedValue([])
+const listOrdersForCustomerDay = vi.fn().mockResolvedValue([])
+const setOrderBoats = vi.fn().mockResolvedValue(2)
 
 vi.mock('../../lib/api/shipDays', () => ({
   getOrCreateShipDay: (...a: unknown[]) => getOrCreateShipDay(...a),
   listOrdersForDay: (...a: unknown[]) => listOrdersForDay(...a),
 }))
 vi.mock('../../lib/api/orders', () => ({
+  listOrdersForCustomerDay: (...a: unknown[]) => listOrdersForCustomerDay(...a),
+  setOrderBoats: (...a: unknown[]) => setOrderBoats(...a),
   setOrderBoat: (...a: unknown[]) => setOrderBoat(...a),
   setOrderPierName: (...a: unknown[]) => setOrderPierName(...a),
   updateOrderStatus: (...a: unknown[]) => updateOrderStatus(...a),
@@ -286,4 +290,93 @@ test('the retry button re-invokes the loader and recovers after a failure', asyn
     expect(listOrdersForDay.mock.calls.length).toBeGreaterThan(callsBefore),
   )
   expect(await screen.findByRole('button', { name: /PO-1/ })).toBeInTheDocument()
+})
+
+const mate = (id: string, no: string, status: string, extra: object = {}) => ({
+  ...orders[0],
+  id,
+  makro_order_no: no,
+  status,
+  customer_phone: '0811111111',
+  ...extra,
+})
+
+test('a customer with 2+ ready POs shows as ONE row (N PO + summed boxes) instead of one row per PO', async () => {
+  listOrdersForDay.mockReset().mockResolvedValue([
+    mate('a', 'PO-A', 'packed'),
+    mate('b', 'PO-B', 'at_pier', { paper_box_count: 1, foam_box_count: 0 }),
+    orders[1],
+  ])
+  render(<PierLoad />)
+  const row = await screen.findByRole('button', { name: /BLUE VIEW/ })
+  expect(row).toHaveTextContent('2 PO')
+  expect(row).toHaveTextContent('PO-A, PO-B')
+  expect(row).toHaveTextContent('4 รวม') // (2+1+0) + (1+0+0)
+  expect(screen.queryByRole('button', { name: /^PO-A · / })).not.toBeInTheDocument()
+})
+
+test('the group row notes how many of that customer POs are still waiting to be packed', async () => {
+  listOrdersForDay.mockReset().mockResolvedValue([
+    mate('a', 'PO-A', 'packed'),
+    mate('b', 'PO-B', 'packed'),
+    mate('c', 'PO-C', 'imported'),
+  ])
+  render(<PierLoad />)
+  expect(await screen.findByText('อีก 1 ออเดอร์ยังรอแพ็ค')).toBeInTheDocument()
+})
+
+test('a lone ready PO whose siblings are still waiting stays a normal row, with the waiting note', async () => {
+  listOrdersForDay.mockReset().mockResolvedValue([
+    mate('a', 'PO-A', 'packed'),
+    mate('c', 'PO-C', 'imported'),
+  ])
+  render(<PierLoad />)
+  expect(await screen.findByRole('button', { name: /PO-A · BLUE VIEW/ })).toBeInTheDocument()
+  expect(screen.getByText('อีก 1 ออเดอร์ของลูกค้านี้ยังรอแพ็ค')).toBeInTheDocument()
+  expect(screen.queryByText('2 PO')).not.toBeInTheDocument()
+})
+
+test('a customer with no ready PO at all is not listed', async () => {
+  listOrdersForDay.mockReset().mockResolvedValue([
+    mate('c', 'PO-C', 'imported'),
+    mate('d', 'PO-D', 'shipped'),
+  ])
+  render(<PierLoad />)
+  expect(await screen.findByText('ไม่มีออเดอร์ที่พร้อมส่งขึ้นเรือ')).toBeInTheDocument()
+})
+
+test('opening a customer row shows the group panel for that customer and phone', async () => {
+  listOrdersForDay.mockReset().mockResolvedValue([mate('a', 'PO-A', 'packed'), mate('b', 'PO-B', 'packed')])
+  listOrdersForCustomerDay.mockReset().mockResolvedValue([
+    { ...mate('a', 'PO-A', 'packed'), evidence_photos: [] },
+    { ...mate('b', 'PO-B', 'packed'), evidence_photos: [] },
+  ])
+  render(<PierLoad />)
+  await userEvent.click(await screen.findByRole('button', { name: /BLUE VIEW/ }))
+  expect(await screen.findByText('เลือกเรือ (ทุกออเดอร์ไปเรือลำเดียวกัน)')).toBeInTheDocument()
+  expect(listOrdersForCustomerDay).toHaveBeenCalledWith(expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/), '0811111111')
+  // back returns to the list
+  await userEvent.click(screen.getByRole('button', { name: '← กลับ' }))
+  expect(await screen.findByRole('button', { name: /BLUE VIEW/ })).toBeInTheDocument()
+})
+
+test('POs with no phone never group, even with identical customer names', async () => {
+  listOrdersForDay.mockReset().mockResolvedValue([
+    mate('a', 'PO-A', 'packed', { customer_phone: null }),
+    mate('b', 'PO-B', 'packed', { customer_phone: '' }),
+  ])
+  render(<PierLoad />)
+  expect(await screen.findByRole('button', { name: /PO-A · BLUE VIEW/ })).toBeInTheDocument()
+  expect(screen.getByRole('button', { name: /PO-B · BLUE VIEW/ })).toBeInTheDocument()
+  expect(screen.queryByText(/\d+ PO$/)).not.toBeInTheDocument()
+})
+
+test('a shipped sibling does not count as waiting: one ready PO + one shipped PO stays a plain row with no waiting note', async () => {
+  listOrdersForDay.mockReset().mockResolvedValue([
+    mate('a', 'PO-A', 'packed'),
+    mate('d', 'PO-D', 'shipped'),
+  ])
+  render(<PierLoad />)
+  expect(await screen.findByRole('button', { name: /PO-A · BLUE VIEW/ })).toBeInTheDocument()
+  expect(screen.queryByText(/ยังรอแพ็ค/)).not.toBeInTheDocument()
 })

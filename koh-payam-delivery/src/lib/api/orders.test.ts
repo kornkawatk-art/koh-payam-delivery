@@ -4,6 +4,7 @@ import {
   findOrdersByMakroOrderNo,
   listOrdersForCustomerDay,
   regenTokenLink,
+  setOrderBoats,
   setOrderPierName,
   updateOrderStatus,
 } from './orders'
@@ -24,6 +25,8 @@ const state = {
   customerDayRows: [] as any[],
   customerDayError: null as null | { message: string },
   customerDayCalls: [] as any[],
+  boatsData: [] as any[],
+  boatsCalls: [] as any[],
 }
 
 vi.mock('../supabase', () => {
@@ -67,6 +70,22 @@ vi.mock('../supabase', () => {
       update: (patch: any) => {
         state.updated.push({ table, patch })
         return {
+          // setOrderBoats: update(...).in('id', ids).in('status', [...]).select('id')
+          in: (col: string, vals: unknown[]) => {
+            state.boatsCalls.push([col, vals])
+            return {
+              in: (col2: string, vals2: unknown[]) => {
+                state.boatsCalls.push([col2, vals2])
+                return {
+                  select: () =>
+                    Promise.resolve({
+                      data: state.updateError ? null : state.boatsData,
+                      error: state.updateError,
+                    }),
+                }
+              },
+            }
+          },
           eq: () => ({
             select: () =>
               Promise.resolve({
@@ -158,6 +177,8 @@ beforeEach(() => {
   state.customerDayRows = []
   state.customerDayError = null
   state.customerDayCalls = []
+  state.boatsData = []
+  state.boatsCalls = []
   logAction.mockClear()
   linkBackordersToDay.mockClear()
   syncShortageBackorders.mockClear()
@@ -417,4 +438,29 @@ test('listOrdersForCustomerDay throws a Thai error on failure', async () => {
   await expect(listOrdersForCustomerDay('2026-10-01', '0811111111')).rejects.toThrow(
     'โหลดออเดอร์ของลูกค้าไม่สำเร็จ',
   )
+})
+
+test('setOrderBoats assigns the boat + at_pier to every ready PO in one update, guarded to packed/at_pier, and audits each', async () => {
+  state.boatsData = [{ id: 'a' }, { id: 'b' }]
+  const n = await setOrderBoats(['a', 'b', 'c'], '2')
+  expect(n).toBe(2)
+  expect(state.updated.at(-1)).toEqual({ table: 'orders', patch: { boat_id: '2', status: 'at_pier' } })
+  expect(state.boatsCalls).toEqual([
+    ['id', ['a', 'b', 'c']],
+    ['status', ['packed', 'at_pier']],
+  ])
+  expect(logAction).toHaveBeenCalledWith('boat_set', 'order', 'a', { boatId: '2' })
+  expect(logAction).toHaveBeenCalledWith('boat_set', 'order', 'b', { boatId: '2' })
+  expect(logAction).toHaveBeenCalledTimes(2)
+})
+
+test('setOrderBoats throws when no PO was updatable (all already shipped) and logs nothing', async () => {
+  state.boatsData = []
+  await expect(setOrderBoats(['a'], '2')).rejects.toThrow('บันทึกเรือไม่สำเร็จ (ออเดอร์อาจถูกส่งไปแล้ว)')
+  expect(logAction).not.toHaveBeenCalled()
+})
+
+test('setOrderBoats surfaces a database error in Thai', async () => {
+  state.updateError = { message: 'boom' }
+  await expect(setOrderBoats(['a'], '2')).rejects.toThrow('บันทึกเรือไม่สำเร็จ: boom')
 })

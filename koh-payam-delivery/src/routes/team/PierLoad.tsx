@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { getOrCreateShipDay, listOrdersForDay } from '../../lib/api/shipDays'
 import {
   setOrderBoat,
@@ -15,6 +15,8 @@ import {
 import PhotoCapture from '../../components/PhotoCapture'
 import { MapPin } from '@phosphor-icons/react'
 import { PageHeader } from '../../components/ui/PageHeader'
+import PierGroup from './PierGroup'
+import { groupByPhone } from '../../lib/groupOrders'
 import { Spinner } from '../../components/ui/Spinner'
 import { todayLocalISO, formatTHB } from '../../lib/format'
 
@@ -32,15 +34,22 @@ type PierOrder = {
   payment_method: string | null
   packer_name: string | null
   pier_name: string | null
+  customer_phone?: string | null
   packed_with?: { makro_order_no: string } | null
 }
 
 const ACTIVE = ['packed', 'at_pier']
 
+// One pier-list row: a single PO, or a customer's ready POs shipped together.
+type PierEntry =
+  | { kind: 'single'; order: PierOrder; waiting: number }
+  | { kind: 'group'; phone: string; name: string; ready: PierOrder[]; waiting: number }
+
 export default function PierLoad() {
   const [date, setDate] = useState(todayLocalISO())
   const [boats, setBoats] = useState<Boat[]>([])
-  const [orders, setOrders] = useState<PierOrder[]>([])
+  const [all, setAll] = useState<PierOrder[]>([])
+  const [selGroup, setSelGroup] = useState<{ phone: string; name: string } | null>(null)
   const [sel, setSel] = useState<PierOrder | null>(null)
   const [photoCount, setPhotoCount] = useState(0)
   // Photos already attached to `sel` from an earlier visit (e.g. the app was
@@ -58,9 +67,9 @@ export default function PierLoad() {
   const load = useCallback(() => {
     setFailed(false)
     Promise.all([getOrCreateShipDay(date), listOrdersForDay(date)])
-      .then(([day, all]) => {
+      .then(([day, list]) => {
         setBoats(day.boats)
-        setOrders((all as PierOrder[]).filter((o) => ACTIVE.includes(o.status)))
+        setAll(list as PierOrder[])
       })
       .catch(() => setFailed(true))
   }, [date])
@@ -103,6 +112,24 @@ export default function PierLoad() {
     }
   }
 
+  // Customers with several POs on this date collapse into one row when 2+ of
+  // them are ready; POs still waiting to be packed are counted, not listed.
+  const entries = useMemo<PierEntry[]>(() => {
+    const out: PierEntry[] = []
+    for (const e of groupByPhone(all)) {
+      if (e.kind === 'single') {
+        if (ACTIVE.includes(e.order.status)) out.push({ kind: 'single', order: e.order, waiting: 0 })
+        continue
+      }
+      const ready = e.orders.filter((o) => ACTIVE.includes(o.status))
+      const waiting = e.orders.filter((o) => o.status === 'imported').length
+      if (ready.length === 0) continue
+      if (ready.length === 1) out.push({ kind: 'single', order: ready[0], waiting })
+      else out.push({ kind: 'group', phone: e.phone, name: e.name, ready, waiting })
+    }
+    return out
+  }, [all])
+
   if (failed)
     return (
       <div className="flex flex-col items-start gap-3">
@@ -111,6 +138,24 @@ export default function PierLoad() {
           ลองใหม่
         </button>
       </div>
+    )
+
+  if (selGroup)
+    return (
+      <PierGroup
+        date={date}
+        phone={selGroup.phone}
+        boats={boats}
+        onBack={() => {
+          setSelGroup(null)
+          load()
+        }}
+        onShipped={(message) => {
+          setSelGroup(null)
+          setMsg(message)
+          load()
+        }}
+      />
     )
 
   if (!sel)
@@ -129,47 +174,80 @@ export default function PierLoad() {
             />
           }
         />
-        {orders.length === 0 && (
+        {entries.length === 0 && (
           <p className="muted">ไม่มีออเดอร์ที่พร้อมส่งขึ้นเรือ</p>
         )}
         <div className="flex flex-col gap-2">
-          {orders.map((o) => (
-            <button
-              key={o.id}
-              className="card flex items-center justify-between gap-3 text-left hover:border-line-strong"
-              onClick={() => {
-                setSel(o)
-                setPhotoCount(0)
-                setInitialPhotos(null)
-                setPhotoBusy(false)
-                setPierName(o.pier_name ?? '')
-                setMsg(undefined)
-                listEvidencePhotos(o.id, 'handoff')
-                  .then((photos) => {
-                    setInitialPhotos(photos)
-                    setPhotoCount(photos.length)
-                  })
-                  .catch(() => setInitialPhotos([])) // fail open: an unrecoverable
-                  // fetch just means no photos are pre-shown -- the team member
-                  // can still attach fresh ones and the ship gate still works.
-              }}
-            >
-              <span className="flex flex-col items-start">
-                <span className="font-medium">
-                  {o.makro_order_no} · {o.customer_name_en}
+          {entries.map((e) =>
+            e.kind === 'group' ? (
+              <button
+                key={`g-${e.phone}`}
+                className="card flex items-center justify-between gap-3 text-left hover:border-line-strong"
+                onClick={() => {
+                  setMsg(undefined)
+                  setSelGroup({ phone: e.phone, name: e.name })
+                }}
+              >
+                <span className="flex flex-col items-start">
+                  <span className="font-medium">{e.name}</span>
+                  <span className="muted text-xs">{e.ready.map((o) => o.makro_order_no).join(', ')}</span>
+                  {e.waiting > 0 && (
+                    <span className="text-xs text-warn-ink">อีก {e.waiting} ออเดอร์ยังรอแพ็ค</span>
+                  )}
                 </span>
-                {o.packer_name && (
-                  <span className="muted text-xs">คนแพ็ค: {o.packer_name}</span>
-                )}
-                {o.packed_with?.makro_order_no && (
-                  <span className="muted text-xs">แพ็ครวมกับ {o.packed_with.makro_order_no}</span>
-                )}
-              </span>
-              <span className="badge badge-neutral">
-                {o.paper_box_count + o.foam_box_count + o.piece_count} รวม
-              </span>
-            </button>
-          ))}
+                <span className="flex items-center gap-2">
+                  <span className="badge badge-brand">{e.ready.length} PO</span>
+                  <span className="badge badge-neutral">
+                    {e.ready.reduce((n, o) => n + o.paper_box_count + o.foam_box_count + o.piece_count, 0)} รวม
+                  </span>
+                </span>
+              </button>
+            ) : (
+              <button
+                key={e.order.id}
+                className="card flex items-center justify-between gap-3 text-left hover:border-line-strong"
+                onClick={() => {
+                  const o = e.order
+                  setSel(o)
+                  setPhotoCount(0)
+                  setInitialPhotos(null)
+                  setPhotoBusy(false)
+                  setPierName(o.pier_name ?? '')
+                  setMsg(undefined)
+                  listEvidencePhotos(o.id, 'handoff')
+                    .then((photos) => {
+                      setInitialPhotos(photos)
+                      setPhotoCount(photos.length)
+                    })
+                    .catch(() => setInitialPhotos([])) // fail open: an unrecoverable
+                    // fetch just means no photos are pre-shown -- the team member
+                    // can still attach fresh ones and the ship gate still works.
+                }}
+              >
+                <span className="flex flex-col items-start">
+                  <span className="font-medium">
+                    {e.order.makro_order_no} · {e.order.customer_name_en}
+                  </span>
+                  {e.order.packer_name && (
+                    <span className="muted text-xs">คนแพ็ค: {e.order.packer_name}</span>
+                  )}
+                  {e.order.packed_with?.makro_order_no && (
+                    <span className="muted text-xs">
+                      แพ็ครวมกับ {e.order.packed_with.makro_order_no}
+                    </span>
+                  )}
+                  {e.waiting > 0 && (
+                    <span className="text-xs text-warn-ink">
+                      อีก {e.waiting} ออเดอร์ของลูกค้านี้ยังรอแพ็ค
+                    </span>
+                  )}
+                </span>
+                <span className="badge badge-neutral">
+                  {e.order.paper_box_count + e.order.foam_box_count + e.order.piece_count} รวม
+                </span>
+              </button>
+            ),
+          )}
         </div>
         {msg && <p className="muted">{msg}</p>}
       </div>
