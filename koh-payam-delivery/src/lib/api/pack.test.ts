@@ -3,6 +3,7 @@ import { savePack, savePackGroup } from './pack'
 const calls: any[] = []
 const syncShortageBackorders = vi.fn().mockResolvedValue(undefined)
 let itemUpdateError: { message: string } | null = null
+let primaryUpdateRows: { id: string }[] = [{ id: 'p1' }]
 
 vi.mock('./backorders', () => ({
   syncShortageBackorders: (...a: unknown[]) => syncShortageBackorders(...a),
@@ -13,16 +14,34 @@ vi.mock('./audit', () => ({ logAction: vi.fn() }))
 vi.mock('../supabase', () => ({
   supabase: {
     from: (t: string) => ({
-      update: (patch: any) => ({
-        eq: (col: string, val: any) => {
-          calls.push(['update', t, patch, { [col]: val }])
-          return Promise.resolve({ error: null })
-        },
-        in: (col: string, vals: any[]) => {
-          calls.push(['update', t, patch, { [col]: vals }])
-          return Promise.resolve({ error: itemUpdateError })
-        },
-      }),
+      // Chainable + thenable like a PostgREST builder: records ONE call
+      // (patch + every filter applied) when awaited.
+      update: (patch: any) => {
+        const filters: Record<string, unknown> = {}
+        let selected = false
+        const q: any = {
+          eq: (col: string, val: unknown) => {
+            filters[col] = val
+            return q
+          },
+          in: (col: string, vals: unknown[]) => {
+            filters[col] = vals
+            return q
+          },
+          select: () => {
+            selected = true
+            return q
+          },
+          then: (resolve: any) => {
+            calls.push(['update', t, patch, { ...filters }])
+            resolve({
+              data: selected ? primaryUpdateRows : null,
+              error: t === 'order_items' ? itemUpdateError : null,
+            })
+          },
+        }
+        return q
+      },
     }),
   },
 }))
@@ -30,6 +49,7 @@ vi.mock('../supabase', () => ({
 beforeEach(() => {
   calls.length = 0
   itemUpdateError = null
+  primaryUpdateRows = [{ id: 'p1' }]
   syncShortageBackorders.mockClear()
 })
 
@@ -171,13 +191,13 @@ test('savePackGroup records boxes on the primary, zeros + links the others, tick
       'update',
       'orders',
       { paper_box_count: 3, foam_box_count: 1, piece_count: 0, packer_name: 'สมชาย', packed_with_order_id: null },
-      { id: 'p1' },
+      { id: 'p1', status: 'imported' },
     ],
     [
       'update',
       'orders',
       { paper_box_count: 0, foam_box_count: 0, piece_count: 0, packer_name: 'สมชาย', packed_with_order_id: 'p1' },
-      { id: ['p2', 'p3'] },
+      { id: ['p2', 'p3'], status: 'imported' },
     ],
     ['update', 'order_items', { packed: true }, { id: ['i1', 'i2'] }],
   ])
@@ -195,5 +215,23 @@ test('savePackGroup with no other POs skips the linked-orders update', async () 
     itemPacked: [],
   })
   expect(calls).toHaveLength(1)
-  expect(calls[0][3]).toEqual({ id: 'p1' })
+  expect(calls[0][3]).toEqual({ id: 'p1', status: 'imported' })
+})
+
+test('savePackGroup refuses (and writes nothing else) when the primary is no longer imported', async () => {
+  primaryUpdateRows = [] // the status = imported guard matched no row
+  await expect(
+    savePackGroup({
+      primaryId: 'p1',
+      otherIds: ['p2'],
+      paperCount: 1,
+      foamCount: 0,
+      pieceCount: 0,
+      packerName: '',
+      itemPacked: [{ id: 'i1', packed: true }],
+    }),
+  ).rejects.toThrow('ออเดอร์หลักถูกแพ็คหรือเปลี่ยนสถานะไปแล้ว')
+  // only the guarded primary update was attempted: no other POs, no item ticks, no backorder sync
+  expect(calls).toHaveLength(1)
+  expect(syncShortageBackorders).not.toHaveBeenCalled()
 })

@@ -74,7 +74,10 @@ export type PackGroupInput = {
 // so. Item ticks (which span every PO in the action) are saved in one batch.
 export async function savePackGroup(input: PackGroupInput): Promise<void> {
   const packer = input.packerName.trim() || null
-  const { error: eP } = await supabase
+  // Both writes are guarded on status = 'imported': if another session packed
+  // or shipped one of these POs since this page loaded, its own boxes must not
+  // be zeroed or re-linked here.
+  const { data: primaryRows, error: eP } = await supabase
     .from('orders')
     .update({
       paper_box_count: input.paperCount,
@@ -84,7 +87,11 @@ export async function savePackGroup(input: PackGroupInput): Promise<void> {
       packed_with_order_id: null,
     })
     .eq('id', input.primaryId)
+    .eq('status', 'imported')
+    .select('id')
   if (eP) throw new Error('บันทึกจำนวนลังไม่สำเร็จ: ' + eP.message)
+  if (!primaryRows || primaryRows.length === 0)
+    throw new Error('ออเดอร์หลักถูกแพ็คหรือเปลี่ยนสถานะไปแล้ว กรุณาโหลดหน้านี้ใหม่')
 
   if (input.otherIds.length > 0) {
     const { error: eO } = await supabase
@@ -97,6 +104,7 @@ export async function savePackGroup(input: PackGroupInput): Promise<void> {
         packed_with_order_id: input.primaryId,
       })
       .in('id', input.otherIds)
+      .eq('status', 'imported')
     if (eO) throw new Error('บันทึกออเดอร์ที่แพ็ครวมไม่สำเร็จ: ' + eO.message)
   }
 

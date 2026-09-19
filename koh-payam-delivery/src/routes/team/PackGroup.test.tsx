@@ -325,3 +325,79 @@ test('shows a Thai error when the customer has no orders that day, and when load
   renderPage()
   expect(await screen.findByText('โหลดออเดอร์ไม่สำเร็จ')).toBeInTheDocument()
 })
+
+test('a later-imported lower-numbered PO does not steal the primary role from the PO that already owns the recorded boxes/photos', async () => {
+  listOrdersForCustomerDay.mockResolvedValue([
+    base('o0', 'PO-0', 'imported', [item('i0', 'newcomer')]),
+    base('o1', 'PO-1', 'imported', [item('i1', 'rice')], {
+      paper_box_count: 3,
+      packer_name: 'สมชาย',
+      evidence_photos: [{ id: 'e1', r2_key: 'evidence/o1/a.jpg', stage: 'pack' }],
+    }),
+    base('o2', 'PO-2', 'imported', [item('i2', 'salt')], { packed_with_order_id: 'o1' }),
+  ])
+  renderPage()
+  await screen.findByText('rice')
+  expect(screen.getByText('photo-target:o1')).toBeInTheDocument()
+  expect((screen.getByLabelText(/ลังกระดาษ/) as HTMLInputElement).value).toBe('3')
+  await userEvent.click(screen.getByRole('button', { name: 'บันทึก' }))
+  expect(savePackGroup.mock.calls[0][0]).toMatchObject({ primaryId: 'o1', otherIds: ['o0', 'o2'] })
+})
+
+test('warns which other not-yet-packed POs already carry boxes that a group save will reset to 0', async () => {
+  listOrdersForCustomerDay.mockResolvedValue([
+    base('o1', 'PO-1', 'imported', [item('i1', 'rice')], { paper_box_count: 2 }),
+    base('o2', 'PO-2', 'imported', [item('i2', 'salt')], { piece_count: 5 }),
+    base('o3', 'PO-3', 'imported', [item('i3', 'oil')]),
+  ])
+  renderPage()
+  await screen.findByText('rice')
+  expect(screen.getByText(/PO-2\s+มีจำนวนลัง\/ชิ้นที่บันทึกไว้แล้ว/)).toBeInTheDocument()
+  expect(screen.queryByText(/PO-3\s+มีจำนวนลัง/)).not.toBeInTheDocument()
+})
+
+test('no reset warning when only the primary carries boxes', async () => {
+  renderPage()
+  await screen.findByText('rice')
+  expect(screen.queryByText(/จะถูกรีเซ็ตเป็น 0/)).not.toBeInTheDocument()
+})
+
+test('photos recorded on a non-primary PO do not open the gate (only the primary photos count)', async () => {
+  listOrdersForCustomerDay.mockResolvedValue([
+    base('o1', 'PO-1', 'imported', [item('i1', 'rice')], { paper_box_count: 2 }),
+    base('o2', 'PO-2', 'imported', [item('i2', 'salt')], {
+      evidence_photos: [{ id: 'e1', r2_key: 'evidence/o2/a.jpg', stage: 'pack' }],
+    }),
+  ])
+  renderPage()
+  await screen.findByText('rice')
+  await userEvent.click(screen.getByRole('button', { name: 'เลือกทั้งหมด' }))
+  expect(screen.getByText('photo-target:o1')).toBeInTheDocument()
+  expect(screen.getByRole('button', { name: 'บันทึก + แพ็คเสร็จ' })).toBeDisabled()
+})
+
+test('after a partial failure in a 3-PO group, retrying saves onto the same primary with only the remaining POs', async () => {
+  listOrdersForCustomerDay.mockResolvedValue([
+    base('o1', 'PO-1', 'imported', [item('i1', 'rice')]),
+    base('o2', 'PO-2', 'imported', [item('i2', 'oil')]),
+    base('o3', 'PO-3', 'imported', [item('i3', 'salt')]),
+  ])
+  updateOrderStatus
+    .mockReset()
+    .mockResolvedValueOnce(undefined) // o2
+    .mockRejectedValueOnce(new Error('boom')) // o3
+    .mockResolvedValue(undefined)
+  renderPage()
+  await screen.findByText('rice')
+  await satisfyGate()
+  await userEvent.click(screen.getByRole('button', { name: 'บันทึก + แพ็คเสร็จ' }))
+  expect(await screen.findByText(/แพ็คเสร็จแล้ว 1\/3 ออเดอร์/)).toBeInTheDocument()
+
+  await waitFor(() => expect(screen.getByRole('button', { name: 'บันทึก + แพ็คเสร็จ' })).toBeEnabled())
+  await userEvent.click(screen.getByRole('button', { name: 'บันทึก + แพ็คเสร็จ' }))
+  await waitFor(() => expect(savePackGroup).toHaveBeenCalledTimes(2))
+  expect(savePackGroup.mock.calls[1][0]).toMatchObject({ primaryId: 'o1', otherIds: ['o3'] })
+  await waitFor(() =>
+    expect(updateOrderStatus.mock.calls.map((c) => c[0])).toEqual(['o2', 'o3', 'o3', 'o1']),
+  )
+})

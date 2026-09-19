@@ -12,6 +12,7 @@ import PhotoCapture from '../../components/PhotoCapture'
 import { Spinner } from '../../components/ui/Spinner'
 import { PageHeader } from '../../components/ui/PageHeader'
 import { splitFreshDry } from '../../lib/freshDry'
+import { pickPrimary } from '../../lib/groupOrders'
 import { PackItemRow, type ItemState } from './PackOrder'
 
 const R2 = import.meta.env.VITE_R2_PUBLIC_BASE_URL as string
@@ -49,7 +50,7 @@ export default function PackGroup() {
             ),
           ),
         )
-        const primary = os.find((o) => o.status === 'imported')
+        const primary = pickPrimary(os.filter((o) => o.status === 'imported'))
         if (primary) {
           setPaper(primary.paper_box_count)
           setFoam(primary.foam_box_count)
@@ -74,7 +75,13 @@ export default function PackGroup() {
   }, [date, phone])
 
   const packable = useMemo(() => (orders ?? []).filter((o) => o.status === 'imported'), [orders])
-  const primary = packable[0] ?? null
+  const primary = useMemo(() => pickPrimary(packable), [packable])
+  const others = useMemo(() => packable.filter((o) => o.id !== primary?.id), [packable, primary])
+  // Other not-yet-packed POs that already carry their own recorded boxes: a
+  // group save resets them to 0 (their boxes count toward the primary's).
+  const willReset = others.filter(
+    (o) => (o.paper_box_count ?? 0) + (o.foam_box_count ?? 0) + (o.piece_count ?? 0) > 0,
+  )
 
   const items: GroupItem[] = useMemo(
     () =>
@@ -133,7 +140,7 @@ export default function PackGroup() {
     try {
       await savePackGroup({
         primaryId: primary.id,
-        otherIds: packable.slice(1).map((o) => o.id),
+        otherIds: others.map((o) => o.id),
         paperCount: paper,
         foamCount: foam,
         pieceCount: piece,
@@ -149,7 +156,7 @@ export default function PackGroup() {
         // Primary last: if a later status change fails, the primary (which
         // owns this action's boxes and photos) is still the first
         // not-yet-packed PO, so a retry keeps recording onto the same PO.
-        for (const o of [...packable.slice(1), packable[0]]) {
+        for (const o of [...others, primary]) {
           await updateOrderStatus(o.id, 'packed')
           done.push(o.id)
         }
@@ -218,6 +225,14 @@ export default function PackGroup() {
           กลับหน้างานวันนี้
         </Link>
       </div>
+
+      {willReset.length > 0 && (
+        <div className="alert alert-warn">
+          ⚠️ {willReset.map((o) => o.makro_order_no).join(', ')}{' '}
+          มีจำนวนลัง/ชิ้นที่บันทึกไว้แล้ว — เมื่อกดบันทึกจะถูกรีเซ็ตเป็น 0
+          (ให้นับรวมกับลัง/ชิ้นของออเดอร์หลักด้านล่างแทน)
+        </div>
+      )}
 
       {backorders.length > 0 && (
         <div className="alert alert-warn">
