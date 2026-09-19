@@ -157,11 +157,27 @@ export async function findOrdersByMakroOrderNo(
 export async function getOrder(orderId: string) {
   const { data, error } = await supabase
     .from('orders')
-    .select('*, order_items(*), boxes(*), evidence_photos(*), claims(*)')
+    .select(
+      '*, order_items(*), boxes(*), evidence_photos(*), claims(*), packed_with:orders!packed_with_order_id(makro_order_no)',
+    )
     .eq('id', orderId)
     .single()
   if (error) throw new Error('โหลดออเดอร์ไม่สำเร็จ: ' + error.message)
   return data
+}
+
+// Every PO one customer (same phone) has on one ship date, with items and pack
+// photos, for the combined pack page. Ordered by makro_order_no so the first
+// not-yet-packed row is a stable "primary" PO.
+export async function listOrdersForCustomerDay(shipDate: string, phone: string) {
+  const { data, error } = await supabase
+    .from('orders')
+    .select('*, order_items(*), evidence_photos(*)')
+    .eq('ship_date', shipDate)
+    .eq('customer_phone', phone)
+    .order('makro_order_no')
+  if (error) throw new Error('โหลดออเดอร์ของลูกค้าไม่สำเร็จ: ' + error.message)
+  return (data ?? []) as any[]
 }
 
 export async function updateOrderStatus(orderId: string, next: OrderStatus) {

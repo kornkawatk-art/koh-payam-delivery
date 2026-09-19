@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { useParams } from 'react-router-dom'
+import { Link, useParams } from 'react-router-dom'
 import { getOrder } from '../../lib/api/orders'
 import { Spinner } from '../../components/ui/Spinner'
 import { formatDateTH } from '../../lib/format'
@@ -33,6 +33,15 @@ export default function LabelSheet() {
       >
         สั่งพิมพ์
       </button>
+
+      {order.packed_with?.makro_order_no && (
+        <p className="no-print alert alert-info">
+          ออเดอร์นี้แพ็ครวมกับ {order.packed_with.makro_order_no} — ลังทั้งหมดของลูกค้าอยู่ที่ใบเขียนหน้าลังของออเดอร์นั้น{' '}
+          <Link className="link" to={`/order/${order.packed_with_order_id}/label`}>
+            เปิดใบเขียนหน้าลัง {order.packed_with.makro_order_no}
+          </Link>
+        </p>
+      )}
 
       <div className="label-sheet card">
         <p className="text-4xl font-bold uppercase tracking-tight">{order.customer_name_en}</p>

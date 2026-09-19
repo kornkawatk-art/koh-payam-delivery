@@ -58,7 +58,7 @@ export async function listOrdersForDay(shipDate: string) {
   const { data, error } = await supabase
     .from('orders')
     .select(
-      'id,makro_order_no,customer_name_en,status,boat_id,paper_box_count,foam_box_count,piece_count,sub_district,outstanding_amount,payment_method,customer_phone,packer_name,pier_name',
+      'id,makro_order_no,customer_name_en,status,boat_id,paper_box_count,foam_box_count,piece_count,sub_district,outstanding_amount,payment_method,customer_phone,packer_name,pier_name,packed_with_order_id,packed_with:orders!packed_with_order_id(makro_order_no)',
     )
     .eq('ship_date', shipDate)
   if (error) throw new Error('โหลดรายการออเดอร์ไม่สำเร็จ: ' + error.message)

@@ -73,3 +73,29 @@ test('the print button calls window.print', async () => {
   expect(print).toHaveBeenCalled()
   vi.unstubAllGlobals()
 })
+
+test('a PO packed together with another shows a pointer to the primary PO label instead of looking empty', async () => {
+  getOrder.mockReset().mockResolvedValue({
+    id: 'ord2',
+    makro_order_no: 'PO-2',
+    customer_name_en: 'BLUE VIEW',
+    ship_date: '2026-10-01',
+    paper_box_count: 0,
+    foam_box_count: 0,
+    piece_count: 0,
+    packed_with_order_id: 'ord1',
+    packed_with: { makro_order_no: 'PO-1' },
+  })
+  renderPage()
+  expect(await screen.findByText(/ออเดอร์นี้แพ็ครวมกับ PO-1/)).toBeInTheDocument()
+  expect(screen.getByRole('link', { name: 'เปิดใบเขียนหน้าลัง PO-1' })).toHaveAttribute(
+    'href',
+    '/order/ord1/label',
+  )
+})
+
+test('an ordinary PO shows no packed-together notice', async () => {
+  renderPage()
+  await screen.findByText('BLUE VIEW')
+  expect(screen.queryByText(/แพ็ครวมกับ/)).not.toBeInTheDocument()
+})

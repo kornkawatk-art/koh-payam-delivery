@@ -97,6 +97,9 @@ function buildMessage(
     case 'pack_saved':
       return `บันทึกแพ็คออเดอร์ ${orderNo(r.entity_id)} — ลังกระดาษ ${meta.paperCount} · ลังโฟม ${meta.foamCount} · ชิ้น ${meta.pieceCount}${by}`
 
+    case 'pack_group_saved':
+      return `บันทึกแพ็ครวม ${meta.orderIds?.length ?? 0} ออเดอร์ของลูกค้าเดียวกัน (ออเดอร์หลัก ${orderNo(r.entity_id)}) — ลังกระดาษ ${meta.paperCount} · ลังโฟม ${meta.foamCount} · ชิ้น ${meta.pieceCount}${by}`
+
     case 'claim_submitted':
       // Customer-initiated -- no "โดย" clause. user_id is always null.
       return `ลูกค้ายื่นเคลม — ออเดอร์ ${claimOrderNo(r.entity_id)}`
