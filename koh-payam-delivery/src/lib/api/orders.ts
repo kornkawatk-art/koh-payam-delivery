@@ -27,6 +27,27 @@ function itemRows(orderId: string, items: ParsedItem[], packedByKey?: Map<string
   }))
 }
 
+export type OtherDayOrder = { makro_order_no: string; ship_date: string; status: string }
+
+// POs from `nos` that already exist on a ship date OTHER than `shipDate`. The
+// same Makro export routinely re-lists POs imported (and often already
+// shipped) on earlier days, and uniqueness is only per ship day -- without
+// this check every re-listed PO would be created again as a fresh "imported"
+// order on the new day, along with fresh duplicate shortage backorders.
+export async function listOrdersOnOtherDays(
+  nos: string[],
+  shipDate: string,
+): Promise<OtherDayOrder[]> {
+  if (nos.length === 0) return []
+  const { data, error } = await supabase
+    .from('orders')
+    .select('makro_order_no,ship_date,status')
+    .neq('ship_date', shipDate)
+    .in('makro_order_no', nos)
+  if (error) throw new Error('ตรวจออเดอร์ที่เคยนำเข้าแล้วไม่สำเร็จ: ' + error.message)
+  return (data ?? []) as OtherDayOrder[]
+}
+
 // Re-import is a non-destructive sync: brand-new orders are inserted, orders that
 // already exist for this ship day get their order-level makro fields refreshed and
 // their line items replaced from the file. Box counts, boat, status, timestamps,
@@ -36,12 +57,18 @@ function itemRows(orderId: string, items: ParsedItem[], packedByKey?: Map<string
 // backorder list too, not just on the order's own item table. Each line's own
 // "packed" tick is carried forward across the sync too (matched by
 // makro_item_id, or product_name when that's blank) — see itemRows below.
+// A PO that already exists on a DIFFERENT ship day is skipped, never re-created
+// (listOrdersOnOtherDays); the skipped list is returned so the UI can say so.
 export async function commitImport(
   shipDate: string,
-  orders: ParsedOrder[],
-): Promise<{ created: number; synced: number }> {
+  incoming: ParsedOrder[],
+): Promise<{
+  created: number
+  synced: number
+  skipped: { makroOrderNo: string; shipDate: string }[]
+}> {
   const day = await getOrCreateShipDay(shipDate)
-  const nos = orders.map((o) => o.makroOrderNo)
+  const nos = incoming.map((o) => o.makroOrderNo)
   const { data: existing } = await supabase
     .from('orders')
     .select('id,makro_order_no')
@@ -50,6 +77,15 @@ export async function commitImport(
   const idByNo = new Map<string, string>(
     (existing ?? []).map((r: any) => [r.makro_order_no, r.id]),
   )
+
+  // A PO already imported on another day is skipped, never duplicated. (One
+  // that also exists on THIS day still syncs in place -- same-day wins.)
+  const elsewhere = new Map<string, string>()
+  for (const r of await listOrdersOnOtherDays(nos, shipDate))
+    if (!idByNo.has(r.makro_order_no) && !elsewhere.has(r.makro_order_no))
+      elsewhere.set(r.makro_order_no, r.ship_date)
+  const orders = incoming.filter((o) => !elsewhere.has(o.makroOrderNo))
+  const skipped = Array.from(elsewhere, ([makroOrderNo, d]) => ({ makroOrderNo, shipDate: d }))
 
   let created = 0
   let synced = 0
@@ -134,8 +170,13 @@ export async function commitImport(
   }
 
   await linkBackordersToDay(shipDate)
-  await logAction('import', 'ship_day', day.id, { shipDate, created, synced })
-  return { created, synced }
+  await logAction('import', 'ship_day', day.id, {
+    shipDate,
+    created,
+    synced,
+    skipped: skipped.length,
+  })
+  return { created, synced, skipped }
 }
 
 // Lookup by the Makro shipping-label QR code (plain text = makro_order_no).

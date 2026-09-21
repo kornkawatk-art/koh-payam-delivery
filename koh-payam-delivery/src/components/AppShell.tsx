@@ -4,6 +4,7 @@ import { List, SignOut } from '@phosphor-icons/react'
 import { useAuth } from '../lib/auth'
 import { NAV, canAccess } from '../lib/roles'
 import { NAV_ACCENT_CLASSES } from '../lib/navAccentStyles'
+import { useAppUpdate } from '../lib/useAppUpdate'
 
 export default function AppShell() {
   const { profile, signOut } = useAuth()
@@ -11,6 +12,7 @@ export default function AppShell() {
   const items = NAV.filter((n) => canAccess(n.path, role))
   const [open, setOpen] = useState(false)
   const { pathname } = useLocation()
+  const updateAvailable = useAppUpdate()
 
   // Close the mobile drawer on navigation and on Escape.
   useEffect(() => setOpen(false), [pathname])
@@ -124,6 +126,18 @@ export default function AppShell() {
           <Outlet />
         </main>
       </div>
+
+      {updateAvailable && (
+        <div
+          role="alert"
+          className="fixed inset-x-3 bottom-3 z-50 mx-auto flex max-w-md items-center justify-between gap-3 rounded-xl border border-warn/30 bg-warn-soft px-4 py-3 text-sm text-warn-ink shadow-pop"
+        >
+          <span>มีเวอร์ชันใหม่ของแอป — รีเฟรชก่อนใช้งานต่อเพื่อให้ข้อมูลถูกต้อง</span>
+          <button className="btn btn-warn btn-sm shrink-0" onClick={() => location.reload()}>
+            รีเฟรช
+          </button>
+        </div>
+      )}
     </div>
   )
 }

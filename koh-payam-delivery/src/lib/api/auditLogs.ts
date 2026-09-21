@@ -68,7 +68,7 @@ function buildMessage(
 
   switch (r.action) {
     case 'import':
-      return `นำเข้าออเดอร์วันที่ ${meta.shipDate} — ใหม่ ${meta.created} รายการ · sync ${meta.synced} รายการ${by}`
+      return `นำเข้าออเดอร์วันที่ ${meta.shipDate} — ใหม่ ${meta.created} รายการ · sync ${meta.synced} รายการ${meta.skipped > 0 ? ` · ข้าม ${meta.skipped} รายการที่เคยนำเข้าแล้ว` : ''}${by}`
 
     case 'status_change': {
       const fromLabel = STATUS_LABEL[meta.from] ?? meta.from

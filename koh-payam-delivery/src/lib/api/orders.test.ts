@@ -1,5 +1,6 @@
 import {
   commitImport,
+  listOrdersOnOtherDays,
   deleteOrder,
   findOrdersByMakroOrderNo,
   listOrdersForCustomerDay,
@@ -22,6 +23,8 @@ const state = {
   searchResult: [] as any[],
   searchError: null as null | { message: string },
   oldItems: [] as any[],
+  elsewhere: [] as any[],
+  elsewhereError: null as null | { message: string },
   customerDayRows: [] as any[],
   customerDayError: null as null | { message: string },
   customerDayCalls: [] as any[],
@@ -55,7 +58,18 @@ vi.mock('../supabase', () => {
         }
         return b
       },
-      in: () => Promise.resolve({ data: state.existing, error: null }),
+      // listOrdersOnOtherDays: select(...).neq('ship_date', d).in('makro_order_no', nos)
+      neq: () => {
+        b.__other = true
+        return b
+      },
+      in: () => {
+        if (b.__other) {
+          b.__other = false
+          return Promise.resolve({ data: state.elsewhere, error: state.elsewhereError })
+        }
+        return Promise.resolve({ data: state.existing, error: null })
+      },
       single: () => Promise.resolve({ data: state.current, error: null }),
       insert: (rows: any) => {
         state.inserted.push({ table, rows })
@@ -174,6 +188,8 @@ beforeEach(() => {
   state.searchResult = []
   state.searchError = null
   state.oldItems = []
+  state.elsewhere = []
+  state.elsewhereError = null
   state.customerDayRows = []
   state.customerDayError = null
   state.customerDayCalls = []
@@ -186,7 +202,7 @@ beforeEach(() => {
 
 test('fresh import inserts orders + items and counts created', async () => {
   const r = await commitImport('2026-10-01', parsedOrders as any)
-  expect(r).toEqual({ created: 1, synced: 0 })
+  expect(r).toEqual({ created: 1, synced: 0, skipped: [] })
   const ordIns = state.inserted.find((i) => i.table === 'orders')
   expect(ordIns.rows).toMatchObject({
     makro_order_no: 'PO-1',
@@ -221,7 +237,7 @@ test('fresh import inserts orders + items and counts created', async () => {
 test('re-import of an existing order syncs without touching protected columns', async () => {
   state.existing = [{ id: 'old1', makro_order_no: 'PO-1' }]
   const r = await commitImport('2026-10-01', parsedOrders as any)
-  expect(r).toEqual({ created: 0, synced: 1 })
+  expect(r).toEqual({ created: 0, synced: 1, skipped: [] })
 
   // orders row is not inserted again
   expect(state.inserted.some((i) => i.table === 'orders')).toBe(false)
@@ -463,4 +479,58 @@ test('setOrderBoats throws when no PO was updatable (all already shipped) and lo
 test('setOrderBoats surfaces a database error in Thai', async () => {
   state.updateError = { message: 'boom' }
   await expect(setOrderBoats(['a'], '2')).rejects.toThrow('บันทึกเรือไม่สำเร็จ: boom')
+})
+
+test('a PO already imported on ANOTHER day is skipped: nothing is created, synced or back-ordered for it', async () => {
+  state.elsewhere = [{ makro_order_no: 'PO-1', ship_date: '2026-09-19', status: 'shipped' }]
+  const r = await commitImport('2026-10-01', parsedOrders as any)
+  expect(r).toEqual({
+    created: 0,
+    synced: 0,
+    skipped: [{ makroOrderNo: 'PO-1', shipDate: '2026-09-19' }],
+  })
+  expect(state.inserted.some((i) => i.table === 'orders' || i.table === 'order_items')).toBe(false)
+  expect(state.updated.some((u) => u.table === 'orders')).toBe(false)
+  expect(syncShortageBackorders).not.toHaveBeenCalled()
+  expect(logAction).toHaveBeenCalledWith('import', 'ship_day', 'sd1', {
+    shipDate: '2026-10-01',
+    created: 0,
+    synced: 0,
+    skipped: 1,
+  })
+})
+
+test('a PO that exists on THIS day (and also on another) still syncs in place -- same day wins', async () => {
+  state.existing = [{ id: 'old1', makro_order_no: 'PO-1' }]
+  state.elsewhere = [{ makro_order_no: 'PO-1', ship_date: '2026-09-19', status: 'shipped' }]
+  const r = await commitImport('2026-10-01', parsedOrders as any)
+  expect(r).toEqual({ created: 0, synced: 1, skipped: [] })
+})
+
+test('in a mixed file only the already-imported POs are skipped; the new ones are created', async () => {
+  state.elsewhere = [{ makro_order_no: 'PO-1', ship_date: '2026-09-19', status: 'shipped' }]
+  const twoOrders = [parsedOrders[0], { ...parsedOrders[0], makroOrderNo: 'PO-2', customerName: 'B' }]
+  const r = await commitImport('2026-10-01', twoOrders as any)
+  expect(r.created).toBe(1)
+  expect(r.skipped).toEqual([{ makroOrderNo: 'PO-1', shipDate: '2026-09-19' }])
+  const ordIns = state.inserted.filter((i) => i.table === 'orders')
+  expect(ordIns).toHaveLength(1)
+  expect(ordIns[0].rows.makro_order_no).toBe('PO-2')
+})
+
+test('the same skipped PO listed on two other days is reported once', async () => {
+  state.elsewhere = [
+    { makro_order_no: 'PO-1', ship_date: '2026-09-19', status: 'shipped' },
+    { makro_order_no: 'PO-1', ship_date: '2026-09-20', status: 'imported' },
+  ]
+  const r = await commitImport('2026-10-01', parsedOrders as any)
+  expect(r.skipped).toHaveLength(1)
+})
+
+test('listOrdersOnOtherDays returns the rows, short-circuits on an empty list, and throws a Thai error on failure', async () => {
+  state.elsewhere = [{ makro_order_no: 'PO-1', ship_date: '2026-09-19', status: 'shipped' }]
+  expect(await listOrdersOnOtherDays(['PO-1'], '2026-10-01')).toEqual(state.elsewhere)
+  expect(await listOrdersOnOtherDays([], '2026-10-01')).toEqual([])
+  state.elsewhereError = { message: 'boom' }
+  await expect(listOrdersOnOtherDays(['PO-1'], '2026-10-01')).rejects.toThrow('ตรวจออเดอร์ที่เคยนำเข้าแล้วไม่สำเร็จ: boom')
 })
