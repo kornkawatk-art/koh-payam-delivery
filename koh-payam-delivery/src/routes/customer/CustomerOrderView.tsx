@@ -19,7 +19,7 @@ type Item = {
 type Claim = {
   id: string
   type: string
-  items: { productName: string | null; qty: number }[]
+  items: { productName: string | null; itemId?: string | null; qty: number }[]
   description: string
   status: string
   resolution: string | null
@@ -277,6 +277,7 @@ export default function CustomerOrderView() {
                     {c.items.map((it, i) => (
                       <span key={i}>
                         {i > 0 ? ', ' : ''}
+                        {it.itemId ? `${it.itemId} · ` : ''}
                         {it.productName} × {it.qty}
                       </span>
                     ))}

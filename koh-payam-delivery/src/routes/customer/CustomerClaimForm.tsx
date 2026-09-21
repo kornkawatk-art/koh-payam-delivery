@@ -10,7 +10,7 @@ type ClaimType = (typeof CLAIM_TYPES)[number]
 
 type Props = {
   token: string
-  items: { productName: string; shippedQty: number }[]
+  items: { productName: string; itemId?: string | null; shippedQty: number }[]
   lang: Lang
   onDone: () => void
 }
@@ -135,7 +135,7 @@ export default function CustomerClaimForm({ token, items, lang, onDone }: Props)
           <legend className="section-title">
             {t(lang, type === 'damaged' ? 'claim_form_damaged_items' : 'claim_form_missing_items')}
           </legend>
-          {claimableItems.map(({ productName, shippedQty, index }) => {
+          {claimableItems.map(({ productName, itemId, shippedQty, index }) => {
             const checked = index in checkedItems
             return (
               <div key={`${productName}-${index}`} className="flex items-center gap-3 text-sm">
@@ -145,7 +145,10 @@ export default function CustomerClaimForm({ token, items, lang, onDone }: Props)
                     checked={checked}
                     onChange={(e) => toggleItem(index, e.target.checked)}
                   />
-                  {productName}
+                  <span>
+                    {itemId && <span className="tnum text-ink-soft">{itemId} · </span>}
+                    {productName}
+                  </span>
                 </label>
                 {checked && (
                   <input
