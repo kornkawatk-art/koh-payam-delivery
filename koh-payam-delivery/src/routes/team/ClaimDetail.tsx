@@ -92,7 +92,10 @@ export default function ClaimDetail() {
     }
   }
 
-  const claimItems = (c.claim_items ?? []) as { qty: number; order_items: { product_name: string } | null }[]
+  const claimItems = (c.claim_items ?? []) as {
+    qty: number
+    order_items: { product_name: string; makro_item_id?: string | null } | null
+  }[]
 
   return (
     <div className="flex flex-col gap-5">
@@ -104,6 +107,9 @@ export default function ClaimDetail() {
           <ul className="list-inside list-disc">
             {claimItems.map((ci, i) => (
               <li key={i}>
+                {ci.order_items?.makro_item_id && (
+                  <span className="tnum text-ink-soft">{ci.order_items.makro_item_id} · </span>
+                )}
                 {ci.order_items?.product_name ?? 'ไม่ระบุสินค้า'} × {ci.qty}
               </li>
             ))}
