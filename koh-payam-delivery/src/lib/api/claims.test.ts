@@ -143,7 +143,7 @@ test('getClaim selects claim_items with product_name, without any price column',
   state.singleData = { id: 'c1', description: '' }
   await getClaim('c1')
   expect(
-    state.selectArgs.some((s) => s.includes('claim_items(qty,order_items(product_name))')),
+    state.selectArgs.some((s) => s.includes('claim_items(qty,order_items(product_name,makro_item_id))')),
   ).toBe(true)
   expect(state.selectArgs.some((s) => /price|value_cached/.test(s))).toBe(false)
 })

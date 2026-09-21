@@ -77,6 +77,22 @@ test('renders several claim_items entries for a multi-item missing_in_box claim'
   expect(screen.getByText('fish sauce × 1')).toBeInTheDocument()
 })
 
+test('shows the makro item code in front of each claimed product, and omits it when the order line has none', async () => {
+  getClaim.mockReset().mockResolvedValue({
+    ...claim,
+    type: 'missing_in_box',
+    claim_items: [
+      { qty: 2, order_items: { product_name: 'rice', makro_item_id: '100001' } },
+      { qty: 1, order_items: { product_name: 'fish sauce', makro_item_id: null } },
+    ],
+  })
+  renderPage()
+  await screen.findByLabelText('จำนวนเงินคืน')
+  const rice = screen.getByText('rice × 2').closest('li')!
+  expect(rice).toHaveTextContent('100001 · rice × 2')
+  expect(screen.getByText('fish sauce × 1').closest('li')).toHaveTextContent(/^fish sauce × 1$/)
+})
+
 test('renders no item list for a box_lost claim (zero claim_items)', async () => {
   getClaim.mockReset().mockResolvedValue({ ...claim, type: 'box_lost', claim_items: [] })
   renderPage()
