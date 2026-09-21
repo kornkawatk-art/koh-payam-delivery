@@ -185,6 +185,32 @@ test('renders each claim item as product × qty for a multi-item claim', async (
   expect(document.body.textContent).toContain('Fish sauce × 1')
 })
 
+test('a claim item carries its makro item code when the order line has one', async () => {
+  fetchMock.mockReset().mockResolvedValue(
+    ok({
+      ...payload,
+      claims: [
+        {
+          id: 'c1',
+          type: 'missing_in_box',
+          items: [
+            { productName: 'Rice 5kg', itemId: '100001', qty: 2 },
+            { productName: 'Fish sauce', itemId: null, qty: 1 },
+          ],
+          description: '',
+          status: 'open',
+          resolution: null,
+          createdAt: '2026-09-10T00:00:00.000Z',
+        },
+      ],
+    }),
+  )
+  renderAt()
+  await screen.findByText(/PO-1001/)
+  expect(document.body.textContent).toContain('100001 · Rice 5kg × 2')
+  expect(document.body.textContent).toContain('Fish sauce × 1')
+})
+
 test('renders a claim with no items (box_lost) with no item line', async () => {
   fetchMock.mockReset().mockResolvedValue(
     ok({

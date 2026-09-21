@@ -63,7 +63,7 @@ Deno.serve(async (req) => {
   const { data: o, error } = await admin
     .from('orders')
     .select(
-      '*, order_items(product_name,makro_item_id,qty_ordered,qty_shipped,shortage_qty,status,line_no), evidence_photos(r2_key,taken_at), claims(id,type,description,status,resolution,created_at,refund_amount,claim_items(qty,order_items(product_name))), ship_days(boats)',
+      '*, order_items(product_name,makro_item_id,qty_ordered,qty_shipped,shortage_qty,status,line_no), evidence_photos(r2_key,taken_at), claims(id,type,description,status,resolution,created_at,refund_amount,claim_items(qty,order_items(product_name,makro_item_id))), ship_days(boats)',
     )
     .eq('link_token', token)
     .single()
@@ -156,6 +156,8 @@ Deno.serve(async (req) => {
       items: ((c.claim_items ?? []) as Array<Record<string, unknown>>).map((ci) => ({
         productName:
           (ci.order_items as { product_name?: string } | null)?.product_name ?? null,
+        itemId:
+          (ci.order_items as { makro_item_id?: string } | null)?.makro_item_id ?? null,
         qty: Number(ci.qty),
       })),
       // I7: never leak internal team notes. ClaimDetail appends manager notes as

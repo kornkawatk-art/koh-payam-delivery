@@ -306,3 +306,19 @@ test('a failed submit surfaces a translated error and does not call onDone', asy
   ).toBeInTheDocument()
   expect(onDone).not.toHaveBeenCalled()
 })
+
+test('the item checklist shows the makro item code before the product name (and just the name when there is none)', async () => {
+  render(
+    <CustomerClaimForm
+      token="tok_abc"
+      items={[
+        { productName: 'Rice 5kg', itemId: '100001', shippedQty: 10 },
+        { productName: 'Fish sauce', itemId: null, shippedQty: 4 },
+      ]}
+      lang="en"
+      onDone={vi.fn()}
+    />,
+  )
+  expect(screen.getByRole('checkbox', { name: '100001 · Rice 5kg' })).toBeInTheDocument()
+  expect(screen.getByRole('checkbox', { name: 'Fish sauce' })).toBeInTheDocument()
+})
