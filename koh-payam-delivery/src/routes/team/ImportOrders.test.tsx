@@ -16,8 +16,10 @@ vi.mock('../../lib/import/buildImport', async (orig) => ({
 }))
 
 const commitImport = vi.fn()
+const listOrdersOnOtherDays = vi.fn()
 vi.mock('../../lib/api/orders', () => ({
   commitImport: (...a: unknown[]) => commitImport(...a),
+  listOrdersOnOtherDays: (...a: unknown[]) => listOrdersOnOtherDays(...a),
 }))
 
 // Detail file rows must expose every column the default detail mapping points at.
@@ -65,7 +67,8 @@ beforeEach(() => {
   localStorage.clear()
   parseMakroFile.mockReset()
   buildImportMock.mockReset().mockReturnValue(baseResult)
-  commitImport.mockReset().mockResolvedValue({ created: 1, synced: 0 })
+  commitImport.mockReset().mockResolvedValue({ created: 1, synced: 0, skipped: [] })
+  listOrdersOnOtherDays.mockReset().mockResolvedValue([])
 })
 
 async function uploadBoth() {
@@ -116,11 +119,50 @@ test('preview surfaces the shippedAllZero warning', async () => {
 })
 
 test('import calls commitImport(shipDate, orders) and reports created/synced', async () => {
-  commitImport.mockResolvedValue({ created: 3, synced: 2 })
+  commitImport.mockResolvedValue({ created: 3, synced: 2, skipped: [] })
   await uploadBoth()
   await userEvent.click(await screen.findByRole('button', { name: /ดูตัวอย่าง/i }))
   await userEvent.click(await screen.findByRole('button', { name: /นำเข้า 1 ออเดอร์/i }))
 
   expect(commitImport).toHaveBeenCalledWith('2026-09-11', baseResult.orders)
   expect(await screen.findByText(/นำเข้า 3 ใหม่ · sync 2/i)).toBeInTheDocument()
+})
+
+test('preview warns which POs were already imported on another day, and the import button counts only the ones that will be created', async () => {
+  listOrdersOnOtherDays.mockResolvedValue([
+    { makro_order_no: 'P-1', ship_date: '2026-09-09', status: 'shipped' },
+  ])
+  await uploadBoth()
+  await userEvent.click(await screen.findByRole('button', { name: /ดูตัวอย่าง/i }))
+  expect(await screen.findByText('จะข้าม 1 ออเดอร์ที่เคยนำเข้าแล้วในวันอื่น')).toBeInTheDocument()
+  expect(screen.getByText('P-1 (2026-09-09)')).toBeInTheDocument()
+  // the only order in the file is already imported elsewhere -> nothing left to import
+  expect(screen.getByRole('button', { name: /นำเข้า 0 ออเดอร์/i })).toBeDisabled()
+  expect(listOrdersOnOtherDays).toHaveBeenCalledWith(['P-1'], '2026-09-11')
+})
+
+test('no already-imported warning when none of the POs exist on another day', async () => {
+  await uploadBoth()
+  await userEvent.click(await screen.findByRole('button', { name: /ดูตัวอย่าง/i }))
+  await screen.findByRole('button', { name: /นำเข้า 1 ออเดอร์/i })
+  expect(screen.queryByText(/จะข้าม/)).not.toBeInTheDocument()
+})
+
+test('a failed already-imported lookup never blocks the preview (commit re-checks anyway)', async () => {
+  listOrdersOnOtherDays.mockRejectedValue(new Error('offline'))
+  await uploadBoth()
+  await userEvent.click(await screen.findByRole('button', { name: /ดูตัวอย่าง/i }))
+  expect(await screen.findByRole('button', { name: /นำเข้า 1 ออเดอร์/i })).toBeEnabled()
+})
+
+test('the result message reports how many POs were skipped as already imported', async () => {
+  commitImport.mockResolvedValue({
+    created: 1,
+    synced: 0,
+    skipped: [{ makroOrderNo: 'P-9', shipDate: '2026-09-08' }],
+  })
+  await uploadBoth()
+  await userEvent.click(await screen.findByRole('button', { name: /ดูตัวอย่าง/i }))
+  await userEvent.click(await screen.findByRole('button', { name: /นำเข้า 1 ออเดอร์/i }))
+  expect(await screen.findByText('นำเข้า 1 ใหม่ · sync 0 · ข้าม 1 ที่เคยนำเข้าแล้ว')).toBeInTheDocument()
 })

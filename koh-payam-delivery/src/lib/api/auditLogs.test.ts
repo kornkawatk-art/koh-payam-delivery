@@ -236,6 +236,34 @@ test('action: order_deleted uses only its own camelCase meta, no order lookup', 
   expect(calls.find((c) => c[0] === 'select' && c[1] === 'orders')).toBeUndefined()
 })
 
+test('action: import mentions skipped already-imported POs only when there were some', async () => {
+  auditRows = [
+    {
+      id: 90,
+      user_id: 'u1',
+      action: 'import',
+      entity_type: 'ship_day',
+      entity_id: 'sd1',
+      meta: { shipDate: '2026-09-21', created: 1, synced: 0, skipped: 24 },
+      created_at: '2026-09-21T00:00:00.000Z',
+    },
+    {
+      id: 91,
+      user_id: 'u1',
+      action: 'import',
+      entity_type: 'ship_day',
+      entity_id: 'sd1',
+      meta: { shipDate: '2026-09-21', created: 1, synced: 0 },
+      created_at: '2026-09-21T00:00:01.000Z',
+    },
+  ]
+  profilesData = [PROFILE]
+  const rows = await listAuditLogs()
+  const byId = Object.fromEntries(rows.map((r: any) => [r.id, r.message]))
+  expect(byId[90]).toContain('· ข้าม 24 รายการที่เคยนำเข้าแล้ว')
+  expect(byId[91]).not.toContain('ข้าม')
+})
+
 test('action: pack_saved', async () => {
   ordersData = [ORDER]
   profilesData = [PROFILE]

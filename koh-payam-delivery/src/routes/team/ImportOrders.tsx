@@ -1,4 +1,4 @@
-import { useMemo, useState, type ChangeEvent } from 'react'
+import { useEffect, useMemo, useState, type ChangeEvent } from 'react'
 import { parseMakroFile, detectFileKind, type RawRow } from '../../lib/import/parseMakroFile'
 import {
   buildImport,
@@ -11,7 +11,7 @@ import {
   type OrderMapping,
   type BuildResult,
 } from '../../lib/import/buildImport'
-import { commitImport } from '../../lib/api/orders'
+import { commitImport, listOrdersOnOtherDays, type OtherDayOrder } from '../../lib/api/orders'
 import { UploadSimple } from '@phosphor-icons/react'
 import { PageHeader } from '../../components/ui/PageHeader'
 import { todayLocalISO } from '../../lib/format'
@@ -49,6 +49,27 @@ export default function ImportOrders() {
   const [result, setResult] = useState<BuildResult | null>(null)
   const [importMsg, setImportMsg] = useState<string>()
   const [error, setError] = useState<string>()
+  // POs in this file that already exist on another ship day (they'll be skipped)
+  const [alreadyImported, setAlreadyImported] = useState<OtherDayOrder[]>([])
+
+  useEffect(() => {
+    if (!result || result.orders.length === 0) {
+      setAlreadyImported([])
+      return
+    }
+    let active = true
+    listOrdersOnOtherDays(result.orders.map((o) => o.makroOrderNo), shipDate)
+      .then((rows) => active && setAlreadyImported(rows))
+      .catch(() => active && setAlreadyImported([])) // preview hint only; commit re-checks
+    return () => {
+      active = false
+    }
+  }, [result, shipDate])
+  const skipNos = useMemo(
+    () => new Set(alreadyImported.map((r) => r.makro_order_no)),
+    [alreadyImported],
+  )
+  const toImport = result ? result.orders.filter((o) => !skipNos.has(o.makroOrderNo)) : []
 
   const detailProblems = useMemo(
     () => (detailHeaders.length ? validateMapping('detail', detailHeaders, dm) : []),
@@ -115,7 +136,10 @@ export default function ImportOrders() {
     setError(undefined)
     try {
       const r = await commitImport(shipDate, result.orders)
-      setImportMsg(`นำเข้า ${r.created} ใหม่ · sync ${r.synced}`)
+      setImportMsg(
+        `นำเข้า ${r.created} ใหม่ · sync ${r.synced}` +
+          (r.skipped.length > 0 ? ` · ข้าม ${r.skipped.length} ที่เคยนำเข้าแล้ว` : ''),
+      )
     } catch (e) {
       setError((e as Error).message)
     }
@@ -252,6 +276,19 @@ export default function ImportOrders() {
             </table>
           </div>
 
+          {alreadyImported.length > 0 && (
+            <div className="alert alert-warn">
+              <p className="font-semibold">
+                จะข้าม {new Set(alreadyImported.map((r) => r.makro_order_no)).size} ออเดอร์ที่เคยนำเข้าแล้วในวันอื่น
+              </p>
+              <p className="mt-1 text-xs">
+                {alreadyImported
+                  .map((r) => `${r.makro_order_no} (${r.ship_date})`)
+                  .join(', ')}
+              </p>
+            </div>
+          )}
+
           <label className="field w-fit">
             <span className="field-label">วันจัดส่ง</span>
             <input
@@ -268,9 +305,9 @@ export default function ImportOrders() {
           <button
             className="btn btn-primary w-full sm:w-auto"
             onClick={doImport}
-            disabled={result.orders.length === 0}
+            disabled={toImport.length === 0}
           >
-            นำเข้า {result.orders.length} ออเดอร์
+            นำเข้า {toImport.length} ออเดอร์
           </button>
         </div>
       )}
