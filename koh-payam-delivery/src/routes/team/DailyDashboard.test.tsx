@@ -2,7 +2,8 @@ import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Routes, Route, useParams } from 'react-router-dom'
 import DailyDashboard from './DailyDashboard'
-import { listOrdersForDay } from '../../lib/api/shipDays'
+import { listOrdersForDay, getShipDayLinksSentAt, sendOrderLinks } from '../../lib/api/shipDays'
+import { todayLocalISO } from '../../lib/format'
 
 // QrOrderScanner owns the real camera (html5-qrcode) — stub it so this file
 // only exercises the dashboard's own toggle + navigate-on-found wiring.
@@ -64,6 +65,10 @@ vi.mock('../../lib/api/shipDays', () => ({
       outstanding_amount: 0,
     },
   ]),
+  // Non-null by default so the new "ยังไม่ได้ส่งลิงก์ไลน์" banner stays out of
+  // every pre-existing test's way; tests that care override it explicitly.
+  getShipDayLinksSentAt: vi.fn().mockResolvedValue('2026-01-01T00:00:00.000Z'),
+  sendOrderLinks: vi.fn().mockResolvedValue({ sent: 0, failed: 0, skipped: false }),
 }))
 
 const listBackordersForDay = vi.fn().mockResolvedValue([])
@@ -386,4 +391,59 @@ test('a found order (onFound) navigates to /order/<id> and closes the scanner', 
 
   expect(await screen.findByText('order detail page 2')).toBeInTheDocument()
   expect(screen.queryByText('qr scanner section')).not.toBeInTheDocument()
+})
+
+test('prompts to send LINE links when they have not been sent yet for today, and the prompt clears once sent', async () => {
+  vi.mocked(getShipDayLinksSentAt).mockResolvedValueOnce(null)
+  renderPage()
+  await screen.findByText('BLUE VIEW')
+  expect(await screen.findByText('ยังไม่ได้ส่งลิงก์ไลน์ให้ลูกค้าวันนี้')).toBeInTheDocument()
+
+  vi.mocked(sendOrderLinks).mockResolvedValueOnce({ sent: 3, failed: 0, skipped: false })
+  await userEvent.click(screen.getByRole('button', { name: 'ส่งลิงก์ไลน์เลย' }))
+
+  expect(sendOrderLinks).toHaveBeenCalledWith(todayLocalISO())
+  expect(await screen.findByText('ส่งลิงก์ไลน์ 3 ฉบับ')).toBeInTheDocument()
+  expect(
+    screen.queryByText('ยังไม่ได้ส่งลิงก์ไลน์ให้ลูกค้าวันนี้'),
+  ).not.toBeInTheDocument()
+})
+
+test('no send-links prompt when links were already sent for today', async () => {
+  renderPage()
+  await screen.findByText('BLUE VIEW')
+  expect(
+    screen.queryByText('ยังไม่ได้ส่งลิงก์ไลน์ให้ลูกค้าวันนี้'),
+  ).not.toBeInTheDocument()
+})
+
+test('shows a Thai error inline when sending fails, and keeps the prompt so it can be retried', async () => {
+  vi.mocked(getShipDayLinksSentAt).mockResolvedValueOnce(null)
+  vi.mocked(sendOrderLinks).mockRejectedValueOnce(new Error('ยังไม่ได้ตั้งค่า LINE'))
+  renderPage()
+  await screen.findByText('BLUE VIEW')
+  await screen.findByText('ยังไม่ได้ส่งลิงก์ไลน์ให้ลูกค้าวันนี้')
+
+  await userEvent.click(screen.getByRole('button', { name: 'ส่งลิงก์ไลน์เลย' }))
+
+  expect(await screen.findByText('ยังไม่ได้ตั้งค่า LINE')).toBeInTheDocument()
+  expect(screen.getByText('ยังไม่ได้ส่งลิงก์ไลน์ให้ลูกค้าวันนี้')).toBeInTheDocument()
+})
+
+test('never checks or offers to send links for a date other than today', async () => {
+  vi.mocked(getShipDayLinksSentAt).mockClear()
+  renderPage()
+  await screen.findByText('BLUE VIEW')
+  await waitFor(() => expect(getShipDayLinksSentAt).toHaveBeenCalledTimes(1))
+
+  const dateInput = document.querySelector('input[type="date"]') as HTMLInputElement
+  await userEvent.clear(dateInput)
+  await userEvent.type(dateInput, '2020-01-15')
+
+  await waitFor(() => expect(dateInput.value).toBe('2020-01-15'))
+  expect(
+    screen.queryByText('ยังไม่ได้ส่งลิงก์ไลน์ให้ลูกค้าวันนี้'),
+  ).not.toBeInTheDocument()
+  // still just the one call from the initial (today) render -- never re-queried for the past date
+  expect(getShipDayLinksSentAt).toHaveBeenCalledTimes(1)
 })

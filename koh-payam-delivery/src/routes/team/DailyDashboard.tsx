@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { listOrdersForDay } from '../../lib/api/shipDays'
+import { listOrdersForDay, getShipDayLinksSentAt, sendOrderLinks } from '../../lib/api/shipDays'
 import { listBackordersForDay, type BackorderRow } from '../../lib/api/backorders'
 import { supabase } from '../../lib/supabase'
 import {
@@ -28,6 +28,10 @@ export default function DailyDashboard() {
   const [backorders, setBackorders] = useState<BackorderRow[]>([])
   const [q, setQ] = useState('')
   const [scanOpen, setScanOpen] = useState(false)
+  // undefined = not loaded yet (don't flash the banner while unknown)
+  const [linksSentAt, setLinksSentAt] = useState<string | null | undefined>(undefined)
+  const [linkSendBusy, setLinkSendBusy] = useState(false)
+  const [linkSendMsg, setLinkSendMsg] = useState<string>()
 
   const load = useCallback(async () => {
     setFailed(false)
@@ -51,6 +55,44 @@ export default function DailyDashboard() {
       active = false
     }
   }, [date])
+
+  useEffect(() => {
+    let active = true
+    setLinksSentAt(undefined)
+    setLinkSendMsg(undefined)
+    // Only today's send status is ever actionable (send-order-links itself
+    // silently skips any other date -- see its own file header), so don't
+    // bother the server for a date this page could never offer to send for.
+    if (date !== todayLocalISO()) return
+    getShipDayLinksSentAt(date)
+      .then((v) => {
+        if (active) setLinksSentAt(v)
+      })
+      .catch(() => {
+        if (active) setLinksSentAt(null)
+      })
+    return () => {
+      active = false
+    }
+  }, [date])
+
+  // Manual catch-all for a day nobody opened "ตั้งค่าเรือประจำวัน" for (the
+  // only other place that triggers a send) -- e.g. the boat list from
+  // yesterday is still fine so nobody saves it again. Safe to press more than
+  // once: the edge function itself is idempotent per ship day.
+  async function sendLinksNow() {
+    setLinkSendBusy(true)
+    setLinkSendMsg(undefined)
+    try {
+      const { sent, skipped } = await sendOrderLinks(date)
+      setLinkSendMsg(skipped ? 'ส่งลิงก์ไลน์ไปแล้วก่อนหน้านี้' : `ส่งลิงก์ไลน์ ${sent} ฉบับ`)
+      setLinksSentAt(new Date().toISOString())
+    } catch (e) {
+      setLinkSendMsg((e as Error).message)
+    } finally {
+      setLinkSendBusy(false)
+    }
+  }
 
   useEffect(() => {
     load()
@@ -148,6 +190,30 @@ export default function DailyDashboard() {
           <span className="tnum font-semibold text-ink">{counts.shipped}</span>
         </span>
       </div>
+
+      {linksSentAt === null && rows.length > 0 && (
+        <div className="alert alert-warn">
+          <p className="flex flex-wrap items-center gap-1.5 font-semibold">
+            <Warning size={16} weight="fill" aria-hidden="true" />
+            ยังไม่ได้ส่งลิงก์ไลน์ให้ลูกค้าวันนี้
+            <button
+              type="button"
+              className="btn btn-warn btn-sm ml-1"
+              onClick={sendLinksNow}
+              disabled={linkSendBusy}
+            >
+              ส่งลิงก์ไลน์เลย
+            </button>
+          </p>
+          {linkSendMsg && <p className="mt-1 text-sm">{linkSendMsg}</p>}
+        </div>
+      )}
+
+      {linksSentAt !== null && linkSendMsg && (
+        <div className="alert alert-ok">
+          <p>{linkSendMsg}</p>
+        </div>
+      )}
 
       {backorders.length > 0 && (
         <div className="alert alert-warn">

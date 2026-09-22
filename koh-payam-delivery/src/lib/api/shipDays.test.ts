@@ -1,4 +1,4 @@
-import { listOrdersForDay, sendOrderLinks } from './shipDays'
+import { listOrdersForDay, sendOrderLinks, getShipDayLinksSentAt } from './shipDays'
 
 const { from, select, eq, getSession } = vi.hoisted(() => {
   const eq = vi.fn().mockResolvedValue({ data: [{ id: '1' }], error: null })
@@ -55,4 +55,31 @@ test('sendOrderLinks POSTs to the edge function with the session bearer token an
 test('sendOrderLinks throws a Thai error carrying the status code on a non-ok response', async () => {
   fetchMock.mockResolvedValue({ ok: false, status: 403, json: () => Promise.resolve({}) })
   await expect(sendOrderLinks('2026-10-01')).rejects.toThrow('ส่งลิงก์ไลน์ไม่สำเร็จ (403)')
+})
+
+test('getShipDayLinksSentAt queries ship_days.links_sent_at filtered by ship_date', async () => {
+  eq.mockResolvedValueOnce({ data: [{ links_sent_at: null }], error: null })
+  await getShipDayLinksSentAt('2026-10-01')
+  expect(from).toHaveBeenCalledWith('ship_days')
+  expect(select).toHaveBeenCalledWith('links_sent_at')
+  expect(eq).toHaveBeenCalledWith('ship_date', '2026-10-01')
+})
+
+test('getShipDayLinksSentAt returns the stored timestamp when a row exists and links were sent', async () => {
+  eq.mockResolvedValueOnce({ data: [{ links_sent_at: '2026-10-01T05:00:00Z' }], error: null })
+  expect(await getShipDayLinksSentAt('2026-10-01')).toBe('2026-10-01T05:00:00Z')
+})
+
+test('getShipDayLinksSentAt returns null when the row has never sent, or the row does not exist at all', async () => {
+  eq.mockResolvedValueOnce({ data: [{ links_sent_at: null }], error: null })
+  expect(await getShipDayLinksSentAt('2026-10-01')).toBeNull()
+  eq.mockResolvedValueOnce({ data: [], error: null })
+  expect(await getShipDayLinksSentAt('2026-10-01')).toBeNull()
+})
+
+test('getShipDayLinksSentAt throws a Thai error on failure', async () => {
+  eq.mockResolvedValueOnce({ data: null, error: { message: 'boom' } })
+  await expect(getShipDayLinksSentAt('2026-10-01')).rejects.toThrow(
+    'โหลดสถานะวันจัดส่งไม่สำเร็จ: boom',
+  )
 })
