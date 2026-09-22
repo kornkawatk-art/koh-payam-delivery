@@ -186,7 +186,7 @@ export default function CustomerOrderView() {
       <section className="flex flex-col gap-2">
         <h2 className="section-title">{t(lang, 'items')}</h2>
         <div className="table-wrap">
-          <table className="data-table">
+          <table className="data-table stack-table">
             <thead>
               <tr>
                 <th>{t(lang, 'col_item_id')}</th>
@@ -198,15 +198,21 @@ export default function CustomerOrderView() {
             <tbody>
               {data.items.map((it, i) => (
                 <tr key={`${it.productName}-${i}`} className={it.isShort ? 'bg-warn-soft' : ''}>
-                  <td className="tnum">{it.itemId}</td>
-                  <td>
+                  <td data-label={t(lang, 'col_item_id')} className="tnum">
+                    {it.itemId}
+                  </td>
+                  <td className="stack-lead">
                     {it.productName}
                     {it.isShort && (
                       <span className="badge badge-warn ml-1.5">{t(lang, 'badge_short')}</span>
                     )}
                   </td>
-                  <td className="tnum">{it.orderedQty}</td>
-                  <td className="tnum">{it.shippedQty}</td>
+                  <td data-label={t(lang, 'col_ordered')} className="tnum">
+                    {it.orderedQty}
+                  </td>
+                  <td data-label={t(lang, 'col_shipped')} className="tnum">
+                    {it.shippedQty}
+                  </td>
                 </tr>
               ))}
             </tbody>

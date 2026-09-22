@@ -257,7 +257,7 @@ export default function ImportOrders() {
           )}
 
           <div className="table-wrap">
-            <table className="data-table">
+            <table className="data-table stack-table">
               <thead>
                 <tr>
                   <th>เลขออเดอร์</th>
@@ -269,10 +269,14 @@ export default function ImportOrders() {
               <tbody>
                 {result.orders.map((o) => (
                   <tr key={o.makroOrderNo}>
-                    <td className="whitespace-nowrap">{o.makroOrderNo}</td>
-                    <td>{o.customerName}</td>
-                    <td className="tnum">{o.items.length}</td>
-                    <td className="tnum">{o.items.filter((i) => i.isShort).length}</td>
+                    <td className="stack-lead whitespace-nowrap">{o.makroOrderNo}</td>
+                    <td data-label="ลูกค้า">{o.customerName}</td>
+                    <td data-label="#รายการ" className="tnum">
+                      {o.items.length}
+                    </td>
+                    <td data-label="#ของขาด" className="tnum">
+                      {o.items.filter((i) => i.isShort).length}
+                    </td>
                   </tr>
                 ))}
               </tbody>

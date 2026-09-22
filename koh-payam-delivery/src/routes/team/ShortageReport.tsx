@@ -90,7 +90,7 @@ export default function ShortageReport() {
                 </button>
                 {open && (
                   <div className="table-wrap mt-3">
-                    <table className="data-table">
+                    <table className="data-table stack-table">
                       <thead>
                         <tr>
                           <th>เลขออเดอร์</th>
@@ -102,14 +102,18 @@ export default function ShortageReport() {
                       <tbody>
                         {p.details.map((d) => (
                           <tr key={d.orderId}>
-                            <td className="whitespace-nowrap">
+                            <td className="stack-lead whitespace-nowrap">
                               <Link className="link" to={`/order/${d.orderId}`}>
                                 {d.makroOrderNo}
                               </Link>
                             </td>
-                            <td>{d.customerNameEn}</td>
-                            <td className="whitespace-nowrap">{formatDateTH(d.shipDate)}</td>
-                            <td className="tnum">{d.qty}</td>
+                            <td data-label="ลูกค้า">{d.customerNameEn}</td>
+                            <td data-label="วันที่ส่ง" className="whitespace-nowrap">
+                              {formatDateTH(d.shipDate)}
+                            </td>
+                            <td data-label="จำนวน" className="tnum">
+                              {d.qty}
+                            </td>
                           </tr>
                         ))}
                       </tbody>

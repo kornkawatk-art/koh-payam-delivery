@@ -34,7 +34,7 @@ export default function AuditLog() {
         <p className="muted">ยังไม่มีประวัติการใช้งาน</p>
       ) : (
         <div className="table-wrap">
-          <table className="data-table">
+          <table className="data-table stack-table">
             <thead>
               <tr>
                 <th>เวลา</th>
@@ -44,7 +44,9 @@ export default function AuditLog() {
             <tbody>
               {rows.map((r) => (
                 <tr key={r.id}>
-                  <td className="whitespace-nowrap">{formatDateTimeTH(r.createdAt)}</td>
+                  <td className="whitespace-nowrap text-xs text-ink-faint">
+                    {formatDateTimeTH(r.createdAt)}
+                  </td>
                   <td>{r.message}</td>
                 </tr>
               ))}
