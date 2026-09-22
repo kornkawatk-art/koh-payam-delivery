@@ -24,6 +24,24 @@ export async function setBoats(shipDayId: string, boats: { id: string; name: str
 }
 
 /**
+ * Whether `send-order-links` has already run for this ship day, straight off
+ * `ship_days.links_sent_at` — same table/column the edge function itself
+ * guards on (see its file header, step 1). Used to show a "ยังไม่ได้ส่งลิงก์"
+ * prompt on the daily dashboard for days where nobody ever opened
+ * BoatSetup.tsx (the only other place that currently triggers a send) --
+ * a plain select, not `getOrCreateShipDay`, so just looking at the
+ * dashboard never creates a ship_days row of its own.
+ */
+export async function getShipDayLinksSentAt(shipDate: string): Promise<string | null> {
+  const { data, error } = await supabase
+    .from('ship_days')
+    .select('links_sent_at')
+    .eq('ship_date', shipDate)
+  if (error) throw new Error('โหลดสถานะวันจัดส่งไม่สำเร็จ: ' + error.message)
+  return (data?.[0] as { links_sent_at: string | null } | undefined)?.links_sent_at ?? null
+}
+
+/**
  * Ask the `send-order-links` edge function to push today's order links over
  * LINE to every registered customer shipping on `shipDate`. Attaches the
  * team session's real access token as the bearer, same session-attachment
