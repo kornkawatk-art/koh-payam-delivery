@@ -452,3 +452,27 @@ test('shows carry-over backorders and fulfils one on "ส่งแล้ว"', a
   expect(markBackorderFulfilled).toHaveBeenCalledWith('b1')
   expect(screen.queryByText('sugar x4')).not.toBeInTheDocument()
 })
+
+test('tapping anywhere on an item row toggles its tick, and a direct tap on the box toggles it exactly once', async () => {
+  renderPage()
+  const riceRow = (await screen.findByText('rice')).closest('tr')!
+  const riceBox = screen.getByRole('checkbox', { name: 'แพ็คแล้ว: rice' }) as HTMLInputElement
+
+  await userEvent.click(screen.getByText('แยกถุง'))
+  expect(riceBox.checked).toBe(true)
+  expect(riceRow).toHaveClass('row-done')
+
+  await userEvent.click(riceBox)
+  expect(riceBox.checked).toBe(false)
+  expect(riceRow).not.toHaveClass('row-done')
+})
+
+test('the bottom action bar shows how many items are ticked out of the total', async () => {
+  renderPage()
+  await screen.findByText('rice')
+  expect(screen.getByText('ติ๊กแล้ว 0/2')).toBeInTheDocument()
+  await userEvent.click(screen.getByText('oil'))
+  expect(screen.getByText('ติ๊กแล้ว 1/2')).toBeInTheDocument()
+  await userEvent.click(screen.getByRole('button', { name: 'เลือกทั้งหมด' }))
+  expect(screen.getByText('ติ๊กแล้ว 2/2')).toBeInTheDocument()
+})

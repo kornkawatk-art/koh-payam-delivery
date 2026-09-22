@@ -13,7 +13,8 @@ import { Spinner } from '../../components/ui/Spinner'
 import { PageHeader } from '../../components/ui/PageHeader'
 import { splitFreshDry } from '../../lib/freshDry'
 import { pickPrimary } from '../../lib/groupOrders'
-import { PackItemRow, type ItemState } from './PackOrder'
+import { Warning } from '@phosphor-icons/react'
+import { PackActionBar, PackItemRow, type ItemState } from './PackOrder'
 
 const R2 = import.meta.env.VITE_R2_PUBLIC_BASE_URL as string
 
@@ -198,7 +199,7 @@ export default function PackGroup() {
     />
   )
   const divider = (label: string, n: number) => (
-    <tr>
+    <tr className="row-divider">
       <td colSpan={8} className="bg-paper text-xs font-semibold text-ink-soft">
         {label} ({n})
       </td>
@@ -227,10 +228,12 @@ export default function PackGroup() {
       </div>
 
       {willReset.length > 0 && (
-        <div className="alert alert-warn">
-          ⚠️ {willReset.map((o) => o.makro_order_no).join(', ')}{' '}
-          มีจำนวนลัง/ชิ้นที่บันทึกไว้แล้ว — เมื่อกดบันทึกจะถูกรีเซ็ตเป็น 0
-          (ให้นับรวมกับลัง/ชิ้นของออเดอร์หลักด้านล่างแทน)
+        <div className="alert alert-warn flex items-start gap-2">
+          <Warning size={18} weight="fill" className="mt-0.5 shrink-0" aria-hidden="true" />
+          <span>
+            {willReset.map((o) => o.makro_order_no).join(', ')} มีจำนวนลัง/ชิ้นที่บันทึกไว้แล้ว —
+            เมื่อกดบันทึกจะถูกรีเซ็ตเป็น 0 (ให้นับรวมกับลัง/ชิ้นของออเดอร์หลักด้านล่างแทน)
+          </span>
         </div>
       )}
 
@@ -262,7 +265,7 @@ export default function PackGroup() {
           )}
         </div>
         <div className="table-wrap">
-          <table className="data-table">
+          <table className="data-table stack-table">
             <thead>
               <tr>
                 <th>แพ็ค</th>
@@ -369,29 +372,21 @@ export default function PackGroup() {
               }}
             />
           </section>
-          <div className="flex flex-wrap gap-2">
-            <button className="btn btn-secondary" onClick={() => save(false)} disabled={saveBlocked}>
-              บันทึก
-            </button>
-            <button
-              className="btn btn-ok"
-              onClick={() => save(true)}
-              disabled={saveBlocked || packGateBlocked}
-            >
-              บันทึก + แพ็คเสร็จ
-            </button>
-          </div>
-          {photoBusy && (
-            <p className="muted text-xs">กำลังอัปโหลดรูป กรุณารอสักครู่ก่อนกดบันทึก</p>
-          )}
-          {!saveBlocked && packGateBlocked && (
-            <p className="muted text-xs">
-              ต้องถ่ายรูปลังที่แพ็คเสร็จอย่างน้อย 1 รูป กรอกจำนวนลัง/ชิ้นอย่างน้อย 1 และติ๊กสินค้าครบทุกรายการ
-            </p>
-          )}
         </div>
       )}
-      {msg && <p className="muted">{msg}</p>}
+      {primary ? (
+        <PackActionBar
+          ticked={editableItems.filter((i) => packedIds.has(i.id)).length}
+          total={editableItems.length}
+          onSave={save}
+          saveBlocked={saveBlocked}
+          packGateBlocked={packGateBlocked}
+          photoBusy={photoBusy}
+          msg={msg}
+        />
+      ) : (
+        msg && <p className="muted">{msg}</p>
+      )}
     </div>
   )
 }

@@ -12,7 +12,7 @@ import {
   type BuildResult,
 } from '../../lib/import/buildImport'
 import { commitImport, listOrdersOnOtherDays, type OtherDayOrder } from '../../lib/api/orders'
-import { UploadSimple } from '@phosphor-icons/react'
+import { UploadSimple, Warning } from '@phosphor-icons/react'
 import { PageHeader } from '../../components/ui/PageHeader'
 import { todayLocalISO } from '../../lib/format'
 
@@ -236,10 +236,13 @@ export default function ImportOrders() {
           </p>
 
           {result.shippedAllZero && (
-            <p className="alert alert-warn">
-              ⚠️ ไฟล์นี้ยังไม่มีข้อมูลจัดส่งจากแม็คโคร (ส่งจริง = 0 ทั้งหมด) — นำเข้าได้ แต่ควร
-              export ใหม่หลังจัดของเสร็จแล้ว sync
-            </p>
+            <div className="alert alert-warn flex items-start gap-2">
+              <Warning size={18} weight="fill" className="mt-0.5 shrink-0" aria-hidden="true" />
+              <p>
+                ไฟล์นี้ยังไม่มีข้อมูลจัดส่งจากแม็คโคร (ส่งจริง = 0 ทั้งหมด) — นำเข้าได้ แต่ควร
+                export ใหม่หลังจัดของเสร็จแล้ว sync
+              </p>
+            </div>
           )}
 
           {result.skippedNoItems.length > 0 && (

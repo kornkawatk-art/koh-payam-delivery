@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { Warning } from '@phosphor-icons/react'
 import {
   listOrdersForCustomerDay,
   setOrderBoats,
@@ -187,9 +188,13 @@ export default function PierGroup({
       </h1>
 
       {waiting.length > 0 && (
-        <p className="alert alert-warn">
-          ⚠️ อีก {waiting.length} ออเดอร์ของลูกค้ารายนี้ยังรอแพ็ค ({waiting.map((o) => o.makro_order_no).join(', ')}) — จะไม่ถูกส่งในรอบนี้
-        </p>
+        <div className="alert alert-warn flex items-start gap-2">
+          <Warning size={18} weight="fill" className="mt-0.5 shrink-0" aria-hidden="true" />
+          <p>
+            อีก {waiting.length} ออเดอร์ของลูกค้ารายนี้ยังรอแพ็ค (
+            {waiting.map((o) => o.makro_order_no).join(', ')}) — จะไม่ถูกส่งในรอบนี้
+          </p>
+        </div>
       )}
 
       {outstanding > 0 && (
