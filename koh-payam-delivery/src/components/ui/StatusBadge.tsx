@@ -11,7 +11,8 @@ const TONE: Record<string, string> = {
   imported: 'badge-neutral',
   packed: 'badge-ok',
   at_pier: 'badge-brand',
-  shipped: 'badge-ok',
+  // Solid fill: same green family as "packed" but visibly the finished state.
+  shipped: 'badge-ok-solid',
 }
 
 // currentColor inherits each badge's own text tone above -- no extra color

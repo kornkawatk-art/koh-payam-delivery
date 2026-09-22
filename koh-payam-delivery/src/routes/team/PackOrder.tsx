@@ -163,7 +163,7 @@ export default function PackOrder() {
           )}
         </div>
         <div className="table-wrap">
-          <table className="data-table">
+          <table className="data-table stack-table">
             <thead>
               <tr>
                 <th>แพ็ค</th>
@@ -179,7 +179,7 @@ export default function PackOrder() {
               {showFreshDrySplit ? (
                 <>
                   {freshItems.length > 0 && (
-                    <tr>
+                    <tr className="row-divider">
                       <td colSpan={7} className="bg-paper text-xs font-semibold text-ink-soft">
                         ของสด ({freshItems.length})
                       </td>
@@ -194,7 +194,7 @@ export default function PackOrder() {
                     />
                   ))}
                   {dryItems.length > 0 && (
-                    <tr>
+                    <tr className="row-divider">
                       <td colSpan={7} className="bg-paper text-xs font-semibold text-ink-soft">
                         ของแห้ง ({dryItems.length})
                       </td>
@@ -301,28 +301,17 @@ export default function PackOrder() {
             }}
           />
         </section>
-        <div className="flex flex-wrap gap-2">
-          <button className="btn btn-secondary" onClick={() => save(false)} disabled={saveBlocked}>
-            บันทึก
-          </button>
-          <button
-            className="btn btn-ok"
-            onClick={() => save(true)}
-            disabled={saveBlocked || packGateBlocked}
-          >
-            บันทึก + แพ็คเสร็จ
-          </button>
-        </div>
-        {photoBusy && (
-          <p className="muted text-xs">กำลังอัปโหลดรูป กรุณารอสักครู่ก่อนกดบันทึก</p>
-        )}
-        {!saveBlocked && packGateBlocked && (
-          <p className="muted text-xs">
-            ต้องถ่ายรูปลังที่แพ็คเสร็จอย่างน้อย 1 รูป กรอกจำนวนลัง/ชิ้นอย่างน้อย 1 และติ๊กสินค้าครบทุกรายการ
-          </p>
-        )}
-        {msg && <p className="muted">{msg}</p>}
       </div>
+
+      <PackActionBar
+        ticked={packedIds.size}
+        total={items.length}
+        onSave={save}
+        saveBlocked={saveBlocked}
+        packGateBlocked={packGateBlocked}
+        photoBusy={photoBusy}
+        msg={msg}
+      />
     </div>
   )
 }
@@ -342,26 +331,110 @@ export function PackItemRow({
   orderNo?: string
   disabled?: boolean
 }) {
+  // The whole row is a tap target (packers tick dozens of lines one-handed);
+  // the checkbox stops its own click so a direct tap doesn't toggle twice.
   return (
-    <tr>
-      <td>
+    <tr
+      className={(disabled ? '' : 'row-tap ') + (checked ? 'row-done' : '')}
+      onClick={disabled ? undefined : () => onToggle(it.id)}
+    >
+      <td className="stack-tick">
         <input
           type="checkbox"
           aria-label={`แพ็คแล้ว: ${it.product_name}`}
           checked={checked}
           disabled={disabled}
+          onClick={(e) => e.stopPropagation()}
           onChange={() => onToggle(it.id)}
         />
       </td>
       {orderNo !== undefined && (
-        <td className="whitespace-nowrap text-xs text-ink-soft">{orderNo}</td>
+        <td data-label="ออเดอร์" className="whitespace-nowrap text-xs text-ink-soft">
+          {orderNo}
+        </td>
       )}
-      <td className="tnum">{it.makro_item_id}</td>
-      <td>{it.product_name}</td>
-      <td className="tnum">{it.qty_ordered}</td>
-      <td className="tnum">{it.qty_shipped}</td>
-      <td>{it.status === 'short' && <span className="badge badge-danger">ขาด</span>}</td>
-      <td>{it.item_remark}</td>
+      <td data-label="รหัสสินค้า" className="tnum">
+        {it.makro_item_id}
+      </td>
+      <td className="stack-lead">{it.product_name}</td>
+      <td data-label="สั่ง" className="tnum">
+        {it.qty_ordered}
+      </td>
+      <td data-label="ส่งจริง" className="tnum">
+        {it.qty_shipped}
+      </td>
+      <td data-label={it.status === 'short' ? 'สถานะ' : ''}>
+        {it.status === 'short' && <span className="badge badge-danger">ขาด</span>}
+      </td>
+      <td data-label={it.item_remark ? 'หมายเหตุ' : ''}>{it.item_remark}</td>
     </tr>
+  )
+}
+
+/**
+ * Save / finish controls for the pack pages, pinned to the bottom of the
+ * screen so a packer never has to scroll past the item list and photos to
+ * reach them. Shows tick progress and, while "แพ็คเสร็จ" is still blocked,
+ * why.
+ */
+export function PackActionBar({
+  ticked,
+  total,
+  onSave,
+  saveBlocked,
+  packGateBlocked,
+  photoBusy,
+  msg,
+}: {
+  ticked: number
+  total: number
+  onSave: (markPacked: boolean) => void
+  saveBlocked: boolean
+  packGateBlocked: boolean
+  photoBusy: boolean
+  msg?: string
+}) {
+  return (
+    <div className="action-bar">
+      <div className="flex flex-wrap items-center gap-2">
+        <span
+          className={
+            'badge tnum sm:mr-auto ' +
+            (total > 0 && ticked === total ? 'badge-ok' : 'badge-neutral')
+          }
+        >
+          ติ๊กแล้ว {ticked}/{total}
+        </span>
+        {/* Full-width pair on phones; compact on the right from `sm` up. */}
+        <div className="flex w-full gap-2 sm:w-auto">
+          <button
+            className="btn btn-secondary flex-1 sm:flex-none"
+            onClick={() => onSave(false)}
+            disabled={saveBlocked}
+          >
+            บันทึก
+          </button>
+          <button
+            className="btn btn-ok flex-[2] whitespace-nowrap sm:flex-none"
+            onClick={() => onSave(true)}
+            disabled={saveBlocked || packGateBlocked}
+          >
+            บันทึก + แพ็คเสร็จ
+          </button>
+        </div>
+      </div>
+      {photoBusy && <p className="muted text-xs">กำลังอัปโหลดรูป กรุณารอสักครู่ก่อนกดบันทึก</p>}
+      {!saveBlocked && packGateBlocked && (
+        <p className="muted text-xs">
+          ต้องถ่ายรูปลังที่แพ็คเสร็จอย่างน้อย 1 รูป กรอกจำนวนลัง/ชิ้นอย่างน้อย 1
+          และติ๊กสินค้าครบทุกรายการ
+        </p>
+      )}
+      {msg && (
+        <p className="text-sm text-ink" role="status">
+          {msg}
+        </p>
+      )}
+    </div>
   )
 }

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link, useParams, useNavigate } from 'react-router-dom'
+import { Warning } from '@phosphor-icons/react'
 import { getOrder, regenTokenLink, deleteOrder } from '../../lib/api/orders'
 import {
   listRelatedBackordersForOrder,
@@ -275,10 +276,13 @@ export default function OrderDetail() {
           ) : (
             <div className="flex flex-col gap-3">
               {order.status === 'shipped' && (
-                <p className="alert alert-danger">
-                  ⚠️ ออเดอร์นี้ส่งขึ้นเรือแล้ว ลูกค้าอาจเคยเห็นลิงก์หรือเคยแจ้งเคลมไปแล้ว —
-                  การลบจะลบข้อมูลเคลมที่เกี่ยวข้องไปด้วยถาวร
-                </p>
+                <div className="alert alert-danger flex items-start gap-2">
+                  <Warning size={18} weight="fill" className="mt-0.5 shrink-0" aria-hidden="true" />
+                  <p>
+                    ออเดอร์นี้ส่งขึ้นเรือแล้ว ลูกค้าอาจเคยเห็นลิงก์หรือเคยแจ้งเคลมไปแล้ว —
+                    การลบจะลบข้อมูลเคลมที่เกี่ยวข้องไปด้วยถาวร
+                  </p>
+                </div>
               )}
               <label className="field">
                 <span className="field-label">

@@ -401,3 +401,11 @@ test('after a partial failure in a 3-PO group, retrying saves onto the same prim
     expect(updateOrderStatus.mock.calls.map((c) => c[0])).toEqual(['o2', 'o3', 'o3', 'o1']),
   )
 })
+
+test('tapping the row of an already-packed line does not untick it', async () => {
+  renderPage()
+  await screen.findByText('rice')
+  await userEvent.click(screen.getByText('sugar'))
+  const sugar = screen.getByRole('checkbox', { name: 'แพ็คแล้ว: sugar' }) as HTMLInputElement
+  expect(sugar.checked).toBe(true)
+})

@@ -269,7 +269,7 @@ export default function DailyDashboard() {
         <p className="muted">ไม่มีออเดอร์</p>
       ) : (
         <div className="table-wrap">
-          <table className="data-table">
+          <table className="data-table stack-table">
             <thead>
               <tr>
                 <th>เลขออเดอร์</th>
@@ -283,7 +283,7 @@ export default function DailyDashboard() {
             </thead>
             <tbody>
               {notPacked.length > 0 && (
-                <tr>
+                <tr className="row-divider">
                   <td colSpan={7} className="bg-paper text-xs font-semibold text-ink-soft">
                     ยังไม่แพ็ค ({notPacked.length})
                   </td>
@@ -293,7 +293,7 @@ export default function DailyDashboard() {
                 <EntryRows key={entryKey(e)} entry={e} date={date} />
               ))}
               {packedOrAhead.length > 0 && (
-                <tr>
+                <tr className="row-divider">
                   <td colSpan={7} className="bg-paper text-xs font-semibold text-ink-soft">
                     แพ็คแล้ว ({packedOrAhead.length})
                   </td>
@@ -336,7 +336,7 @@ function GroupRows({
   return (
     <>
       <tr className="bg-brand-soft/40">
-        <td className="whitespace-nowrap">
+        <td className="stack-lead whitespace-nowrap">
           <button
             type="button"
             className="inline-flex items-center gap-1.5 font-medium"
@@ -348,7 +348,7 @@ function GroupRows({
             <span className="badge badge-brand">{os.length} PO</span>
           </button>
         </td>
-        <td>
+        <td data-label="ลูกค้า">
           <span className="font-medium">{group.name}</span>
           <Link
             className="btn btn-ok btn-sm ml-2"
@@ -357,7 +357,7 @@ function GroupRows({
             แพ็ครวม
           </Link>
         </td>
-        <td>
+        <td data-label="สถานะ">
           <span className={`badge ${packed === os.length ? 'badge-ok' : 'badge-neutral'}`}>
             แพ็คแล้ว {packed}/{os.length}
           </span>
@@ -365,12 +365,14 @@ function GroupRows({
             <span className="badge badge-warn ml-1.5">เก็บเงิน</span>
           )}
         </td>
-        <td className="tnum">
+        <td data-label="รวม" className="tnum">
           {os.reduce((n, o) => n + o.paper_box_count + o.foam_box_count + o.piece_count, 0)}
         </td>
-        <td className="whitespace-nowrap">{boats.length ? boats.join(', ') : '—'}</td>
-        <td>{uniq(os.map((o) => o.packer_name)).join(', ') || '—'}</td>
-        <td>{uniq(os.map((o) => o.pier_name)).join(', ') || '—'}</td>
+        <td data-label="เรือ" className="whitespace-nowrap">
+          {boats.length ? boats.join(', ') : '—'}
+        </td>
+        <td data-label="คนแพ็ค">{uniq(os.map((o) => o.packer_name)).join(', ') || '—'}</td>
+        <td data-label="คนลงเรือ">{uniq(os.map((o) => o.pier_name)).join(', ') || '—'}</td>
       </tr>
       {open && os.map((o) => <OrderRow key={o.id} order={o} indent />)}
     </>
@@ -379,21 +381,25 @@ function GroupRows({
 
 function OrderRow({ order: o, indent }: { order: any; indent?: boolean }) {
   return (
-    <tr>
-      <td className={`whitespace-nowrap ${indent ? 'pl-8' : ''}`}>
+    <tr className={indent ? 'row-child' : undefined}>
+      <td className={`stack-lead whitespace-nowrap ${indent ? 'pl-8' : ''}`}>
         <Link className="link" to={`/order/${o.id}`}>
           {o.makro_order_no}
         </Link>
       </td>
-      <td>{o.customer_name_en}</td>
-      <td>
+      <td data-label="ลูกค้า">{o.customer_name_en}</td>
+      <td data-label="สถานะ">
         <StatusBadge status={o.status} />
         {o.outstanding_amount > 0 && <span className="badge badge-warn ml-1.5">เก็บเงิน</span>}
       </td>
-      <td className="tnum">{o.paper_box_count + o.foam_box_count + o.piece_count}</td>
-      <td className="whitespace-nowrap">{o.boat_id ?? '—'}</td>
-      <td>{o.packer_name || '—'}</td>
-      <td>{o.pier_name || '—'}</td>
+      <td data-label="รวม" className="tnum">
+        {o.paper_box_count + o.foam_box_count + o.piece_count}
+      </td>
+      <td data-label="เรือ" className="whitespace-nowrap">
+        {o.boat_id ?? '—'}
+      </td>
+      <td data-label="คนแพ็ค">{o.packer_name || '—'}</td>
+      <td data-label="คนลงเรือ">{o.pier_name || '—'}</td>
     </tr>
   )
 }
