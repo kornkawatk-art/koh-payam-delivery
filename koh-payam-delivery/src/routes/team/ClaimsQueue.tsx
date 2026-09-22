@@ -130,7 +130,7 @@ export default function ClaimsQueue() {
         <p className="muted">ไม่มีเคลม</p>
       ) : (
         <div className="table-wrap">
-          <table className="data-table">
+          <table className="data-table stack-table">
             <thead>
               <tr>
                 <th>เลขออเดอร์</th>
@@ -147,20 +147,24 @@ export default function ClaimsQueue() {
                   c.status === 'open' && new Date(c.deadline_at).getTime() < now
                 return (
                   <tr key={c.id} className={overdue ? 'bg-red-50' : undefined}>
-                    <td className="whitespace-nowrap">
+                    <td className="stack-lead whitespace-nowrap">
                       <Link className="link" to={`/claims/${c.id}`}>
                         {c.makro_order_no}
                       </Link>
                     </td>
-                    <td>{c.customer_name_en}</td>
-                    <td>{c.type}</td>
-                    <td className="tnum">{c.itemCount} รายการ</td>
-                    <td>
+                    <td data-label="ลูกค้า">{c.customer_name_en}</td>
+                    <td data-label="ประเภท">{c.type}</td>
+                    <td data-label="จำนวนรายการ" className="tnum">
+                      {c.itemCount} รายการ
+                    </td>
+                    <td data-label="สถานะ">
                       <span className={'badge ' + (STATUS_TONE[c.status] ?? 'badge-neutral')}>
                         {c.status}
                       </span>
                     </td>
-                    <td className="whitespace-nowrap">{formatDateTimeTH(c.deadline_at)}</td>
+                    <td data-label="กำหนดเส้นตาย" className="whitespace-nowrap">
+                      {formatDateTimeTH(c.deadline_at)}
+                    </td>
                   </tr>
                 )
               })}
@@ -179,7 +183,7 @@ export default function ClaimsQueue() {
           <p className="muted">ไม่มีรายการค้างส่งที่ยังจับคู่ไม่สำเร็จ</p>
         ) : (
           <div className="table-wrap">
-            <table className="data-table">
+            <table className="data-table stack-table">
               <thead>
                 <tr>
                   <th>ลูกค้า</th>
@@ -193,11 +197,13 @@ export default function ClaimsQueue() {
                   const stale = daysWaiting > 7
                   return (
                     <tr key={b.id} className={stale ? 'bg-red-50' : undefined}>
-                      <td>{b.customerName}</td>
-                      <td>
+                      <td className="stack-lead">{b.customerName}</td>
+                      <td data-label="สินค้า">
                         {b.productName} x{b.qty}
                       </td>
-                      <td className="tnum">{daysWaiting} วัน</td>
+                      <td data-label="ค้างมาแล้ว" className="tnum">
+                        {daysWaiting} วัน
+                      </td>
                     </tr>
                   )
                 })}

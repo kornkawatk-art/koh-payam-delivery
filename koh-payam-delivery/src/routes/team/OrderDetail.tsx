@@ -151,7 +151,7 @@ export default function OrderDetail() {
       <section className="flex flex-col gap-2">
         <p className="section-title">รายการสินค้า</p>
         <div className="table-wrap">
-          <table className="data-table">
+          <table className="data-table stack-table">
             <thead>
               <tr>
                 <th>แพ็ค</th>
@@ -167,7 +167,7 @@ export default function OrderDetail() {
               {showFreshDrySplit ? (
                 <>
                   {freshItems.length > 0 && (
-                    <tr>
+                    <tr className="row-divider">
                       <td colSpan={7} className="bg-paper text-xs font-semibold text-ink-soft">
                         ของสด ({freshItems.length})
                       </td>
@@ -177,7 +177,7 @@ export default function OrderDetail() {
                     <OrderDetailItemRow key={it.id} item={it} />
                   ))}
                   {dryItems.length > 0 && (
-                    <tr>
+                    <tr className="row-divider">
                       <td colSpan={7} className="bg-paper text-xs font-semibold text-ink-soft">
                         ของแห้ง ({dryItems.length})
                       </td>
@@ -322,7 +322,7 @@ export default function OrderDetail() {
 function OrderDetailItemRow({ item: it }: { item: any }) {
   return (
     <tr>
-      <td>
+      <td className="stack-tick">
         <input
           type="checkbox"
           aria-label={`แพ็คแล้ว: ${it.product_name}`}
@@ -331,12 +331,20 @@ function OrderDetailItemRow({ item: it }: { item: any }) {
           readOnly
         />
       </td>
-      <td className="tnum">{it.makro_item_id}</td>
-      <td>{it.product_name}</td>
-      <td className="tnum">{it.qty_ordered}</td>
-      <td className="tnum">{it.qty_shipped}</td>
-      <td>{it.status === 'short' && <span className="badge badge-warn">ขาด</span>}</td>
-      <td>{it.item_remark}</td>
+      <td data-label="รหัสสินค้า" className="tnum">
+        {it.makro_item_id}
+      </td>
+      <td className="stack-lead">{it.product_name}</td>
+      <td data-label="สั่ง" className="tnum">
+        {it.qty_ordered}
+      </td>
+      <td data-label="ส่งจริง" className="tnum">
+        {it.qty_shipped}
+      </td>
+      <td data-label={it.status === 'short' ? 'สถานะ' : ''}>
+        {it.status === 'short' && <span className="badge badge-warn">ขาด</span>}
+      </td>
+      <td data-label={it.item_remark ? 'หมายเหตุ' : ''}>{it.item_remark}</td>
     </tr>
   )
 }

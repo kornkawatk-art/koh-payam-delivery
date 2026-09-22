@@ -90,7 +90,7 @@ export default function LineContacts() {
           {pendingError && <p className="alert alert-danger">{pendingError}</p>}
           {!pendingFailed && (
           <div className="table-wrap">
-            <table className="data-table">
+            <table className="data-table stack-table">
               <thead>
                 <tr>
                   <th>เบอร์โทร</th>
@@ -103,12 +103,14 @@ export default function LineContacts() {
               <tbody>
                 {pending.map((p) => (
                   <tr key={p.phone}>
-                    <td className="whitespace-nowrap">{p.phone}</td>
-                    <td>{p.oldDisplayName || '—'}</td>
-                    <td>{p.pendingDisplayName || '—'}</td>
-                    <td className="whitespace-nowrap">{formatDateTimeTH(p.requestedAt)}</td>
+                    <td className="stack-lead whitespace-nowrap">{p.phone}</td>
+                    <td data-label="ชื่อ LINE เดิม">{p.oldDisplayName || '—'}</td>
+                    <td data-label="ชื่อ LINE ใหม่">{p.pendingDisplayName || '—'}</td>
+                    <td data-label="วันที่ขอ" className="whitespace-nowrap">
+                      {formatDateTimeTH(p.requestedAt)}
+                    </td>
                     <td className="whitespace-nowrap">
-                      <div className="flex gap-2">
+                      <div className="flex gap-2 max-sm:w-full">
                         <button
                           type="button"
                           className="btn btn-primary btn-sm"
@@ -150,7 +152,7 @@ export default function LineContacts() {
         <p className="muted">ยังไม่มีลูกค้าลงทะเบียน</p>
       ) : (
         <div className="table-wrap">
-          <table className="data-table">
+          <table className="data-table stack-table">
             <thead>
               <tr>
                 <th>เบอร์โทร</th>
@@ -161,9 +163,11 @@ export default function LineContacts() {
             <tbody>
               {filtered.map((c) => (
                 <tr key={c.phone}>
-                  <td className="whitespace-nowrap">{c.phone}</td>
-                  <td>{c.displayName || '—'}</td>
-                  <td className="whitespace-nowrap">{formatDateTimeTH(c.createdAt)}</td>
+                  <td className="stack-lead whitespace-nowrap">{c.phone}</td>
+                  <td data-label="ชื่อ LINE">{c.displayName || '—'}</td>
+                  <td data-label="วันที่ลงทะเบียน" className="whitespace-nowrap">
+                    {formatDateTimeTH(c.createdAt)}
+                  </td>
                 </tr>
               ))}
             </tbody>
