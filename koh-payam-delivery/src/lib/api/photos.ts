@@ -1,4 +1,5 @@
 import { supabase } from '../supabase'
+import { fetchWithTeamSession } from './teamFetch'
 
 const FN_BASE = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1`
 
@@ -23,16 +24,13 @@ export async function requestUploadUrl(
     'Content-Type': 'application/json',
     Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
   }
-  if (args.scope === 'evidence') {
-    const { data: sess } = await supabase.auth.getSession()
-    if (sess.session) headers.Authorization = `Bearer ${sess.session.access_token}`
-  }
-  const res = await fetch(`${FN_BASE}/photo-upload-url`, {
-    method: 'POST',
-    headers,
-    body: JSON.stringify(args),
-    signal,
-  })
+  const init = { method: 'POST', headers, body: JSON.stringify(args), signal }
+  // Team evidence uploads go as the signed-in member (refreshed + retried on
+  // a 401); customer claim uploads stay on the anon key.
+  const res =
+    args.scope === 'evidence'
+      ? await fetchWithTeamSession(`${FN_BASE}/photo-upload-url`, init)
+      : await fetch(`${FN_BASE}/photo-upload-url`, init)
   if (!res.ok) throw new Error('ขอลิงก์อัปโหลดรูปไม่สำเร็จ (' + res.status + ')')
   return (await res.json()) as UploadUrlResponse
 }
