@@ -98,17 +98,21 @@ test('language toggle switches the header text to Thai and persists', async () =
   expect(localStorage.getItem('cust_lang')).toBe('th')
 })
 
-test('shows the box/piece counts line, including pieces', async () => {
+test('shows the box/piece counts as labeled tiles, including pieces', async () => {
   renderAt()
-  expect(
-    await screen.findByText('Boxes: Paper boxes 3 · Foam boxes 1 · Pieces 2'),
-  ).toBeInTheDocument()
+  await screen.findByText('Paper boxes', { selector: 'dt' })
+  const value = (label: string) =>
+    screen.getByText(label, { selector: 'dt' }).parentElement!.querySelector('dd')
+  expect(value('Paper boxes')).toHaveTextContent(/^3$/)
+  expect(value('Foam boxes')).toHaveTextContent(/^1$/)
+  expect(value('Pieces')).toHaveTextContent(/^2$/)
 })
 
 test('shows the amount-due line when outstandingAmount is positive', async () => {
   fetchMock.mockReset().mockResolvedValue(ok({ ...payload, outstandingAmount: 6172.5 }))
   renderAt()
-  expect(await screen.findByText('Amount due on delivery: ฿6,172.50')).toBeInTheDocument()
+  expect(await screen.findByText('Amount due on delivery')).toBeInTheDocument()
+  expect(screen.getByText('฿6,172.50')).toBeInTheDocument()
 })
 
 test('hides the amount-due line when outstandingAmount is null', async () => {
@@ -231,4 +235,11 @@ test('renders a claim with no items (box_lost) with no item line', async () => {
   renderAt()
   expect(await screen.findByText(/Box lost/)).toBeInTheDocument()
   expect(screen.queryByText(/×/)).not.toBeInTheDocument()
+})
+
+test('with no shortages, shows a green "None" badge beside the heading', async () => {
+  fetchMock.mockReset().mockResolvedValue(ok({ ...payload, shortages: [] }))
+  renderAt()
+  expect(await screen.findByText('None')).toHaveClass('badge-ok')
+  expect(screen.queryByText(/Out of stock/)).not.toBeInTheDocument()
 })

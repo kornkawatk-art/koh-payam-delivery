@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link, useParams, useNavigate } from 'react-router-dom'
-import { Warning } from '@phosphor-icons/react'
+import { Anchor, MapPin, Package, Warning } from '@phosphor-icons/react'
 import { getOrder, regenTokenLink, deleteOrder } from '../../lib/api/orders'
 import {
   listRelatedBackordersForOrder,
@@ -9,6 +9,7 @@ import {
 import { StatusBadge } from '../../components/ui/StatusBadge'
 import { PageSkeleton } from '../../components/ui/Skeleton'
 import { BackLink } from '../../components/ui/BackLink'
+import { InfoItem, StatTile } from '../../components/ui/Stat'
 import { ZoomableImage } from '../../components/ui/ZoomableImage'
 import { formatTHB } from '../../lib/format'
 import { splitFreshDry } from '../../lib/freshDry'
@@ -100,15 +101,23 @@ export default function OrderDetail() {
         </p>
       )}
 
-      <p className="muted">ส่งที่: {order.sub_district || '—'}</p>
-      <p className="muted">
-        ลังกระดาษ {order.paper_box_count} · ลังโฟม {order.foam_box_count} · ชิ้น{' '}
-        {order.piece_count} · รวม{' '}
-        {order.paper_box_count + order.foam_box_count + order.piece_count}
-      </p>
-      <p className="muted">
-        คนแพ็ค: {order.packer_name || '—'} · คนลงเรือ: {order.pier_name || '—'}
-      </p>
+      <section className="card flex flex-col gap-4" aria-label="สรุปการจัดส่ง">
+        <dl className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+          <StatTile label="ลังกระดาษ" value={order.paper_box_count} />
+          <StatTile label="ลังโฟม" value={order.foam_box_count} />
+          <StatTile label="ชิ้น" value={order.piece_count} />
+          <StatTile
+            label="รวม"
+            value={order.paper_box_count + order.foam_box_count + order.piece_count}
+            emphasis
+          />
+        </dl>
+        <dl className="grid gap-3 border-t border-line pt-4 sm:grid-cols-3">
+          <InfoItem icon={MapPin} label="ส่งที่" value={order.sub_district} />
+          <InfoItem icon={Package} label="คนแพ็ค" value={order.packer_name} />
+          <InfoItem icon={Anchor} label="คนลงเรือ" value={order.pier_name} />
+        </dl>
+      </section>
       {order.packed_with?.makro_order_no && (
         <p className="alert alert-info">
           แพ็ครวมกับออเดอร์{' '}
