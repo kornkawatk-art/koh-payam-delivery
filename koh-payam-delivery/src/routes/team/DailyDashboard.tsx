@@ -397,6 +397,7 @@ function GroupRows({
           <span className={`badge ${packed === os.length ? 'badge-ok' : 'badge-neutral'}`}>
             แพ็คแล้ว {packed}/{os.length}
           </span>
+          <ShortBadge count={os.reduce((n, o) => n + shortCount(o), 0)} />
           {os.some((o) => o.outstanding_amount > 0) && (
             <span className="badge badge-warn ml-1.5">เก็บเงิน</span>
           )}
@@ -415,6 +416,20 @@ function GroupRows({
   )
 }
 
+/** Lines Makro under-shipped on this PO (order_items.status = 'short'). */
+const shortCount = (o: any): number =>
+  (o.item_statuses ?? []).filter((i: { status: string }) => i.status === 'short').length
+
+// Same red "ขาด" as the pack screen's per-line badge, with the count.
+function ShortBadge({ count }: { count: number }) {
+  if (count === 0) return null
+  return (
+    <span className="badge badge-danger ml-1.5" title={`ของขาด ${count} รายการ`}>
+      ขาด {count}
+    </span>
+  )
+}
+
 function OrderRow({ order: o, indent }: { order: any; indent?: boolean }) {
   return (
     <tr className={indent ? 'row-child' : undefined}>
@@ -426,6 +441,7 @@ function OrderRow({ order: o, indent }: { order: any; indent?: boolean }) {
       <td data-label="ลูกค้า">{o.customer_name_en}</td>
       <td data-label="สถานะ">
         <StatusBadge status={o.status} />
+        <ShortBadge count={shortCount(o)} />
         {o.outstanding_amount > 0 && <span className="badge badge-warn ml-1.5">เก็บเงิน</span>}
       </td>
       <td data-label="รวม" className="tnum">
