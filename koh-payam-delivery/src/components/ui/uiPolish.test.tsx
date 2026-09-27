@@ -4,6 +4,7 @@ import { Package } from '@phosphor-icons/react'
 import { PageHeader } from './PageHeader'
 import { EmptyState } from './EmptyState'
 import { PageSkeleton } from './Skeleton'
+import { Notice, flash } from './Notice'
 
 test('PageHeader with `back` renders an on-screen link to the parent page', () => {
   render(
@@ -24,4 +25,15 @@ test('EmptyState shows its message and the next-step hint', () => {
 test('PageSkeleton announces loading to screen readers', () => {
   render(<PageSkeleton />)
   expect(screen.getByRole('status')).toHaveTextContent('กำลังโหลด…')
+})
+
+test('Notice: errors are announced as alerts, successes as status, each with its own tone', () => {
+  const { rerender } = render(<Notice flash={flash.error('บันทึกไม่สำเร็จ')} />)
+  expect(screen.getByRole('alert')).toHaveClass('alert-danger')
+  rerender(<Notice flash={flash.ok('บันทึกแล้ว')} />)
+  expect(screen.getByRole('status')).toHaveClass('alert-ok')
+  rerender(<Notice flash={flash.warn('บันทึกแล้ว แต่ส่งลิงก์ไม่สำเร็จ')} />)
+  expect(screen.getByRole('status')).toHaveClass('alert-warn')
+  rerender(<Notice flash={undefined} />)
+  expect(screen.queryByRole('status')).not.toBeInTheDocument()
 })

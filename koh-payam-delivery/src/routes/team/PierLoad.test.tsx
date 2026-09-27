@@ -257,9 +257,9 @@ test('shows the collect-cash alert when outstanding_amount > 0', async () => {
   ])
   render(<PierLoad />)
   await userEvent.click(await screen.findByRole('button', { name: /PO-1/ }))
-  expect(
-    await screen.findByText('เก็บเงินปลายทาง ฿6,172.50 (Pay On Delivery)'),
-  ).toBeInTheDocument()
+  expect(await screen.findByText('เก็บเงินปลายทาง')).toBeInTheDocument()
+  expect(screen.getByText('฿6,172.50')).toBeInTheDocument()
+  expect(screen.getByText('Pay On Delivery')).toBeInTheDocument()
 })
 
 test('hides the collect-cash alert when outstanding_amount is 0 or null', async () => {
@@ -379,4 +379,16 @@ test('a shipped sibling does not count as waiting: one ready PO + one shipped PO
   render(<PierLoad />)
   expect(await screen.findByRole('button', { name: /PO-A · BLUE VIEW/ })).toBeInTheDocument()
   expect(screen.queryByText(/ยังรอแพ็ค/)).not.toBeInTheDocument()
+})
+
+test('the selected order shows paper / foam / piece / total tiles so staff can count what goes aboard', async () => {
+  render(<PierLoad />)
+  await userEvent.click(await screen.findByRole('button', { name: /PO-1/ }))
+  await screen.findByText('ลังกระดาษ', { selector: 'dt' })
+  const value = (label: string) =>
+    screen.getByText(label, { selector: 'dt' }).parentElement!.querySelector('dd')
+  expect(value('ลังกระดาษ')).toHaveTextContent(/^2$/)
+  expect(value('ลังโฟม')).toHaveTextContent(/^1$/)
+  expect(value('ชิ้น')).toHaveTextContent(/^0$/)
+  expect(value('รวม')).toHaveTextContent(/^3$/)
 })

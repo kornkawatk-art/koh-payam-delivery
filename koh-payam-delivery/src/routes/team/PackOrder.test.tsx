@@ -177,10 +177,8 @@ test('typing into all three count fields passes the right pieceCount to savePack
     ],
   })
 
-  // the read-only total line reflects all three
-  expect(
-    screen.getByText('ลังกระดาษ 2 · ลังโฟม 1 · ชิ้น 5 · รวม 8'),
-  ).toBeInTheDocument()
+  // the running total reflects all three
+  expect(screen.getByRole('status', { name: 'รวมทั้งหมด 8 ลัง/ชิ้น' })).toBeInTheDocument()
 })
 
 test('typing a packer name passes it through to savePack, and the pack gate is unaffected', async () => {

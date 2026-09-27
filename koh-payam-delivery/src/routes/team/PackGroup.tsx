@@ -15,6 +15,7 @@ import { splitFreshDry } from '../../lib/freshDry'
 import { pickPrimary } from '../../lib/groupOrders'
 import { Warning } from '@phosphor-icons/react'
 import { PackActionBar, PackItemRow, type ItemState } from './PackOrder'
+import { TotalCount } from '../../components/ui/Stat'
 
 const R2 = import.meta.env.VITE_R2_PUBLIC_BASE_URL as string
 
@@ -348,9 +349,7 @@ export default function PackGroup() {
               ))}
             </datalist>
           </label>
-          <p className="muted">
-            ลังกระดาษ {paper} · ลังโฟม {foam} · ชิ้น {piece} · รวม {paper + foam + piece}
-          </p>
+          <TotalCount total={paper + foam + piece} />
           <section className="flex flex-col gap-2 border-t border-line pt-4">
             <p className="section-title">รูปหลักฐานตอนแพ็ค</p>
             <PhotoCapture

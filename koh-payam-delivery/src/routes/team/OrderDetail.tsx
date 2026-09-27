@@ -11,9 +11,10 @@ import { PageSkeleton } from '../../components/ui/Skeleton'
 import { BackLink } from '../../components/ui/BackLink'
 import { InfoItem, StatTile } from '../../components/ui/Stat'
 import { ZoomableImage } from '../../components/ui/ZoomableImage'
-import { formatTHB } from '../../lib/format'
 import { splitFreshDry } from '../../lib/freshDry'
 import { useAuth } from '../../lib/auth'
+import { Notice, flash, type Flash } from '../../components/ui/Notice'
+import { AmountDue } from '../../components/ui/AmountDue'
 
 export default function OrderDetail() {
   const { id } = useParams()
@@ -22,7 +23,7 @@ export default function OrderDetail() {
   const [order, setOrder] = useState<any>(null)
   const [backorders, setBackorders] = useState<BackorderRow[]>([])
   const [failed, setFailed] = useState(false)
-  const [msg, setMsg] = useState<string>()
+  const [msg, setMsg] = useState<Flash>()
   const [busy, setBusy] = useState(false)
   const [deleteOpen, setDeleteOpen] = useState(false)
   const [confirmText, setConfirmText] = useState('')
@@ -57,9 +58,9 @@ export default function OrderDetail() {
     try {
       await regenTokenLink(id!)
       load()
-      setMsg('สร้างลิงก์ใหม่แล้ว')
+      setMsg(flash.ok('สร้างลิงก์ใหม่แล้ว'))
     } catch (e) {
-      setMsg((e as Error).message)
+      setMsg(flash.error((e as Error).message))
     } finally {
       setBusy(false)
     }
@@ -77,7 +78,7 @@ export default function OrderDetail() {
       })
       nav('/')
     } catch (e) {
-      setMsg((e as Error).message)
+      setMsg(flash.error((e as Error).message))
     } finally {
       setBusy(false)
     }
@@ -96,9 +97,11 @@ export default function OrderDetail() {
       </header>
 
       {order.outstanding_amount != null && order.outstanding_amount > 0 && (
-        <p className="alert alert-danger">
-          เก็บเงินปลายทาง {formatTHB(order.outstanding_amount)} ({order.payment_method})
-        </p>
+        <AmountDue
+          label="เก็บเงินปลายทาง"
+          amount={order.outstanding_amount}
+          note={order.payment_method}
+        />
       )}
 
       <section className="card flex flex-col gap-4" aria-label="สรุปการจัดส่ง">
@@ -325,7 +328,7 @@ export default function OrderDetail() {
         </section>
       )}
 
-      {msg && <p className="muted">{msg}</p>}
+      <Notice flash={msg} />
     </div>
   )
 }

@@ -243,7 +243,8 @@ test('sums the cash-on-delivery amount across the ready POs only', async () => {
     ),
   )
   renderPanel()
-  expect(await screen.findByText('เก็บเงินปลายทางรวม ฿150.50')).toBeInTheDocument()
+  expect(await screen.findByText('เก็บเงินปลายทางรวม')).toBeInTheDocument()
+  expect(screen.getByText('฿150.50')).toBeInTheDocument()
 })
 
 test('flags a shortfall when the boat could not be set on every PO', async () => {
