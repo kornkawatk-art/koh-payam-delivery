@@ -1,6 +1,7 @@
 import { fireEvent, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { DeptBarChart, TrendColumnChart, rampClass } from './ShortageCharts'
+import { DEPT_COLORS } from '../../lib/departments'
 
 const bars = [
   { code: 'FZ' as const, label: 'FZ', occurrences: 6, products: 3 },
@@ -77,13 +78,22 @@ test('rampClass: color follows magnitude -- light violet for the lowest third, d
   expect(rampClass(0, 0)).toBe('bg-violet-500')
 })
 
-test('department bars: the biggest bar gets the darkest step; once one is picked the others go gray', () => {
+test('department bars: each bar wears its own department color; once one is picked the others go gray', () => {
   const { container, rerender } = render(<DeptBarChart bars={bars} active="ALL" onSelect={() => {}} />)
-  const fills = () => Array.from(container.querySelectorAll('li span.absolute')).map((el) => el.className)
-  expect(fills()[0]).toContain('bg-violet-900') // FZ: 6 of 6
-  expect(fills()[1]).toContain('bg-violet-500') // FV: 2 of 6 = exactly a third -> lightest step
+  const fills = () => Array.from(container.querySelectorAll<HTMLElement>('li span.absolute'))
+  expect(fills()[0]).toHaveStyle({ backgroundColor: DEPT_COLORS.FZ })
+  expect(fills()[1]).toHaveStyle({ backgroundColor: DEPT_COLORS.FV })
 
   rerender(<DeptBarChart bars={bars} active="FV" onSelect={() => {}} />)
-  expect(fills()[0]).toContain('bg-line-strong') // FZ steps back to gray
-  expect(fills()[1]).toContain('bg-violet-500') // the picked one keeps its color
+  expect(fills()[0]).toHaveClass('bg-line-strong') // FZ steps back to gray
+  expect(fills()[0].style.backgroundColor).toBe('')
+  expect(fills()[1]).toHaveStyle({ backgroundColor: DEPT_COLORS.FV }) // the picked one keeps its color
+})
+
+test('only the trend chart shows the น้อย-มาก color key (department colors are identity, not magnitude)', () => {
+  const { unmount } = render(<DeptBarChart bars={bars} active="ALL" onSelect={() => {}} />)
+  expect(screen.queryByText(/น้อย/)).not.toBeInTheDocument()
+  unmount()
+  render(<TrendColumnChart trend={trend} />)
+  expect(screen.getByText(/น้อย/)).toBeInTheDocument()
 })

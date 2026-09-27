@@ -14,7 +14,7 @@ import {
   type ShortageProductRow,
   type ShortageReport as Report,
 } from '../../lib/api/shortageReport'
-import type { DeptGroupCode } from '../../lib/departments'
+import { DEPT_COLORS, type DeptGroupCode } from '../../lib/departments'
 import { buildLineSummary, downloadShortageExcel, formatQty } from '../../lib/shortageExport'
 import { SkeletonRows } from '../../components/ui/Skeleton'
 import { PageHeader } from '../../components/ui/PageHeader'
@@ -23,7 +23,7 @@ import { StatTile } from '../../components/ui/Stat'
 import { Notice, flash, type Flash } from '../../components/ui/Notice'
 import { formatDateTH } from '../../lib/format'
 import { deptBars, shortageTrend } from '../../lib/shortageCharts'
-import { DeptBarChart, TrendColumnChart, rampClass } from '../../components/charts/ShortageCharts'
+import { DeptBarChart, TrendColumnChart } from '../../components/charts/ShortageCharts'
 
 // Calendar-local ISO date (not UTC) -- same convention as format.ts's
 // todayLocalISO.
@@ -238,6 +238,7 @@ export default function ShortageReport() {
                 onClick={() => setDeptFilter(g.code)}
                 label={g.label}
                 count={g.products.length}
+                color={DEPT_COLORS[g.code]}
               />
             ))}
           </div>
@@ -266,11 +267,13 @@ function FilterChip({
   onClick,
   label,
   count,
+  color,
 }: {
   active: boolean
   onClick: () => void
   label: string
   count: number
+  color?: string
 }) {
   return (
     <button
@@ -282,6 +285,13 @@ function FilterChip({
         (active ? 'btn-primary' : 'btn-secondary text-ink-soft')
       }
     >
+      {color && (
+        <span
+          className="h-2.5 w-2.5 shrink-0 rounded-full ring-2 ring-white/70"
+          style={{ backgroundColor: color }}
+          aria-hidden="true"
+        />
+      )}
       {label}
       <span
         className={
@@ -322,10 +332,19 @@ function DeptSection({
   }
 
   return (
-    <section className="card overflow-hidden p-0 sm:p-0" aria-label={`แผนก ${g.label}`}>
+    <section
+      className="card overflow-hidden border-l-4 p-0 sm:p-0"
+      style={{ borderLeftColor: DEPT_COLORS[g.code] }}
+      aria-label={`แผนก ${g.label}`}
+    >
       <header className="flex flex-wrap items-center justify-between gap-3 border-b border-line bg-paper/60 px-4 py-3">
         <div className="flex items-center gap-3">
-          <span className="rounded-lg bg-ink px-2.5 py-1 text-sm font-semibold tracking-wide text-white">
+          <span className="inline-flex items-center gap-2 rounded-lg bg-surface px-2.5 py-1 text-sm font-semibold tracking-wide text-ink ring-1 ring-line">
+            <span
+              className="h-3 w-3 rounded-full"
+              style={{ backgroundColor: DEPT_COLORS[g.code] }}
+              aria-hidden="true"
+            />
             {g.label}
           </span>
           <p className="text-sm text-ink-soft">
@@ -398,8 +417,11 @@ function ProductRow({
           {p.itemId && <span className="tnum text-xs text-ink-soft">{p.itemId}</span>}
           <span className="block h-1.5 max-w-xs overflow-hidden rounded-full bg-line" aria-hidden="true">
             <span
-              className={'block h-full rounded-full ' + rampClass(p.orderCount, maxCount)}
-              style={{ width: `${(p.orderCount / maxCount) * 100}%` }}
+              className="block h-full rounded-full"
+              style={{
+                width: `${(p.orderCount / maxCount) * 100}%`,
+                backgroundColor: DEPT_COLORS[p.dept],
+              }}
             />
           </span>
         </span>
