@@ -1,5 +1,5 @@
 import { useRef, useState, type PointerEvent, type ReactNode } from 'react'
-import type { DeptGroupCode } from '../../lib/departments'
+import { DEPT_COLORS, type DeptGroupCode } from '../../lib/departments'
 import { niceTicks, type DeptBar, type Trend, type TrendBucket } from '../../lib/shortageCharts'
 
 /*
@@ -46,10 +46,12 @@ const bucketLabel = (b: TrendBucket) =>
 function ChartCard({
   title,
   subtitle,
+  rampKey,
   children,
 }: {
   title: string
   subtitle: string
+  rampKey?: boolean
   children: ReactNode
 }) {
   return (
@@ -59,7 +61,7 @@ function ChartCard({
           <span className="section-title block">{title}</span>
           <span className="block text-xs text-ink-soft">{subtitle}</span>
         </span>
-        <RampKey />
+        {rampKey && <RampKey />}
       </figcaption>
       {children}
     </figure>
@@ -82,9 +84,10 @@ export function DeptBarChart({
       <ul className="flex flex-col gap-1">
         {bars.map((b) => {
           const selected = active === b.code
-          // Emphasis: once one department is picked, the rest step back to gray.
-          const tone =
-            active === 'ALL' || selected ? rampClass(b.occurrences, max) : 'bg-line-strong'
+          // Each department keeps its own color (labels sit beside every bar,
+          // so identity never rests on color alone). Emphasis: once one
+          // department is picked, the rest step back to gray.
+          const lit = active === 'ALL' || selected
           return (
             <li key={b.code}>
               <button
@@ -100,8 +103,14 @@ export function DeptBarChart({
                 <span className="truncate text-sm font-semibold text-ink">{b.label}</span>
                 <span className="relative h-5">
                   <span
-                    className={`absolute inset-y-0 left-0 rounded-r-[4px] transition-[width,background-color] duration-300 group-hover:brightness-110 ${tone}`}
-                    style={{ width: `max(2px, ${(b.occurrences / max) * 100}%)` }}
+                    className={
+                      'absolute inset-y-0 left-0 rounded-r-[4px] transition-[width,background-color] duration-300 group-hover:brightness-110 ' +
+                      (lit ? '' : 'bg-line-strong')
+                    }
+                    style={{
+                      width: `max(2px, ${(b.occurrences / max) * 100}%)`,
+                      backgroundColor: lit ? DEPT_COLORS[b.code] : undefined,
+                    }}
                   />
                 </span>
                 <span className="text-sm text-ink-soft">
@@ -144,6 +153,7 @@ export function TrendColumnChart({ trend }: { trend: Trend }) {
 
   return (
     <ChartCard
+      rampKey
       title={unit === 'day' ? 'ขาดตามวันจัดส่ง (ครั้ง)' : 'ขาดรายสัปดาห์ (ครั้ง)'}
       subtitle={
         unit === 'day'

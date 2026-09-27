@@ -35,5 +35,29 @@ export function deptGroupLabel(code: DeptGroupCode): string {
   return code === 'UNKNOWN' ? UNKNOWN_DEPT_LABEL : code
 }
 
+/**
+ * One identity color per department, used wherever the shortage report shows
+ * a department (chart bars, section headers, filter chips, product bars) --
+ * the color follows the department, never its rank, so a filter never
+ * repaints anything. Hues are the dataviz reference categorical palette,
+ * mapped for easy recall (FV green, BUT red, FS blue, BK yellow, FZ aqua)
+ * and validated in this order (light mode): lightness/chroma PASS, normal-
+ * vision PASS; red/green sits in the CVD 6-8 band and yellow/aqua/magenta
+ * are under 3:1 on white -- both legal only with a visible label beside
+ * every colored mark, which the report always has. Never used as TEXT color.
+ * Unknown is a neutral gray, not a ninth hue.
+ */
+export const DEPT_COLORS: Record<DeptGroupCode, string> = {
+  FV: '#008300',
+  BUT: '#e34948',
+  FS: '#2a78d6',
+  BK: '#eda100',
+  FZ: '#1baf7a',
+  DF1: '#eb6834',
+  DF2: '#4a3aa7',
+  NF: '#e87ba4',
+  UNKNOWN: '#a8a29e',
+}
+
 /** Every group in display order, the unknown bucket last. */
 export const DEPT_GROUP_ORDER: DeptGroupCode[] = [...DEPT_GROUPS.map((g) => g.code), 'UNKNOWN']
