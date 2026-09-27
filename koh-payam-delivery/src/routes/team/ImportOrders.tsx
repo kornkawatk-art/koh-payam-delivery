@@ -245,6 +245,13 @@ export default function ImportOrders() {
             </div>
           )}
 
+          {result.skippedNotDirect.length > 0 && (
+            <p className="muted">
+              ข้าม {result.skippedNotDirect.length} ออเดอร์ (ลงท้าย B — ไม่ได้ส่งจากแม็คโครโดยตรง):{' '}
+              {result.skippedNotDirect.join(', ')}
+            </p>
+          )}
+
           {result.skippedNoItems.length > 0 && (
             <p className="muted">
               ข้าม {result.skippedNoItems.length} ออเดอร์ (มีที่อยู่แต่ไม่มีรายการสินค้า):{' '}

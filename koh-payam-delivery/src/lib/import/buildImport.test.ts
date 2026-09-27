@@ -5,6 +5,7 @@ import { readFileSync } from 'node:fs'
 import { parseMakroFile, type RawRow } from './parseMakroFile'
 import {
   buildImport,
+  isNotMakroDirect,
   isPayam,
   parseExpectedDate,
   validateMapping,
@@ -547,4 +548,40 @@ test('buildImport: comma-grouped numbers parse, junk numbers become 0', () => {
   const r = buildImport(detail, order, DEFAULT_DETAIL_MAPPING, DEFAULT_ORDER_MAPPING)
   expect(r.orders[0].items[0].orderedQty).toBe(1200)
   expect(r.orders[0].items[0].isShort).toBe(false)
+})
+
+// --- PO numbers ending in "B" are not direct Makro deliveries ---------------
+
+test('isNotMakroDirect: only a trailing B counts (A, C and B elsewhere are ordinary)', () => {
+  expect(isNotMakroDirect('8542380461B')).toBe(true)
+  expect(isNotMakroDirect(' 8542380461b ')).toBe(true)
+  for (const no of ['6042765238A', '6042765238C', 'B6042765238A', '8542380461']) {
+    expect(isNotMakroDirect(no)).toBe(false)
+  }
+})
+
+test('buildImport: a Koh Payam PO ending in B is skipped and reported, never imported', () => {
+  const order = (no: string) => ({
+    'Order Number': no,
+    'Customer Name': 'C',
+    'Sub District': 'เกาะพยาม',
+    'Shipping Address': 'x',
+  })
+  const line = (no: string) => ({
+    'Order Number': no,
+    'Product Name': 'rice',
+    'Order Quantity': '1',
+    'Shipped Quantity': '1',
+    'Item Id': '1',
+    Dept: '7',
+  })
+  const r = buildImport(
+    [line('111A'), line('222B')],
+    [order('111A'), order('222B')],
+    DEFAULT_DETAIL_MAPPING,
+    DEFAULT_ORDER_MAPPING,
+  )
+  expect(r.orders.map((o) => o.makroOrderNo)).toEqual(['111A'])
+  expect(r.skippedNotDirect).toEqual(['222B'])
+  expect(r.skippedNoItems).toEqual([])
 })
