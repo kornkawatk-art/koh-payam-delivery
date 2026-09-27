@@ -452,3 +452,34 @@ test('never checks or offers to send links for a date other than today', async (
   // still just the one call from the initial (today) render -- never re-queried for the past date
   expect(getShipDayLinksSentAt).toHaveBeenCalledTimes(1)
 })
+
+const withStatuses = (o: any, statuses: string[]) => ({
+  ...o,
+  item_statuses: statuses.map((status) => ({ status })),
+})
+
+test('a PO with Makro shortages shows a red "ขาด N" badge; a PO without shows none', async () => {
+  const [a, b, c] = groupOrders()
+  vi.mocked(listOrdersForDay).mockResolvedValueOnce([
+    withStatuses({ ...a, customer_phone: null }, ['ok', 'short', 'short']),
+    withStatuses({ ...b, customer_phone: null }, ['ok', 'ok']),
+    c, // older payload without item_statuses: no badge, no crash
+  ])
+  renderPage()
+  const row1 = (await screen.findByText('PO-1')).closest('tr')!
+  expect(within(row1).getByText('ขาด 2')).toHaveClass('badge-danger')
+  expect(within(screen.getByText('PO-2').closest('tr')!).queryByText(/^ขาด/)).not.toBeInTheDocument()
+  expect(within(screen.getByText('PO-3').closest('tr')!).queryByText(/^ขาด/)).not.toBeInTheDocument()
+})
+
+test('a customer group row sums the shortages of its POs', async () => {
+  const [a, b, c] = groupOrders()
+  vi.mocked(listOrdersForDay).mockResolvedValueOnce([
+    withStatuses(a, ['short']),
+    withStatuses(b, ['short', 'short', 'ok']),
+    c,
+  ])
+  renderPage()
+  const groupRow = (await screen.findByText('2 PO')).closest('tr')!
+  expect(within(groupRow).getByText('ขาด 3')).toBeInTheDocument()
+})
