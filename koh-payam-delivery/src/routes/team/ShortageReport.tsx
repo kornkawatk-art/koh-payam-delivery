@@ -383,7 +383,7 @@ function ProductRow({
         />
       </button>
       {open && (
-        <div className="table-wrap table-flat mx-0 border-b-0 sm:mx-0">
+        <div className="table-wrap rounded-none border-x-0 border-b-0 shadow-none">
           <table className="data-table stack-table">
             <thead>
               <tr>
