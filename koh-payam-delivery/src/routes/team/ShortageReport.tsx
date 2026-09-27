@@ -40,6 +40,7 @@ function daysAgo(n: number): string {
 type Preset = { id: string; label: string; range: () => [string, string] }
 
 const PRESETS: Preset[] = [
+  { id: 'today', label: 'วันนี้', range: () => [daysAgo(0), daysAgo(0)] },
   { id: '7d', label: '7 วัน', range: () => [daysAgo(6), daysAgo(0)] },
   { id: '30d', label: '30 วัน', range: () => [daysAgo(29), daysAgo(0)] },
   {
@@ -64,7 +65,9 @@ const PRESETS: Preset[] = [
 ]
 
 export default function ShortageReport() {
-  const [[fromDate, toDate], setRange] = useState<[string, string]>(() => PRESETS[1].range())
+  const [[fromDate, toDate], setRange] = useState<[string, string]>(() =>
+    PRESETS.find((p) => p.id === '30d')!.range(),
+  )
   const [report, setReport] = useState<Report | null>(null)
   const [failed, setFailed] = useState(false)
   const [deptFilter, setDeptFilter] = useState<DeptGroupCode | 'ALL'>('ALL')

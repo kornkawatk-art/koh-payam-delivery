@@ -232,3 +232,15 @@ test('changing the range keeps the previous report on screen (marked busy) until
     expect(screen.getByText('มะพร้าว').closest('[aria-busy]')).toHaveAttribute('aria-busy', 'false'),
   )
 })
+
+test('"วันนี้" fetches just today (from = to) and shows as pressed; the page still opens on 30 วัน', async () => {
+  renderPage()
+  await screen.findByText('มะพร้าว')
+  const periods = screen.getByRole('group', { name: 'ช่วงเวลา' })
+  expect(within(periods).getByRole('button', { name: '30 วัน' })).toHaveAttribute('aria-pressed', 'true')
+
+  await userEvent.click(within(periods).getByRole('button', { name: 'วันนี้' }))
+  const [from, to] = getShortageReport.mock.lastCall!
+  expect(from).toBe(to)
+  expect(within(periods).getByRole('button', { name: 'วันนี้' })).toHaveAttribute('aria-pressed', 'true')
+})
