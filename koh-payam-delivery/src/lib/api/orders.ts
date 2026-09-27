@@ -23,6 +23,7 @@ function itemRows(orderId: string, items: ParsedItem[], packedByKey?: Map<string
     item_remark: it.itemRemark,
     line_no: it.lineNo,
     is_fresh: it.isFresh,
+    dept: it.dept || null,
     packed: packedByKey?.get(it.itemId || it.productName) ?? false,
   }))
 }

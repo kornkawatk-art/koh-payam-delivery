@@ -61,11 +61,39 @@ beforeEach(() => {
   queryError = null
 })
 
-test('query shape: selects the right columns via an inner join, filters status=short, and filters the date range on orders.ship_date', async () => {
+// One short order_items row, as PostgREST returns it with the orders embed.
+function row(o: {
+  name: string
+  item?: string | null
+  dept?: string | null
+  ordered?: number
+  shipped?: number
+  shortage?: number | null
+  order: string
+  date?: string
+}) {
+  return {
+    product_name: o.name,
+    makro_item_id: o.item ?? null,
+    dept: o.dept ?? null,
+    qty_ordered: o.ordered ?? 2,
+    qty_shipped: o.shipped ?? 1,
+    shortage_qty: o.shortage ?? null,
+    order_id: o.order,
+    status: 'short',
+    orders: {
+      makro_order_no: `PO-${o.order}`,
+      customer_name_en: `C-${o.order}`,
+      ship_date: o.date ?? '2026-09-05',
+    },
+  }
+}
+
+test('query shape: selects item code + dept via an inner join, filters status=short and the ship_date range', async () => {
   await getShortageReport('2026-09-01', '2026-09-10')
   const sel = calls.find((c) => c[0] === 'select')
   expect(sel[1]).toBe(
-    'product_name, qty_ordered, qty_shipped, shortage_qty, order_id, orders!inner(makro_order_no, customer_name_en, ship_date)',
+    'product_name, makro_item_id, dept, qty_ordered, qty_shipped, shortage_qty, order_id, orders!inner(makro_order_no, customer_name_en, ship_date)',
   )
   expect(calls).toContainEqual(['eq', 'status', 'short'])
   expect(calls).toContainEqual(['gte', 'orders.ship_date', '2026-09-01'])
@@ -79,174 +107,105 @@ test('throws the Thai error on a query failure', async () => {
   )
 })
 
-test('returns an empty array when nothing matches', async () => {
-  rows = []
-  const report = await getShortageReport('2026-09-01', '2026-09-10')
-  expect(report).toEqual([])
+test('an empty range yields no groups and zero totals', async () => {
+  expect(await getShortageReport('2026-09-01', '2026-09-10')).toEqual({
+    groups: [],
+    productCount: 0,
+    occurrenceCount: 0,
+    affectedOrderCount: 0,
+  })
 })
 
-test('qty fallback: uses shortage_qty when positive, else ordered - shipped clamped at 0', async () => {
+test('qty fallback: shortage_qty when positive, else ordered - shipped clamped at 0', async () => {
   rows = [
-    {
-      product_name: 'มะพร้าว',
-      qty_ordered: 10,
-      qty_shipped: 3,
-      shortage_qty: 5,
-      order_id: 'o1',
-      status: 'short',
-      orders: { makro_order_no: 'PO-1', customer_name_en: 'Alice', ship_date: '2026-09-05' },
-    },
-    {
-      product_name: 'มะพร้าว',
-      qty_ordered: 10,
-      qty_shipped: 7,
-      shortage_qty: 0,
-      order_id: 'o2',
-      status: 'short',
-      orders: { makro_order_no: 'PO-2', customer_name_en: 'Bob', ship_date: '2026-09-02' },
-    },
+    row({ name: 'coconut', item: '100', dept: '1', ordered: 10, shipped: 3, shortage: 5, order: 'o1' }),
+    row({ name: 'coconut', item: '100', dept: '1', ordered: 10, shipped: 7, shortage: 0, order: 'o2' }),
   ]
-  const report = await getShortageReport('2026-09-01', '2026-09-10')
-  expect(report).toHaveLength(1)
-  expect(report[0].totalQty).toBe(5 + 3) // real shortage_qty=5, fallback 10-7=3
+  const r = await getShortageReport('2026-09-01', '2026-09-10')
+  expect(r.groups[0].products[0].totalQty).toBe(5 + 3)
 })
 
-test('aggregation: groups by product, sums qty, counts distinct orders, sorts products desc by totalQty and each product\'s details asc by shipDate', async () => {
+test('groups by department in the fixed FV..NF order, unknown last, and only non-empty groups', async () => {
   rows = [
-    // order A contributes to two different products
-    {
-      product_name: 'มะพร้าว',
-      qty_ordered: 10,
-      qty_shipped: 5,
-      shortage_qty: 5,
-      order_id: 'o-a',
-      status: 'short',
-      orders: { makro_order_no: 'PO-A', customer_name_en: 'Alice', ship_date: '2026-09-05' },
-    },
-    {
-      product_name: 'มะม่วง',
-      qty_ordered: 4,
-      qty_shipped: 2,
-      shortage_qty: 2,
-      order_id: 'o-a',
-      status: 'short',
-      orders: { makro_order_no: 'PO-A', customer_name_en: 'Alice', ship_date: '2026-09-05' },
-    },
-    // มะพร้าว also short on order B, an earlier ship date than order A
-    {
-      product_name: 'มะพร้าว',
-      qty_ordered: 10,
-      qty_shipped: 7,
-      shortage_qty: 0,
-      order_id: 'o-b',
-      status: 'short',
-      orders: { makro_order_no: 'PO-B', customer_name_en: 'Bob', ship_date: '2026-09-02' },
-    },
+    row({ name: 'soap', item: '9', dept: '45', order: 'o1' }), // NF
+    row({ name: 'fish', item: '5', dept: '3', order: 'o2' }), // FS
+    row({ name: 'old', item: '7', dept: null, order: 'o3' }), // unknown
+    row({ name: 'chips', item: '8', dept: '8', order: 'o4' }), // DF1
   ]
-  const report = await getShortageReport('2026-09-01', '2026-09-10')
-  expect(report).toEqual([
-    {
-      productName: 'มะพร้าว',
-      totalQty: 8, // 5 (order A) + 3 (order B fallback)
-      orderCount: 2,
-      details: [
-        {
-          orderId: 'o-b',
-          makroOrderNo: 'PO-B',
-          customerNameEn: 'Bob',
-          shipDate: '2026-09-02',
-          qty: 3,
-        },
-        {
-          orderId: 'o-a',
-          makroOrderNo: 'PO-A',
-          customerNameEn: 'Alice',
-          shipDate: '2026-09-05',
-          qty: 5,
-        },
-      ],
-    },
-    {
-      productName: 'มะม่วง',
-      totalQty: 2,
-      orderCount: 1,
-      details: [
-        {
-          orderId: 'o-a',
-          makroOrderNo: 'PO-A',
-          customerNameEn: 'Alice',
-          shipDate: '2026-09-05',
-          qty: 2,
-        },
-      ],
-    },
+  const r = await getShortageReport('2026-09-01', '2026-09-10')
+  expect(r.groups.map((g) => g.code)).toEqual(['FS', 'DF1', 'NF', 'UNKNOWN'])
+  expect(r.groups.at(-1)!.label).toBe('ไม่ทราบแผนก')
+})
+
+test('within a department, products rank by how many orders were short, then by quantity', async () => {
+  rows = [
+    row({ name: 'water', item: 'W', dept: '9', shortage: 24, order: 'o1' }),
+    row({ name: 'sauce', item: 'S', dept: '9', shortage: 1, order: 'o1' }),
+    row({ name: 'sauce', item: 'S', dept: '9', shortage: 1, order: 'o2' }),
+    row({ name: 'sauce', item: 'S', dept: '9', shortage: 1, order: 'o3' }),
+  ]
+  const r = await getShortageReport('2026-09-01', '2026-09-10')
+  const ps = r.groups[0].products
+  expect(ps.map((p) => [p.productName, p.orderCount, p.totalQty])).toEqual([
+    ['sauce', 3, 3],
+    ['water', 1, 24],
   ])
+  expect(r.groups[0].occurrenceCount).toBe(4)
+  expect(r).toMatchObject({ productCount: 2, occurrenceCount: 4, affectedOrderCount: 3 })
 })
 
-test('a row whose order falls outside the requested date range is excluded', async () => {
+test('products are keyed by item code: same name with different codes stays separate; no code falls back to the name', async () => {
   rows = [
-    {
-      product_name: 'มะพร้าว',
-      qty_ordered: 10,
-      qty_shipped: 5,
-      shortage_qty: 5,
-      order_id: 'o-in',
-      status: 'short',
-      orders: { makro_order_no: 'PO-IN', customer_name_en: 'Alice', ship_date: '2026-09-05' },
-    },
-    // Same product, but this order shipped before the requested range.
-    {
-      product_name: 'มะพร้าว',
-      qty_ordered: 20,
-      qty_shipped: 0,
-      shortage_qty: 20,
-      order_id: 'o-out-before',
-      status: 'short',
-      orders: { makro_order_no: 'PO-OUT-1', customer_name_en: 'Old', ship_date: '2026-08-20' },
-    },
-    // ...and this one shipped after it.
-    {
-      product_name: 'มะพร้าว',
-      qty_ordered: 20,
-      qty_shipped: 0,
-      shortage_qty: 20,
-      order_id: 'o-out-after',
-      status: 'short',
-      orders: { makro_order_no: 'PO-OUT-2', customer_name_en: 'Future', ship_date: '2026-09-20' },
-    },
+    row({ name: 'milk', item: 'M1', dept: '5', order: 'o1' }),
+    row({ name: 'milk', item: 'M2', dept: '5', order: 'o2' }),
+    row({ name: 'loose', item: '', dept: '5', order: 'o3' }),
+    row({ name: 'loose', item: null, dept: '5', order: 'o4' }),
   ]
-  const report = await getShortageReport('2026-09-01', '2026-09-10')
-  expect(report).toHaveLength(1)
-  expect(report[0].totalQty).toBe(5)
-  expect(report[0].orderCount).toBe(1)
-  expect(report[0].details.map((d) => d.orderId)).toEqual(['o-in'])
+  const r = await getShortageReport('2026-09-01', '2026-09-10')
+  const ps = r.groups[0].products
+  expect(ps).toHaveLength(3)
+  expect(ps.find((p) => p.productName === 'loose')!.orderCount).toBe(2)
 })
 
-test('two item rows for the same product on the same order are combined into a single detail row, not duplicated', async () => {
+test('an item first seen on an older line without Dept still lands in its real department once a newer line has it', async () => {
   rows = [
-    {
-      product_name: 'มะพร้าว',
-      qty_ordered: 5,
-      qty_shipped: 3,
-      shortage_qty: 2,
-      order_id: 'o1',
-      status: 'short',
-      orders: { makro_order_no: 'PO-1', customer_name_en: 'Alice', ship_date: '2026-09-05' },
-    },
-    {
-      product_name: 'มะพร้าว',
-      qty_ordered: 5,
-      qty_shipped: 4,
-      shortage_qty: 1,
-      order_id: 'o1',
-      status: 'short',
-      orders: { makro_order_no: 'PO-1', customer_name_en: 'Alice', ship_date: '2026-09-05' },
-    },
+    row({ name: 'rice', item: 'R', dept: null, order: 'o1' }),
+    row({ name: 'rice', item: 'R', dept: '7', order: 'o2' }),
   ]
-  const report = await getShortageReport('2026-09-01', '2026-09-10')
-  expect(report).toHaveLength(1)
-  expect(report[0].orderCount).toBe(1)
-  expect(report[0].totalQty).toBe(3)
-  expect(report[0].details).toHaveLength(1)
-  expect(report[0].details[0].qty).toBe(3)
+  const r = await getShortageReport('2026-09-01', '2026-09-10')
+  expect(r.groups.map((g) => g.code)).toEqual(['DF1'])
+  expect(r.groups[0].products[0].orderCount).toBe(2)
+})
+
+test('an order outside the requested range is excluded', async () => {
+  rows = [
+    row({ name: 'x', item: 'X', dept: '1', shortage: 5, order: 'in', date: '2026-09-05' }),
+    row({ name: 'x', item: 'X', dept: '1', shortage: 9, order: 'out', date: '2026-08-20' }),
+  ]
+  const r = await getShortageReport('2026-09-01', '2026-09-10')
+  const p = r.groups[0].products[0]
+  expect(p.totalQty).toBe(5)
+  expect(p.details.map((d) => d.orderId)).toEqual(['in'])
+})
+
+test('two lines of the same item on one order combine into one detail row; weighed fractions round to 2 decimals', async () => {
+  rows = [
+    row({ name: 'pork', item: 'P', dept: '2', shortage: 0.1, order: 'o1' }),
+    row({ name: 'pork', item: 'P', dept: '2', shortage: 0.2, order: 'o1' }),
+  ]
+  const r = await getShortageReport('2026-09-01', '2026-09-10')
+  const p = r.groups[0].products[0]
+  expect(p.orderCount).toBe(1)
+  expect(p.details).toHaveLength(1)
+  expect(p.details[0].qty).toBe(0.3)
+  expect(p.totalQty).toBe(0.3)
+})
+
+test('each product lists its orders oldest first', async () => {
+  rows = [
+    row({ name: 'x', item: 'X', dept: '1', order: 'b', date: '2026-09-07' }),
+    row({ name: 'x', item: 'X', dept: '1', order: 'a', date: '2026-09-02' }),
+  ]
+  const r = await getShortageReport('2026-09-01', '2026-09-10')
+  expect(r.groups[0].products[0].details.map((d) => d.orderId)).toEqual(['a', 'b'])
 })
