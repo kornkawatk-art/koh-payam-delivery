@@ -3,30 +3,9 @@ import { getOrCreateShipDay } from './shipDays'
 import { linkBackordersToDay, syncShortageBackorders } from './backorders'
 import { logAction } from './audit'
 import { makeLinkToken } from '../token'
-import type { ParsedOrder, ParsedItem } from '../import/buildImport'
+import type { ParsedOrder } from '../import/buildImport'
+import { itemRow, planItemSync, type ExistingItem } from '../import/itemSync'
 import { canTransition, type OrderStatus } from '../status'
-
-// packedByKey carries a synced order's per-line "packed" tick forward across
-// the delete+reinsert below (see commitImport) -- keyed by makro_item_id when
-// present, else product_name, since order_items rows have no other stable
-// identity across a re-import. Undefined (a brand-new order) means every line
-// starts unpacked, same as the column's own default.
-function itemRows(orderId: string, items: ParsedItem[], packedByKey?: Map<string, boolean>) {
-  return items.map((it) => ({
-    order_id: orderId,
-    product_name: it.productName,
-    qty_ordered: it.orderedQty,
-    qty_shipped: it.shippedQty,
-    shortage_qty: it.shortageQty,
-    status: it.isShort ? 'short' : 'ok',
-    makro_item_id: it.itemId,
-    item_remark: it.itemRemark,
-    line_no: it.lineNo,
-    is_fresh: it.isFresh,
-    dept: it.dept || null,
-    packed: packedByKey?.get(it.itemId || it.productName) ?? false,
-  }))
-}
 
 export type OtherDayOrder = { makro_order_no: string; ship_date: string; status: string }
 
@@ -51,13 +30,15 @@ export async function listOrdersOnOtherDays(
 
 // Re-import is a non-destructive sync: brand-new orders are inserted, orders that
 // already exist for this ship day get their order-level makro fields refreshed and
-// their line items replaced from the file. Box counts, boat, status, timestamps,
-// link token, photos and claims are left untouched. Shortage backorders DO get
-// refreshed (via syncShortageBackorders) for every order, new or synced — a
-// corrected shipped/shortage number from Makro must be reflected in the
-// backorder list too, not just on the order's own item table. Each line's own
-// "packed" tick is carried forward across the sync too (matched by
-// makro_item_id, or product_name when that's blank) — see itemRows below.
+// their line items brought in line with the file IN PLACE (planItemSync):
+// matched lines keep their row id and "packed" tick, new lines are inserted,
+// lines gone from the file are removed unless a claim references them. (The
+// old delete-all + reinsert detached claims: claim_items.order_item_id is ON
+// DELETE SET NULL.) Box counts, boat, status, timestamps, link token, photos
+// and claims are left untouched. Shortage backorders DO get refreshed (via
+// syncShortageBackorders) for every order, new or synced — a corrected
+// shipped/shortage number from Makro must be reflected in the backorder list
+// too, not just on the order's own item table.
 // A PO that already exists on a DIFFERENT ship day is skipped, never re-created
 // (listOrdersOnOtherDays); the skipped list is returned so the UI can say so.
 export async function commitImport(
@@ -113,7 +94,9 @@ export async function commitImport(
         .single()
       if (error) throw new Error(`สร้างออเดอร์ ${o.makroOrderNo} ไม่สำเร็จ: ${error.message}`)
       const orderId = (ins as any).id
-      const { error: e2 } = await supabase.from('order_items').insert(itemRows(orderId, o.items))
+      const { error: e2 } = await supabase
+        .from('order_items')
+        .insert(o.items.map((it) => itemRow(orderId, it, false)))
       if (e2) throw new Error(`สร้างรายการของ ${o.makroOrderNo} ไม่สำเร็จ: ${e2.message}`)
       await syncShortageBackorders(orderId)
       created++
@@ -131,33 +114,40 @@ export async function commitImport(
         })
         .eq('id', existingId)
       if (eU) throw new Error(`อัปเดตออเดอร์ ${o.makroOrderNo} ไม่สำเร็จ: ${eU.message}`)
-      const { data: oldItems } = await supabase
+      const { data: oldRows, error: eR } = await supabase
         .from('order_items')
-        .select('makro_item_id,product_name,packed')
+        .select('id,makro_item_id,product_name,line_no,packed')
         .eq('order_id', existingId)
-      // Skip any key two old rows share (blank makro_item_id + identical
-      // product_name is a real Makro data gap, not just theoretical) -- an
-      // ambiguous match could leak one item's tick onto an unrelated line,
-      // silently letting the pack gate think that line was re-verified when
-      // it wasn't. Losing the carried-forward tick for those rows (falling
-      // back to the column's own default: unpacked) is the safe direction;
-      // a false "already packed" is not.
-      const keyCounts = new Map<string, number>()
-      for (const r of oldItems ?? []) {
-        const k = (r as any).makro_item_id || (r as any).product_name
-        keyCounts.set(k, (keyCounts.get(k) ?? 0) + 1)
+      if (eR) throw new Error(`อ่านรายการเดิมของ ${o.makroOrderNo} ไม่สำเร็จ: ${eR.message}`)
+      const olds = (oldRows ?? []) as Omit<ExistingItem, 'claimed'>[]
+      // Which lines a claim points at -- those are never deleted. Fail closed:
+      // if this check errors, stop rather than risk detaching a claim.
+      let claimed = new Set<string>()
+      if (olds.length) {
+        const { data: refs, error: eC } = await supabase
+          .from('claim_items')
+          .select('order_item_id')
+          .in('order_item_id', olds.map((r) => r.id))
+        if (eC) throw new Error(`ตรวจเคลมของ ${o.makroOrderNo} ไม่สำเร็จ: ${eC.message}`)
+        claimed = new Set((refs ?? []).map((r: any) => r.order_item_id))
       }
-      const packedByKey = new Map<string, boolean>(
-        (oldItems ?? [])
-          .filter((r: any) => keyCounts.get(r.makro_item_id || r.product_name) === 1)
-          .map((r: any) => [r.makro_item_id || r.product_name, !!r.packed]),
+      const plan = planItemSync(
+        existingId,
+        olds.map((r) => ({ ...r, packed: !!r.packed, claimed: claimed.has(r.id) })),
+        o.items,
       )
-      const { error: eD } = await supabase.from('order_items').delete().eq('order_id', existingId)
-      if (eD) throw new Error(`ล้างรายการของ ${o.makroOrderNo} ไม่สำเร็จ: ${eD.message}`)
-      const { error: e2 } = await supabase
-        .from('order_items')
-        .insert(itemRows(existingId, o.items, packedByKey))
-      if (e2) throw new Error(`sync รายการของ ${o.makroOrderNo} ไม่สำเร็จ: ${e2.message}`)
+      if (plan.update.length) {
+        const { error: eUp } = await supabase.from('order_items').upsert(plan.update)
+        if (eUp) throw new Error(`sync รายการของ ${o.makroOrderNo} ไม่สำเร็จ: ${eUp.message}`)
+      }
+      if (plan.insert.length) {
+        const { error: eIn } = await supabase.from('order_items').insert(plan.insert)
+        if (eIn) throw new Error(`sync รายการของ ${o.makroOrderNo} ไม่สำเร็จ: ${eIn.message}`)
+      }
+      if (plan.remove.length) {
+        const { error: eD } = await supabase.from('order_items').delete().in('id', plan.remove)
+        if (eD) throw new Error(`ล้างรายการของ ${o.makroOrderNo} ไม่สำเร็จ: ${eD.message}`)
+      }
       // Re-syncing an order's items can change which lines are short (Makro
       // corrects a shipped/shortage number after the fact) — refresh this
       // order's still-pending shortage backorders to match, the same way

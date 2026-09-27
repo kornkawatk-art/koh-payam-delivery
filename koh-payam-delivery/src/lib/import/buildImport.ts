@@ -138,12 +138,20 @@ export type ParsedOrder = {
 export type BuildResult = {
   orders: ParsedOrder[] // เฉพาะพยาม + มีรายการ
   skippedNoItems: string[] // พยามใน B แต่ไม่มีใน A
+  skippedNotDirect: string[] // เลข PO ลงท้าย B = ไม่ได้ส่งจากแม็คโครโดยตรง
   skippedNotPayam: number // นับ order ที่ไม่ใช่พยาม
   cancelledLinesDropped: number
   shippedAllZero: boolean // true ถ้าทุกบรรทัด shippedQty==0 -> UI เตือน
 }
 
 // --- Helpers ----------------------------------------------------------------
+
+/**
+ * A Makro order number ending in "B" is not a delivery Makro makes directly
+ * (confirmed by the team), so it never becomes an order here. Other suffixes
+ * (A, C, ...) are ordinary orders.
+ */
+export const isNotMakroDirect = (orderNo: string) => /b$/i.test(orderNo.trim())
 
 function toNum(v: string | undefined): number {
   const n = Number(String(v ?? '').replace(/,/g, '').trim())
@@ -318,7 +326,12 @@ export function buildImport(
   // 3. join B -> A: attach items to each พยาม order
   const orders: ParsedOrder[] = []
   const skippedNoItems: string[] = []
+  const skippedNotDirect: string[] = []
   for (const [orderNo, order] of payamOrders) {
+    if (isNotMakroDirect(orderNo)) {
+      skippedNotDirect.push(orderNo)
+      continue
+    }
     const items = itemsByOrder.get(orderNo) ?? []
     if (items.length === 0) {
       skippedNoItems.push(orderNo)
@@ -332,5 +345,12 @@ export function buildImport(
   const shippedAllZero =
     orders.length > 0 && orders.every((o) => o.items.every((i) => i.shippedQty === 0))
 
-  return { orders, skippedNoItems, skippedNotPayam, cancelledLinesDropped, shippedAllZero }
+  return {
+    orders,
+    skippedNoItems,
+    skippedNotDirect,
+    skippedNotPayam,
+    cancelledLinesDropped,
+    shippedAllZero,
+  }
 }

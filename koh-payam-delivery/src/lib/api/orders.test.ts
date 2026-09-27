@@ -23,6 +23,8 @@ const state = {
   searchResult: [] as any[],
   searchError: null as null | { message: string },
   oldItems: [] as any[],
+  claimItems: [] as any[],
+  upserted: [] as any[],
   elsewhere: [] as any[],
   elsewhereError: null as null | { message: string },
   customerDayRows: [] as any[],
@@ -64,6 +66,8 @@ vi.mock('../supabase', () => {
         return b
       },
       in: () => {
+        // commitImport's claim check: claim_items.select(...).in('order_item_id', ids)
+        if (table === 'claim_items') return Promise.resolve({ data: state.claimItems, error: null })
         if (b.__other) {
           b.__other = false
           return Promise.resolve({ data: state.elsewhere, error: state.elsewhereError })
@@ -80,6 +84,10 @@ vi.mock('../supabase', () => {
           }),
           then: (resolve: any) => resolve({ error: null }),
         }
+      },
+      upsert: (rows: any) => {
+        state.upserted.push({ table, rows })
+        return Promise.resolve({ error: null })
       },
       update: (patch: any) => {
         state.updated.push({ table, patch })
@@ -188,6 +196,8 @@ beforeEach(() => {
   state.searchResult = []
   state.searchError = null
   state.oldItems = []
+  state.claimItems = []
+  state.upserted = []
   state.elsewhere = []
   state.elsewhereError = null
   state.customerDayRows = []
@@ -265,8 +275,8 @@ test('re-import of an existing order syncs without touching protected columns', 
     expect(patch).not.toHaveProperty(k)
   }
 
-  // order_items are deleted for this order then re-inserted from the file
-  expect(state.deleted).toEqual([{ table: 'order_items', order_id: 'old1' }])
+  // a brand-new line (no old row) is inserted; nothing is deleted wholesale
+  expect(state.deleted).toEqual([])
   const itemIns = state.inserted.find((i) => i.table === 'order_items')
   expect(itemIns.rows[0]).toMatchObject({ order_id: 'old1', product_name: 'x', status: 'short' })
 
@@ -276,38 +286,51 @@ test('re-import of an existing order syncs without touching protected columns', 
   expect(syncShortageBackorders).toHaveBeenCalledWith('old1')
 })
 
-test('re-import carries the "packed" tick forward for a line matched by makro_item_id', async () => {
+test('re-import updates a matched line IN PLACE (same row id), keeping its packed tick', async () => {
   state.existing = [{ id: 'old1', makro_order_no: 'PO-1' }]
-  state.oldItems = [{ makro_item_id: '100001', product_name: 'old name', packed: true }]
+  state.oldItems = [{ id: 'row-1', makro_item_id: '100001', product_name: 'old name', line_no: 1, packed: true }]
   await commitImport('2026-10-01', parsedOrders as any)
-  const itemIns = state.inserted.find((i) => i.table === 'order_items')
-  // matched on makro_item_id ('100001') despite the product_name differing
-  // (Makro can rename a product between exports) -- the tick still carries.
-  expect(itemIns.rows[0]).toMatchObject({ makro_item_id: '100001', packed: true })
+  // matched on makro_item_id despite the rename -- updated, not re-created
+  const up = state.upserted.find((u) => u.table === 'order_items')
+  expect(up.rows).toEqual([
+    expect.objectContaining({ id: 'row-1', product_name: 'x', makro_item_id: '100001', packed: true }),
+  ])
+  expect(state.inserted.some((i) => i.table === 'order_items')).toBe(false)
+  expect(state.deleted).toEqual([])
 })
 
-test('re-import does not carry a tick forward for a line with no matching old row', async () => {
-  state.existing = [{ id: 'old1', makro_order_no: 'PO-1' }]
-  state.oldItems = [{ makro_item_id: '999999', product_name: 'unrelated', packed: true }]
-  await commitImport('2026-10-01', parsedOrders as any)
-  const itemIns = state.inserted.find((i) => i.table === 'order_items')
-  expect(itemIns.rows[0]).toMatchObject({ makro_item_id: '100001', packed: false })
-})
-
-test('re-import skips the carry-forward (defaults to unpacked) when two old rows share the same key', async () => {
-  // A data gap Makro's own export can produce for real (e.g. two old rows
-  // both missing Item Id with the same product name) collapses to one
-  // ambiguous map entry -- must not let either row's tick "win" and leak
-  // onto the new line, since that could silently mark a line as already
-  // packed without it ever being re-verified.
+test('re-import removes a line gone from the file, but KEEPS one a claim points at', async () => {
   state.existing = [{ id: 'old1', makro_order_no: 'PO-1' }]
   state.oldItems = [
-    { makro_item_id: '100001', product_name: 'a', packed: true },
-    { makro_item_id: '100001', product_name: 'b', packed: true },
+    { id: 'row-1', makro_item_id: '100001', product_name: 'x', line_no: 1, packed: false },
+    { id: 'row-gone', makro_item_id: '555', product_name: 'gone', line_no: 2, packed: false },
+    { id: 'row-claimed', makro_item_id: '777', product_name: 'claimed', line_no: 3, packed: false },
   ]
+  state.claimItems = [{ order_item_id: 'row-claimed' }]
+  await commitImport('2026-10-01', parsedOrders as any)
+  expect(state.deleted).toEqual([{ table: 'order_items', vals: ['row-gone'] }])
+})
+
+test('re-import does not carry a tick onto a line with no matching old row', async () => {
+  state.existing = [{ id: 'old1', makro_order_no: 'PO-1' }]
+  state.oldItems = [{ id: 'row-9', makro_item_id: '999999', product_name: 'unrelated', line_no: 1, packed: true }]
   await commitImport('2026-10-01', parsedOrders as any)
   const itemIns = state.inserted.find((i) => i.table === 'order_items')
   expect(itemIns.rows[0]).toMatchObject({ makro_item_id: '100001', packed: false })
+  expect(state.deleted).toEqual([{ table: 'order_items', vals: ['row-9'] }])
+})
+
+test('re-import resets the tick (unpacked) when two old rows share the same key', async () => {
+  // A data gap Makro's own export can produce for real -- must not let either
+  // row's tick land on a line that was never re-verified.
+  state.existing = [{ id: 'old1', makro_order_no: 'PO-1' }]
+  state.oldItems = [
+    { id: 'row-a', makro_item_id: '100001', product_name: 'a', line_no: 1, packed: true },
+    { id: 'row-b', makro_item_id: '100001', product_name: 'b', line_no: 2, packed: true },
+  ]
+  await commitImport('2026-10-01', parsedOrders as any)
+  const up = state.upserted.find((u) => u.table === 'order_items')
+  expect(up.rows[0]).toMatchObject({ id: 'row-a', packed: false })
 })
 
 test('re-import calls syncShortageBackorders for every order, new and synced, before the once-per-day link pass', async () => {

@@ -58,6 +58,7 @@ const baseResult = {
     },
   ],
   skippedNoItems: ['P-9'],
+  skippedNotDirect: [],
   skippedNotPayam: 1,
   cancelledLinesDropped: 2,
   shippedAllZero: false,
@@ -165,4 +166,13 @@ test('the result message reports how many POs were skipped as already imported',
   await userEvent.click(await screen.findByRole('button', { name: /ดูตัวอย่าง/i }))
   await userEvent.click(await screen.findByRole('button', { name: /นำเข้า 1 ออเดอร์/i }))
   expect(await screen.findByText('นำเข้า 1 ใหม่ · sync 0 · ข้าม 1 ที่เคยนำเข้าแล้ว')).toBeInTheDocument()
+})
+
+test('preview lists the POs skipped for ending in B (not delivered by Makro directly)', async () => {
+  buildImportMock.mockReturnValue({ ...baseResult, skippedNotDirect: ['8542380461B'] })
+  await uploadBoth()
+  await userEvent.click(await screen.findByRole('button', { name: /ดูตัวอย่าง/i }))
+  expect(
+    await screen.findByText(/ข้าม 1 ออเดอร์ \(ลงท้าย B — ไม่ได้ส่งจากแม็คโครโดยตรง\): 8542380461B/),
+  ).toBeInTheDocument()
 })
