@@ -262,7 +262,7 @@ test('shows a Thai error when loading fails, and "back" calls onBack', async () 
   listOrdersForCustomerDay.mockResolvedValue(orders())
   renderPanel()
   await screen.findByText('PO-1')
-  await userEvent.click(screen.getByRole('button', { name: '← กลับ' }))
+  await userEvent.click(screen.getByRole('button', { name: 'กลับ' }))
   expect(onBack).toHaveBeenCalled()
 })
 

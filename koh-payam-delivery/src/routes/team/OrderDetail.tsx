@@ -7,7 +7,8 @@ import {
   type BackorderRow,
 } from '../../lib/api/backorders'
 import { StatusBadge } from '../../components/ui/StatusBadge'
-import { Spinner } from '../../components/ui/Spinner'
+import { PageSkeleton } from '../../components/ui/Skeleton'
+import { BackLink } from '../../components/ui/BackLink'
 import { ZoomableImage } from '../../components/ui/ZoomableImage'
 import { formatTHB } from '../../lib/format'
 import { splitFreshDry } from '../../lib/freshDry'
@@ -39,7 +40,7 @@ export default function OrderDetail() {
   }, [id, load])
 
   if (failed) return <p className="alert alert-danger">โหลดออเดอร์ไม่สำเร็จ</p>
-  if (!order) return <Spinner />
+  if (!order) return <PageSkeleton />
 
   const link = `${location.origin}/o/${order.link_token}`
   const items: any[] = order.order_items ?? []
@@ -83,7 +84,8 @@ export default function OrderDetail() {
 
   return (
     <div className="flex flex-col gap-5">
-      <header className="flex flex-col gap-3 border-b border-line pb-4">
+      <header className="flex flex-col border-b border-line pb-4">
+        <BackLink to="/" label="งานวันนี้" />
         <div className="flex flex-wrap items-center gap-3">
           <h1 className="page-title">
             {order.makro_order_no} · {order.customer_name_en}

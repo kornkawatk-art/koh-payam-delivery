@@ -4,6 +4,7 @@ import { supabase } from '../../lib/supabase'
 import { Anchor } from '@phosphor-icons/react'
 import { PageHeader } from '../../components/ui/PageHeader'
 import { todayLocalISO } from '../../lib/format'
+import { EmptyState } from '../../components/ui/EmptyState'
 
 type Boat = { id: string; name: string }
 
@@ -96,7 +97,9 @@ export default function BoatSetup() {
       />
 
       <div className="card flex flex-col gap-3">
-        {boats.length === 0 && <p className="muted">ยังไม่มีเรือสำหรับวันนี้</p>}
+        {boats.length === 0 && (
+          <EmptyState compact icon={Anchor} title="ยังไม่มีเรือสำหรับวันนี้" />
+        )}
         {boats.map((b, i) => (
           <div key={b.id} className="flex items-center gap-2">
             <input

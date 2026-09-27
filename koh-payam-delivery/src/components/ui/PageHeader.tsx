@@ -2,6 +2,7 @@ import type { ReactNode } from 'react'
 import type { Icon } from '@phosphor-icons/react'
 import type { NavAccent } from '../../lib/roles'
 import { NAV_ACCENT_CLASSES } from '../../lib/navAccentStyles'
+import { BackLink } from './BackLink'
 
 /**
  * Consistent page heading: title on the left, optional controls on the right.
@@ -14,35 +15,43 @@ import { NAV_ACCENT_CLASSES } from '../../lib/navAccentStyles'
  * drill-down pages (order detail, claim detail, pack, label sheet) are not
  * NAV destinations and should omit both -- their title text already carries
  * enough context (order number, customer name).
+ *
+ * `back` puts a "‹ parent page" link above the title -- use it on those
+ * drill-down pages so phone users have an on-screen way back.
  */
 export function PageHeader({
   title,
   icon: Icon,
   accent,
   actions,
+  back,
   children,
 }: {
   title: ReactNode
   icon?: Icon
   accent?: NavAccent
   actions?: ReactNode
+  back?: { to: string; label: string }
   children?: ReactNode
 }) {
   const accentClasses = accent ? NAV_ACCENT_CLASSES[accent] : null
   return (
     <header className="flex flex-col gap-3 border-b border-line pb-4 sm:flex-row sm:items-center sm:justify-between">
-      <div className="flex items-center gap-3">
-        {Icon && accentClasses && (
-          <span
-            className={
-              'flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ' +
-              accentClasses.chipBg
-            }
-          >
-            <Icon size={20} weight="regular" className={accentClasses.icon} aria-hidden="true" />
-          </span>
-        )}
-        <h1 className="page-title">{title}</h1>
+      <div className="flex flex-col">
+        {back && <BackLink to={back.to} label={back.label} />}
+        <div className="flex items-center gap-3">
+          {Icon && accentClasses && (
+            <span
+              className={
+                'flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ' +
+                accentClasses.chipBg
+              }
+            >
+              <Icon size={20} weight="regular" className={accentClasses.icon} aria-hidden="true" />
+            </span>
+          )}
+          <h1 className="page-title">{title}</h1>
+        </div>
       </div>
       {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}
       {children}

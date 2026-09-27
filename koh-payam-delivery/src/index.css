@@ -116,6 +116,13 @@
       transition-duration: 0.001ms !important;
       scroll-behavior: auto !important;
     }
+
+    /* No press-dip / hover-lift either. */
+    .btn:active,
+    .card-interactive:active,
+    .card-interactive:hover {
+      transform: none !important;
+    }
   }
 }
 
@@ -145,7 +152,7 @@
   }
 
   .btn {
-    @apply inline-flex min-h-[2.75rem] cursor-pointer items-center justify-center gap-2 rounded-lg border border-transparent px-4 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50;
+    @apply inline-flex min-h-[2.75rem] cursor-pointer items-center justify-center gap-2 rounded-lg border border-transparent px-4 text-sm font-medium transition-[color,background-color,border-color,box-shadow,transform] duration-150 active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-50 disabled:active:scale-100;
   }
 
   .btn-primary {
@@ -245,6 +252,25 @@
     @apply overflow-x-auto rounded-xl border border-line bg-surface shadow-card;
   }
 
+  /* A table sitting inside a .card: bleed to the card's edges with just a top
+     and bottom rule, instead of a second rounded frame inside the first. */
+  .table-wrap.table-flat {
+    @apply -mx-4 rounded-none border-x-0 shadow-none sm:-mx-5;
+  }
+
+  /* A card that is itself a tap target: lifts slightly under a mouse, dips on
+     press. Hover lift only where hover exists, so phones don't get stuck
+     "lifted" after a tap. */
+  .card-interactive {
+    @apply transition-[box-shadow,transform,border-color] duration-200 active:scale-[0.99];
+  }
+
+  @media (hover: hover) {
+    .card-interactive:hover {
+      @apply -translate-y-0.5 border-line-strong shadow-pop;
+    }
+  }
+
   .data-table {
     @apply w-full min-w-[34rem] border-collapse text-sm;
   }
@@ -268,6 +294,10 @@
   /* Tappable rows (pack ticks): the whole row toggles, not just the box. */
   .data-table tbody tr.row-tap {
     @apply cursor-pointer select-none;
+  }
+
+  .data-table tbody tr.row-tap:active td {
+    @apply bg-line/60;
   }
 
   .data-table tbody tr.row-done td {
