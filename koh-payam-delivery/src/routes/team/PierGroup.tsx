@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Warning } from '@phosphor-icons/react'
+import { Warning, Anchor } from '@phosphor-icons/react'
 import {
   listOrdersForCustomerDay,
   setOrderBoats,
@@ -10,8 +10,10 @@ import {
 import { attachEvidencePhoto, removeEvidencePhoto } from '../../lib/api/photos'
 import PhotoCapture from '../../components/PhotoCapture'
 import { StatusBadge } from '../../components/ui/StatusBadge'
-import { Spinner } from '../../components/ui/Spinner'
+import { PageSkeleton } from '../../components/ui/Skeleton'
+import { BackLink } from '../../components/ui/BackLink'
 import { formatTHB } from '../../lib/format'
+import { EmptyState } from '../../components/ui/EmptyState'
 
 const R2 = import.meta.env.VITE_R2_PUBLIC_BASE_URL as string
 const READY = ['packed', 'at_pier']
@@ -79,7 +81,7 @@ export default function PierGroup({
   }, [ready, photoKeys])
 
   if (failed) return <p className="alert alert-danger">โหลดออเดอร์ไม่สำเร็จ</p>
-  if (!orders) return <Spinner />
+  if (!orders) return <PageSkeleton />
 
   const customerName = orders[0]?.customer_name_en as string
   // The boat every ready PO is currently on, or null while they differ / are unset.
@@ -180,9 +182,7 @@ export default function PierGroup({
 
   return (
     <div className="flex flex-col gap-4">
-      <button className="btn btn-ghost btn-sm -ml-2 w-fit" onClick={onBack}>
-        ← กลับ
-      </button>
+      <BackLink onClick={onBack} label="กลับ" />
       <h1 className="page-title">
         {customerName} · {ready.length} ออเดอร์
       </h1>
@@ -202,7 +202,7 @@ export default function PierGroup({
       )}
 
       {ready.length === 0 ? (
-        <p className="muted">ไม่มีออเดอร์ของลูกค้ารายนี้ที่พร้อมส่งขึ้นเรือ</p>
+        <EmptyState compact icon={Anchor} title="ไม่มีออเดอร์ของลูกค้ารายนี้ที่พร้อมส่งขึ้นเรือ" />
       ) : (
         <>
           <ul className="card flex flex-col gap-1.5 text-sm">

@@ -9,7 +9,7 @@ import {
   type BackorderRow,
 } from '../../lib/api/backorders'
 import PhotoCapture from '../../components/PhotoCapture'
-import { Spinner } from '../../components/ui/Spinner'
+import { PageSkeleton } from '../../components/ui/Skeleton'
 import { PageHeader } from '../../components/ui/PageHeader'
 import { splitFreshDry } from '../../lib/freshDry'
 import { pickPrimary } from '../../lib/groupOrders'
@@ -99,7 +99,7 @@ export default function PackGroup() {
   const editableItems = items.filter((i) => i.editable)
 
   if (failed) return <p className="alert alert-danger">โหลดออเดอร์ไม่สำเร็จ</p>
-  if (!orders) return <Spinner />
+  if (!orders) return <PageSkeleton />
   if (orders.length === 0)
     return <p className="alert alert-danger">ไม่พบออเดอร์ของลูกค้ารายนี้ในวันนี้</p>
 
@@ -208,7 +208,10 @@ export default function PackGroup() {
 
   return (
     <div className="flex flex-col gap-5">
-      <PageHeader title={`แพ็ครวม · ${customerName} · ${orders.length} ออเดอร์`} />
+      <PageHeader
+        back={{ to: '/', label: 'งานวันนี้' }}
+        title={`แพ็ครวม · ${customerName} · ${orders.length} ออเดอร์`}
+      />
 
       <div className="alert alert-info">
         {primary ? (

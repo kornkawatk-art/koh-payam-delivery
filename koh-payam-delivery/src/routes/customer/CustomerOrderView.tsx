@@ -139,23 +139,36 @@ export default function CustomerOrderView() {
     return shell(<p className="card text-sm text-ink-soft">{t(lang, err)}</p>)
 
   if (!data)
-    return shell(<p className="card text-sm text-ink-soft">{t(lang, 'loading')}</p>)
+    return shell(
+      <div className="card flex flex-col gap-4" role="status">
+        <span className="sr-only">{t(lang, 'loading')}</span>
+        <span className="block h-7 w-2/3 animate-pulse rounded-md bg-line/80" aria-hidden="true" />
+        <span className="block h-4 w-1/2 animate-pulse rounded-md bg-line/80" aria-hidden="true" />
+        <span className="block h-24 animate-pulse rounded-lg bg-line/60" aria-hidden="true" />
+        <span className="block h-4 w-3/4 animate-pulse rounded-md bg-line/80" aria-hidden="true" />
+        <span className="block h-4 w-2/5 animate-pulse rounded-md bg-line/80" aria-hidden="true" />
+      </div>,
+    )
 
   const showClaimClosed =
     !data.canClaim && data.status === 'shipped' && data.claimDeadlineAt != null
 
   return shell(
     <div className="card flex flex-col gap-5">
-      <header className="flex flex-col gap-1">
-        <h1 className="page-title">
+      <header className="flex flex-col gap-3">
+        <h1 className="text-2xl font-semibold tracking-tight text-ink">
           {t(lang, 'title')} · {data.orderNo}
         </h1>
-        <p className="muted">
-          {t(lang, 'customer')}: {data.customerNameEn}
-        </p>
-        <p className="muted">
-          {t(lang, 'ship_date')}: {formatDate(data.shipDate, lang)}
-        </p>
+        <dl className="grid grid-cols-2 gap-3 rounded-lg bg-paper px-3 py-2.5 text-sm">
+          <div className="min-w-0">
+            <dt className="text-xs text-ink-faint">{t(lang, 'customer')}</dt>
+            <dd className="truncate font-medium text-ink">{data.customerNameEn}</dd>
+          </div>
+          <div>
+            <dt className="text-xs text-ink-faint">{t(lang, 'ship_date')}</dt>
+            <dd className="font-medium text-ink">{formatDate(data.shipDate, lang)}</dd>
+          </div>
+        </dl>
       </header>
 
       {data.siblingOrders.length > 0 && (
@@ -185,7 +198,7 @@ export default function CustomerOrderView() {
 
       <section className="flex flex-col gap-2">
         <h2 className="section-title">{t(lang, 'items')}</h2>
-        <div className="table-wrap">
+        <div className="table-wrap table-flat">
           <table className="data-table stack-table">
             <thead>
               <tr>

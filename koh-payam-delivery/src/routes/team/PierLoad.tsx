@@ -13,12 +13,14 @@ import {
   type ExistingPhoto,
 } from '../../lib/api/photos'
 import PhotoCapture from '../../components/PhotoCapture'
-import { MapPin } from '@phosphor-icons/react'
+import { MapPin, Anchor } from '@phosphor-icons/react'
 import { PageHeader } from '../../components/ui/PageHeader'
 import PierGroup from './PierGroup'
 import { groupByPhone } from '../../lib/groupOrders'
 import { Spinner } from '../../components/ui/Spinner'
 import { todayLocalISO, formatTHB } from '../../lib/format'
+import { EmptyState } from '../../components/ui/EmptyState'
+import { BackLink } from '../../components/ui/BackLink'
 
 type Boat = { id: string; name: string }
 type PierOrder = {
@@ -175,14 +177,18 @@ export default function PierLoad() {
           }
         />
         {entries.length === 0 && (
-          <p className="muted">ไม่มีออเดอร์ที่พร้อมส่งขึ้นเรือ</p>
+          <EmptyState
+            icon={Anchor}
+            title="ไม่มีออเดอร์ที่พร้อมส่งขึ้นเรือ"
+            hint="ออเดอร์จะขึ้นที่นี่หลังจากแพ็คเสร็จแล้ว"
+          />
         )}
         <div className="flex flex-col gap-2">
           {entries.map((e) =>
             e.kind === 'group' ? (
               <button
                 key={`g-${e.phone}`}
-                className="card flex items-center justify-between gap-3 text-left hover:border-line-strong"
+                className="card card-interactive flex items-center justify-between gap-3 text-left"
                 onClick={() => {
                   setMsg(undefined)
                   setSelGroup({ phone: e.phone, name: e.name })
@@ -205,7 +211,7 @@ export default function PierLoad() {
             ) : (
               <button
                 key={e.order.id}
-                className="card flex items-center justify-between gap-3 text-left hover:border-line-strong"
+                className="card card-interactive flex items-center justify-between gap-3 text-left"
                 onClick={() => {
                   const o = e.order
                   setSel(o)
@@ -255,9 +261,7 @@ export default function PierLoad() {
 
   return (
     <div className="flex flex-col gap-4">
-      <button className="btn btn-ghost btn-sm -ml-2 w-fit" onClick={() => setSel(null)}>
-        ← กลับ
-      </button>
+      <BackLink onClick={() => setSel(null)} label="กลับ" />
       <h1 className="page-title">
         {sel.makro_order_no} · {sel.customer_name_en}
       </h1>

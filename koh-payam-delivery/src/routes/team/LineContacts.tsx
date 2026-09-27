@@ -7,9 +7,10 @@ import {
   type PendingLineContactRow,
 } from '../../lib/api/lineContacts'
 import { ChatCircle } from '@phosphor-icons/react'
-import { Spinner } from '../../components/ui/Spinner'
+import { SkeletonRows } from '../../components/ui/Skeleton'
 import { PageHeader } from '../../components/ui/PageHeader'
 import { formatDateTimeTH } from '../../lib/format'
+import { EmptyState } from '../../components/ui/EmptyState'
 
 export default function LineContacts() {
   const [rows, setRows] = useState<LineContactRow[] | null>(null)
@@ -147,9 +148,9 @@ export default function LineContacts() {
       {failed ? (
         <p className="alert alert-danger">โหลดรายชื่อผู้ลงทะเบียน LINE ไม่สำเร็จ</p>
       ) : !rows ? (
-        <Spinner />
+        <SkeletonRows />
       ) : filtered.length === 0 ? (
-        <p className="muted">ยังไม่มีลูกค้าลงทะเบียน</p>
+        <EmptyState icon={ChatCircle} title="ยังไม่มีลูกค้าลงทะเบียน" />
       ) : (
         <div className="table-wrap">
           <table className="data-table stack-table">

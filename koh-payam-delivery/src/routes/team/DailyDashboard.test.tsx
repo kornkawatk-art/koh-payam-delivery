@@ -101,11 +101,11 @@ function OrderPageStub() {
   return <div>order detail page {id}</div>
 }
 
-test('summarises status progress for the day as three icon-labeled chips', async () => {
+test('summarises status progress for the day as icon-labeled count tiles', async () => {
   renderPage()
   // "3/3" only ever appears in the packed-count chip -- unambiguous.
   const packedCount = await screen.findByText('3/3')
-  const packedChip = packedCount.parentElement! // the chip <span> wrapping the icon/label/count
+  const packedChip = packedCount.parentElement! // the tile wrapping the icon/label/count
   expect(packedChip.textContent).toContain('แพ็คแล้ว')
   // "ถึงท่าเรือ"/"ส่งแล้ว" also label status badges in the table below, so
   // scope to the chip row specifically (the packed chip's own parent) rather
@@ -113,6 +113,11 @@ test('summarises status progress for the day as three icon-labeled chips', async
   const chipRow = packedChip.parentElement!
   expect(within(chipRow).getByText('ถึงท่าเรือ')).toBeInTheDocument()
   expect(within(chipRow).getByText('ส่งแล้ว')).toBeInTheDocument()
+  expect(within(chipRow).getByText('ออเดอร์ทั้งหมด')).toBeInTheDocument()
+  expect(within(chipRow).getByRole('progressbar', { name: 'ความคืบหน้าการแพ็ค' })).toHaveAttribute(
+    'aria-valuenow',
+    '3',
+  )
 })
 
 test('search filters rows client-side by customer name', async () => {

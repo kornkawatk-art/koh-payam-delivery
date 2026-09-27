@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { getShortageReport, type ShortageProductRow } from '../../lib/api/shortageReport'
-import { ChartBar } from '@phosphor-icons/react'
-import { Spinner } from '../../components/ui/Spinner'
+import { ChartBar, CheckCircle } from '@phosphor-icons/react'
+import { SkeletonRows } from '../../components/ui/Skeleton'
 import { PageHeader } from '../../components/ui/PageHeader'
 import { formatDateTH } from '../../lib/format'
+import { EmptyState } from '../../components/ui/EmptyState'
 
 // Local-date ISO string N days before today -- mirrors format.ts's
 // todayLocalISO (calendar-local, not UTC) but for an arbitrary offset.
@@ -68,15 +69,15 @@ export default function ShortageReport() {
       {failed ? (
         <p className="alert alert-danger">โหลดรายงานของขาดไม่สำเร็จ</p>
       ) : !rows ? (
-        <Spinner />
+        <SkeletonRows />
       ) : rows.length === 0 ? (
-        <p className="muted">ไม่มีของขาดในช่วงที่เลือก</p>
+        <EmptyState icon={CheckCircle} title="ไม่มีของขาดในช่วงที่เลือก" />
       ) : (
         <div className="flex flex-col gap-2">
           {rows.map((p) => {
             const open = openProduct === p.productName
             return (
-              <div key={p.productName} className="card">
+              <div key={p.productName} className="card card-interactive">
                 <button
                   type="button"
                   className="flex w-full items-center justify-between gap-3 text-left"

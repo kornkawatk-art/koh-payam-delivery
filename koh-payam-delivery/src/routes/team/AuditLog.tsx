@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useState } from 'react'
 import { listAuditLogs, type AuditLogRow } from '../../lib/api/auditLogs'
 import { ClockCounterClockwise } from '@phosphor-icons/react'
-import { Spinner } from '../../components/ui/Spinner'
+import { SkeletonRows } from '../../components/ui/Skeleton'
 import { PageHeader } from '../../components/ui/PageHeader'
 import { formatDateTimeTH } from '../../lib/format'
+import { EmptyState } from '../../components/ui/EmptyState'
 
 export default function AuditLog() {
   const [rows, setRows] = useState<AuditLogRow[] | null>(null)
@@ -29,9 +30,9 @@ export default function AuditLog() {
       {failed ? (
         <p className="alert alert-danger">โหลดประวัติการใช้งานไม่สำเร็จ</p>
       ) : !rows ? (
-        <Spinner />
+        <SkeletonRows />
       ) : rows.length === 0 ? (
-        <p className="muted">ยังไม่มีประวัติการใช้งาน</p>
+        <EmptyState icon={ClockCounterClockwise} title="ยังไม่มีประวัติการใช้งาน" />
       ) : (
         <div className="table-wrap">
           <table className="data-table stack-table">

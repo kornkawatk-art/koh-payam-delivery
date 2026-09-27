@@ -2,10 +2,11 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { listClaims, countOutstandingClaims, type ClaimRow } from '../../lib/api/claims'
 import { listUnmatchedBackorders, type UnmatchedBackorderRow } from '../../lib/api/backorders'
-import { Flag } from '@phosphor-icons/react'
-import { Spinner } from '../../components/ui/Spinner'
+import { Flag, CheckCircle } from '@phosphor-icons/react'
+import { SkeletonRows } from '../../components/ui/Skeleton'
 import { PageHeader } from '../../components/ui/PageHeader'
 import { formatDateTimeTH } from '../../lib/format'
+import { EmptyState } from '../../components/ui/EmptyState'
 
 type Filter = 'all' | 'open' | 'approved' | 'rejected'
 
@@ -125,9 +126,9 @@ export default function ClaimsQueue() {
       {failed ? (
         <p className="alert alert-danger">โหลดคิวเคลมไม่สำเร็จ</p>
       ) : !rows ? (
-        <Spinner />
+        <SkeletonRows rows={3} />
       ) : rows.length === 0 ? (
-        <p className="muted">ไม่มีเคลม</p>
+        <EmptyState icon={CheckCircle} title="ไม่มีเคลม" hint="ไม่มีเคลมในสถานะที่เลือก" />
       ) : (
         <div className="table-wrap">
           <table className="data-table stack-table">
@@ -178,9 +179,9 @@ export default function ClaimsQueue() {
         {backordersFailed ? (
           <p className="alert alert-danger">โหลดรายการค้างส่งที่ยังจับคู่ไม่สำเร็จ</p>
         ) : !backorders ? (
-          <Spinner />
+          <SkeletonRows rows={3} />
         ) : backorders.length === 0 ? (
-          <p className="muted">ไม่มีรายการค้างส่งที่ยังจับคู่ไม่สำเร็จ</p>
+          <EmptyState compact icon={CheckCircle} title="ไม่มีรายการค้างส่งที่ยังจับคู่ไม่สำเร็จ" />
         ) : (
           <div className="table-wrap">
             <table className="data-table stack-table">

@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { getClaim, resolveClaim } from '../../lib/api/claims'
 import { supabase } from '../../lib/supabase'
-import { Spinner } from '../../components/ui/Spinner'
+import { PageSkeleton } from '../../components/ui/Skeleton'
 import { PageHeader } from '../../components/ui/PageHeader'
 import { ZoomableImage } from '../../components/ui/ZoomableImage'
 
@@ -66,7 +66,7 @@ export default function ClaimDetail() {
   }, [orderId])
 
   if (failed) return <p className="alert alert-danger">โหลดเคลมไม่สำเร็จ</p>
-  if (!c) return <Spinner />
+  if (!c) return <PageSkeleton />
 
   async function save() {
     setBusy(true)
@@ -99,7 +99,10 @@ export default function ClaimDetail() {
 
   return (
     <div className="flex flex-col gap-5">
-      <PageHeader title={`เคลม · ${c.orders?.makro_order_no} · ${c.orders?.customer_name_en}`} />
+      <PageHeader
+        back={{ to: '/claims', label: 'คิวเคลม' }}
+        title={`เคลม · ${c.orders?.makro_order_no} · ${c.orders?.customer_name_en}`}
+      />
 
       <div className="card flex flex-col gap-2 text-sm">
         <p>ประเภท: {c.type}</p>

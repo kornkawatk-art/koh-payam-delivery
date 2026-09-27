@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { getOrder } from '../../lib/api/orders'
-import { Spinner } from '../../components/ui/Spinner'
+import { PageSkeleton } from '../../components/ui/Skeleton'
 import { formatDateTH } from '../../lib/format'
 import './LabelSheet.css'
 
@@ -19,7 +19,7 @@ export default function LabelSheet() {
   }, [id])
 
   if (failed) return <p className="alert alert-danger">โหลดออเดอร์ไม่สำเร็จ</p>
-  if (!order) return <Spinner />
+  if (!order) return <PageSkeleton />
 
   const paper = order.paper_box_count ?? 0
   const foam = order.foam_box_count ?? 0

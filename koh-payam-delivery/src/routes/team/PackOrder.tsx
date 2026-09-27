@@ -9,7 +9,7 @@ import {
   type BackorderRow,
 } from '../../lib/api/backorders'
 import PhotoCapture from '../../components/PhotoCapture'
-import { Spinner } from '../../components/ui/Spinner'
+import { PageSkeleton } from '../../components/ui/Skeleton'
 import { PageHeader } from '../../components/ui/PageHeader'
 import { splitFreshDry } from '../../lib/freshDry'
 
@@ -69,7 +69,7 @@ export default function PackOrder() {
   }, [id])
 
   if (failed) return <p className="alert alert-danger">โหลดออเดอร์ไม่สำเร็จ</p>
-  if (!order) return <Spinner />
+  if (!order) return <PageSkeleton />
 
   async function save(markPacked: boolean) {
     setBusy(true)
@@ -130,7 +130,10 @@ export default function PackOrder() {
 
   return (
     <div className="flex flex-col gap-5">
-      <PageHeader title={`แพ็ค · ${order.makro_order_no} · ${order.customer_name_en}`} />
+      <PageHeader
+        back={{ to: `/order/${id}`, label: 'รายละเอียดออเดอร์' }}
+        title={`แพ็ค · ${order.makro_order_no} · ${order.customer_name_en}`}
+      />
 
       {backorders.length > 0 && (
         <div className="alert alert-warn">

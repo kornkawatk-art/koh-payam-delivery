@@ -12,13 +12,15 @@ import {
   QrCode,
   CaretDown,
   CaretRight,
+  ListBullets,
 } from '@phosphor-icons/react'
 import { StatusBadge } from '../../components/ui/StatusBadge'
-import { Spinner } from '../../components/ui/Spinner'
+import { PageSkeleton } from '../../components/ui/Skeleton'
 import { PageHeader } from '../../components/ui/PageHeader'
 import QrOrderScanner from '../../components/QrOrderScanner'
 import { todayLocalISO } from '../../lib/format'
 import { groupByPhone, entryOrders, entryHasUnpacked, type DayEntry } from '../../lib/groupOrders'
+import { EmptyState } from '../../components/ui/EmptyState'
 
 export default function DailyDashboard() {
   const navigate = useNavigate()
@@ -153,7 +155,7 @@ export default function DailyDashboard() {
         </button>
       </div>
     )
-  if (!rows) return <Spinner />
+  if (!rows) return <PageSkeleton rows={6} />
 
   return (
     <div className="flex flex-col gap-5">
@@ -171,24 +173,50 @@ export default function DailyDashboard() {
         }
       />
 
-      <div className="flex flex-wrap gap-2 text-sm">
-        <span className="inline-flex items-center gap-1.5 rounded-lg border border-line bg-surface px-3 py-1.5 shadow-card">
-          <Package size={14} className="text-accent-amber" aria-hidden="true" />
-          <span className="text-ink-soft">แพ็คแล้ว</span>
-          <span className="tnum font-semibold text-ink">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <div className="card flex flex-col gap-1 p-3 sm:p-4">
+          <span className="flex items-center gap-1.5 text-xs font-medium text-ink-soft">
+            <ListBullets size={14} className="text-accent-indigo" aria-hidden="true" />
+            ออเดอร์ทั้งหมด
+          </span>
+          <span className="tnum text-2xl font-semibold tracking-tight text-ink">{counts.total}</span>
+        </div>
+        <div className="card flex flex-col gap-1 p-3 sm:p-4">
+          <span className="flex items-center gap-1.5 text-xs font-medium text-ink-soft">
+            <Package size={14} className="text-accent-amber" aria-hidden="true" />
+            แพ็คแล้ว
+          </span>
+          <span className="tnum text-2xl font-semibold tracking-tight text-ink">
             {counts.packed}/{counts.total}
           </span>
-        </span>
-        <span className="inline-flex items-center gap-1.5 rounded-lg border border-line bg-surface px-3 py-1.5 shadow-card">
-          <MapPin size={14} className="text-accent-teal" aria-hidden="true" />
-          <span className="text-ink-soft">ถึงท่าเรือ</span>
-          <span className="tnum font-semibold text-ink">{counts.atPier}</span>
-        </span>
-        <span className="inline-flex items-center gap-1.5 rounded-lg border border-line bg-surface px-3 py-1.5 shadow-card">
-          <CheckCircle size={14} weight="fill" className="text-ok" aria-hidden="true" />
-          <span className="text-ink-soft">ส่งแล้ว</span>
-          <span className="tnum font-semibold text-ink">{counts.shipped}</span>
-        </span>
+          <span
+            className="mt-1 h-1.5 overflow-hidden rounded-full bg-line"
+            role="progressbar"
+            aria-label="ความคืบหน้าการแพ็ค"
+            aria-valuemin={0}
+            aria-valuemax={counts.total}
+            aria-valuenow={counts.packed}
+          >
+            <span
+              className="block h-full rounded-full bg-ok transition-[width] duration-500"
+              style={{ width: `${counts.total ? (counts.packed / counts.total) * 100 : 0}%` }}
+            />
+          </span>
+        </div>
+        <div className="card flex flex-col gap-1 p-3 sm:p-4">
+          <span className="flex items-center gap-1.5 text-xs font-medium text-ink-soft">
+            <MapPin size={14} className="text-accent-teal" aria-hidden="true" />
+            ถึงท่าเรือ
+          </span>
+          <span className="tnum text-2xl font-semibold tracking-tight text-ink">{counts.atPier}</span>
+        </div>
+        <div className="card flex flex-col gap-1 p-3 sm:p-4">
+          <span className="flex items-center gap-1.5 text-xs font-medium text-ink-soft">
+            <CheckCircle size={14} weight="fill" className="text-ok" aria-hidden="true" />
+            ส่งแล้ว
+          </span>
+          <span className="tnum text-2xl font-semibold tracking-tight text-ink">{counts.shipped}</span>
+        </div>
       </div>
 
       {linksSentAt === null && rows.length > 0 && (
@@ -266,7 +294,15 @@ export default function DailyDashboard() {
       )}
 
       {filtered.length === 0 ? (
-        <p className="muted">ไม่มีออเดอร์</p>
+        <EmptyState
+          icon={Package}
+          title="ไม่มีออเดอร์"
+          hint={
+            q.trim()
+              ? 'ไม่พบออเดอร์ที่ตรงกับคำค้น ลองค้นด้วยชื่อลูกค้าหรือเลขออเดอร์อื่น'
+              : 'ยังไม่มีออเดอร์ของวันที่เลือก — เลือกวันอื่น หรือนำเข้าไฟล์ออเดอร์ของวันนี้'
+          }
+        />
       ) : (
         <div className="table-wrap">
           <table className="data-table stack-table">
