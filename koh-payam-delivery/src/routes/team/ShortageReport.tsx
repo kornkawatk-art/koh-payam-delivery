@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import {
   CaretDown,
@@ -22,6 +22,8 @@ import { EmptyState } from '../../components/ui/EmptyState'
 import { StatTile } from '../../components/ui/Stat'
 import { Notice, flash, type Flash } from '../../components/ui/Notice'
 import { formatDateTH } from '../../lib/format'
+import { deptBars, shortageTrend } from '../../lib/shortageCharts'
+import { DeptBarChart, TrendColumnChart } from '../../components/charts/ShortageCharts'
 
 // Calendar-local ISO date (not UTC) -- same convention as format.ts's
 // todayLocalISO.
@@ -69,13 +71,27 @@ export default function ShortageReport() {
   const [openKey, setOpenKey] = useState<string | null>(null)
   const [exportMsg, setExportMsg] = useState<Flash>()
 
+  const [loading, setLoading] = useState(true)
+  const latest = useRef(0)
+
+  // A range change keeps the previous report on screen (faded) until the new
+  // one lands -- no skeleton flash or layout jump. Only the first load shows
+  // a skeleton. Responses that arrive out of order are ignored.
   const load = useCallback(() => {
+    const req = ++latest.current
     setFailed(false)
-    setReport(null)
+    setLoading(true)
     setOpenKey(null)
     return getShortageReport(fromDate, toDate)
-      .then((r) => setReport(r))
-      .catch(() => setFailed(true))
+      .then((r) => {
+        if (req === latest.current) setReport(r)
+      })
+      .catch(() => {
+        if (req === latest.current) setFailed(true)
+      })
+      .finally(() => {
+        if (req === latest.current) setLoading(false)
+      })
   }, [fromDate, toDate])
 
   useEffect(() => {
@@ -98,6 +114,12 @@ export default function ShortageReport() {
     () =>
       Math.max(1, ...(report?.groups ?? []).flatMap((g) => g.products.map((p) => p.orderCount))),
     [report],
+  )
+
+  const bars = useMemo(() => (report ? deptBars(report) : []), [report])
+  const trend = useMemo(
+    () => (report ? shortageTrend(report, fromDate, toDate) : null),
+    [report, fromDate, toDate],
   )
 
   async function exportExcel() {
@@ -180,12 +202,20 @@ export default function ShortageReport() {
           hint="ลูกค้าได้รับของครบทุกรายการในช่วงนี้"
         />
       ) : (
-        <>
+        <div
+          className={'flex flex-col gap-5 transition-opacity ' + (loading ? 'opacity-60' : '')}
+          aria-busy={loading}
+        >
           <dl className="grid grid-cols-3 gap-2 sm:gap-3">
             <StatTile label="สินค้าที่ขาด" value={report.productCount} />
             <StatTile label="ขาดทั้งหมด (ครั้ง)" value={report.occurrenceCount} emphasis />
             <StatTile label="ออเดอร์ที่ได้รับผลกระทบ" value={report.affectedOrderCount} />
           </dl>
+
+          <div className="grid gap-4 lg:grid-cols-2">
+            <DeptBarChart bars={bars} active={deptFilter} onSelect={setDeptFilter} />
+            {trend && <TrendColumnChart key={`${fromDate}_${toDate}`} trend={trend} />}
+          </div>
 
           <div
             role="group"
@@ -222,7 +252,7 @@ export default function ShortageReport() {
               />
             ))}
           </div>
-        </>
+        </div>
       )}
     </div>
   )
@@ -365,7 +395,7 @@ function ProductRow({
           {p.itemId && <span className="tnum text-xs text-ink-soft">{p.itemId}</span>}
           <span className="block h-1.5 max-w-xs overflow-hidden rounded-full bg-line" aria-hidden="true">
             <span
-              className="block h-full rounded-full bg-warn"
+              className="block h-full rounded-full bg-brand"
               style={{ width: `${(p.orderCount / maxCount) * 100}%` }}
             />
           </span>

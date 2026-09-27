@@ -179,14 +179,14 @@ export default function DailyDashboard() {
             <ListBullets size={14} className="text-accent-indigo" aria-hidden="true" />
             ออเดอร์ทั้งหมด
           </span>
-          <span className="tnum text-2xl font-semibold tracking-tight text-ink">{counts.total}</span>
+          <span className="text-2xl font-semibold tracking-tight text-ink">{counts.total}</span>
         </div>
         <div className="card flex flex-col gap-1 p-3 sm:p-4">
           <span className="flex items-center gap-1.5 text-xs font-medium text-ink-soft">
             <Package size={14} className="text-accent-amber" aria-hidden="true" />
             แพ็คแล้ว
           </span>
-          <span className="tnum text-2xl font-semibold tracking-tight text-ink">
+          <span className="text-2xl font-semibold tracking-tight text-ink">
             {counts.packed}/{counts.total}
           </span>
           <span
@@ -208,14 +208,14 @@ export default function DailyDashboard() {
             <MapPin size={14} className="text-accent-teal" aria-hidden="true" />
             ถึงท่าเรือ
           </span>
-          <span className="tnum text-2xl font-semibold tracking-tight text-ink">{counts.atPier}</span>
+          <span className="text-2xl font-semibold tracking-tight text-ink">{counts.atPier}</span>
         </div>
         <div className="card flex flex-col gap-1 p-3 sm:p-4">
           <span className="flex items-center gap-1.5 text-xs font-medium text-ink-soft">
             <CheckCircle size={14} weight="fill" className="text-ok" aria-hidden="true" />
             ส่งแล้ว
           </span>
-          <span className="tnum text-2xl font-semibold tracking-tight text-ink">{counts.shipped}</span>
+          <span className="text-2xl font-semibold tracking-tight text-ink">{counts.shipped}</span>
         </div>
       </div>
 
