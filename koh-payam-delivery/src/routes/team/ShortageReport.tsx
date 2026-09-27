@@ -23,7 +23,7 @@ import { StatTile } from '../../components/ui/Stat'
 import { Notice, flash, type Flash } from '../../components/ui/Notice'
 import { formatDateTH } from '../../lib/format'
 import { deptBars, shortageTrend } from '../../lib/shortageCharts'
-import { DeptBarChart, TrendColumnChart } from '../../components/charts/ShortageCharts'
+import { DeptBarChart, TrendColumnChart, rampClass } from '../../components/charts/ShortageCharts'
 
 // Calendar-local ISO date (not UTC) -- same convention as format.ts's
 // todayLocalISO.
@@ -395,7 +395,7 @@ function ProductRow({
           {p.itemId && <span className="tnum text-xs text-ink-soft">{p.itemId}</span>}
           <span className="block h-1.5 max-w-xs overflow-hidden rounded-full bg-line" aria-hidden="true">
             <span
-              className="block h-full rounded-full bg-brand"
+              className={'block h-full rounded-full ' + rampClass(p.orderCount, maxCount)}
               style={{ width: `${(p.orderCount / maxCount) * 100}%` }}
             />
           </span>

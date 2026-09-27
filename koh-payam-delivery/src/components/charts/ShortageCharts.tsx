@@ -5,11 +5,38 @@ import { niceTicks, type DeptBar, type Trend, type TrendBucket } from '../../lib
 /*
  * Both charts are plain HTML/CSS (no chart library): bars stay crisp at any
  * width, reflow on phones, and every mark is a real <button> for touch and
- * keyboard. One series each, so one hue (brand gold, validated >= 3:1 on
- * the white card) and no legend -- the title says what is plotted. Values
+ * keyboard. One measure each, colored by MAGNITUDE on a one-hue violet ramp
+ * (the page's own accent) -- more shortages, darker bar -- with a small
+ * น้อย->มาก key. The ramp is violet-500/700/900: validated as an ordinal
+ * scale (lightness monotone, adjacent steps far enough apart, light end
+ * 4.23:1 on the white card); violet-400 was too light (2.72:1). Values
  * are always reachable without hovering: direct labels on the department
  * bars, a readout line on the trend chart, and a screen-reader table.
  */
+
+// Literal class names so Tailwind's JIT sees them.
+const RAMP = ['bg-violet-500', 'bg-violet-700', 'bg-violet-900'] as const
+
+/** Ramp step for a value: light violet for the lowest third of the max, darkest for the top third. */
+export function rampClass(value: number, max: number): (typeof RAMP)[number] {
+  const r = max > 0 ? value / max : 0
+  return r > 2 / 3 ? RAMP[2] : r > 1 / 3 ? RAMP[1] : RAMP[0]
+}
+
+/** "น้อย ▮▮▮ มาก" -- how to read the bar colors. */
+function RampKey() {
+  return (
+    <span className="flex shrink-0 items-center gap-1.5 text-[11px] text-ink-faint" aria-hidden="true">
+      น้อย
+      <span className="flex gap-0.5">
+        {RAMP.map((c) => (
+          <span key={c} className={`h-2.5 w-3 rounded-sm ${c}`} />
+        ))}
+      </span>
+      มาก
+    </span>
+  )
+}
 
 const dayFmt = new Intl.DateTimeFormat('th-TH', { day: 'numeric', month: 'short' })
 const shortDate = (iso: string) => dayFmt.format(new Date(`${iso}T00:00:00`))
@@ -27,9 +54,12 @@ function ChartCard({
 }) {
   return (
     <figure className="card flex min-w-0 flex-col gap-4">
-      <figcaption>
-        <p className="section-title">{title}</p>
-        <p className="text-xs text-ink-soft">{subtitle}</p>
+      <figcaption className="flex items-start justify-between gap-3">
+        <span>
+          <span className="section-title block">{title}</span>
+          <span className="block text-xs text-ink-soft">{subtitle}</span>
+        </span>
+        <RampKey />
       </figcaption>
       {children}
     </figure>
@@ -53,7 +83,8 @@ export function DeptBarChart({
         {bars.map((b) => {
           const selected = active === b.code
           // Emphasis: once one department is picked, the rest step back to gray.
-          const tone = active === 'ALL' || selected ? 'bg-brand' : 'bg-line-strong'
+          const tone =
+            active === 'ALL' || selected ? rampClass(b.occurrences, max) : 'bg-line-strong'
           return (
             <li key={b.code}>
               <button
@@ -190,8 +221,9 @@ export function TrendColumnChart({ trend }: { trend: Trend }) {
                     )}
                     <span
                       className={
-                        'block w-full max-w-[24px] rounded-t-[4px] transition-colors ' +
-                        (active ? 'bg-brand-ink' : 'bg-brand')
+                        'block w-full max-w-[24px] rounded-t-[4px] transition-shadow ' +
+                        rampClass(b.count, top) +
+                        (active ? ' ring-2 ring-violet-300 ring-offset-1' : '')
                       }
                       style={{ height: b.count ? `${(b.count / top) * 100}%` : 0 }}
                     />

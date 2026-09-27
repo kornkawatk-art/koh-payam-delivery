@@ -1,6 +1,6 @@
 import { fireEvent, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { DeptBarChart, TrendColumnChart } from './ShortageCharts'
+import { DeptBarChart, TrendColumnChart, rampClass } from './ShortageCharts'
 
 const bars = [
   { code: 'FZ' as const, label: 'FZ', occurrences: 6, products: 3 },
@@ -67,4 +67,23 @@ test('trend: a range with no shortages says so instead of showing a zero peak', 
 test('trend: an empty range (e.g. a date field cleared mid-edit) renders without crashing', () => {
   render(<TrendColumnChart trend={{ unit: 'day', buckets: [] }} />)
   expect(screen.getByText('ไม่มีของขาดในช่วงนี้')).toBeInTheDocument()
+})
+
+test('rampClass: color follows magnitude -- light violet for the lowest third, darkest for the top third', () => {
+  expect(rampClass(1, 9)).toBe('bg-violet-500')
+  expect(rampClass(3, 9)).toBe('bg-violet-500')
+  expect(rampClass(5, 9)).toBe('bg-violet-700')
+  expect(rampClass(9, 9)).toBe('bg-violet-900')
+  expect(rampClass(0, 0)).toBe('bg-violet-500')
+})
+
+test('department bars: the biggest bar gets the darkest step; once one is picked the others go gray', () => {
+  const { container, rerender } = render(<DeptBarChart bars={bars} active="ALL" onSelect={() => {}} />)
+  const fills = () => Array.from(container.querySelectorAll('li span.absolute')).map((el) => el.className)
+  expect(fills()[0]).toContain('bg-violet-900') // FZ: 6 of 6
+  expect(fills()[1]).toContain('bg-violet-500') // FV: 2 of 6 = exactly a third -> lightest step
+
+  rerender(<DeptBarChart bars={bars} active="FV" onSelect={() => {}} />)
+  expect(fills()[0]).toContain('bg-line-strong') // FZ steps back to gray
+  expect(fills()[1]).toContain('bg-violet-500') // the picked one keeps its color
 })
