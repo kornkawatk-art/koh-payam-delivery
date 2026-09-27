@@ -12,8 +12,10 @@ import PhotoCapture from '../../components/PhotoCapture'
 import { StatusBadge } from '../../components/ui/StatusBadge'
 import { PageSkeleton } from '../../components/ui/Skeleton'
 import { BackLink } from '../../components/ui/BackLink'
-import { formatTHB } from '../../lib/format'
 import { EmptyState } from '../../components/ui/EmptyState'
+import { Notice, flash, type Flash } from '../../components/ui/Notice'
+import { AmountDue } from '../../components/ui/AmountDue'
+import { StatTile } from '../../components/ui/Stat'
 
 const R2 = import.meta.env.VITE_R2_PUBLIC_BASE_URL as string
 const READY = ['packed', 'at_pier']
@@ -45,7 +47,7 @@ export default function PierGroup({
   const [attaching, setAttaching] = useState(0)
   const [pierName, setPierName] = useState('')
   const [pierNames, setPierNames] = useState<string[]>([])
-  const [msg, setMsg] = useState<string>()
+  const [msg, setMsg] = useState<Flash>()
   const [busy, setBusy] = useState(false)
 
   useEffect(() => {
@@ -100,7 +102,7 @@ export default function PierGroup({
       if (n < readyIds.length) {
         // Some POs were shipped/changed elsewhere: re-read the truth instead of
         // marking every local PO as on this boat.
-        setMsg(`เลือกเรือให้ได้ ${n} จาก ${readyIds.length} ออเดอร์ (บางออเดอร์ถูกส่งไปแล้ว)`)
+        setMsg(flash.warn(`เลือกเรือให้ได้ ${n} จาก ${readyIds.length} ออเดอร์ (บางออเดอร์ถูกส่งไปแล้ว)`))
         setOrders(await listOrdersForCustomerDay(date, phone))
         return
       }
@@ -108,7 +110,7 @@ export default function PierGroup({
         (os ?? []).map((o) => (READY.includes(o.status) ? { ...o, boat_id: id, status: 'at_pier' } : o)),
       )
     } catch (e) {
-      setMsg((e as Error).message)
+      setMsg(flash.error((e as Error).message))
     }
   }
 
@@ -128,9 +130,11 @@ export default function PierGroup({
           failedNos.push(o.makro_order_no)
         }
       }
-      if (failedNos.length === ready.length) setMsg('แนบรูปไม่สำเร็จ กรุณาลบรูปนี้แล้วถ่ายใหม่')
+      if (failedNos.length === ready.length) setMsg(flash.error('แนบรูปไม่สำเร็จ กรุณาลบรูปนี้แล้วถ่ายใหม่'))
       else if (failedNos.length > 0)
-        setMsg(`แนบรูปให้ ${failedNos.join(', ')} ไม่สำเร็จ — ระบบจะลองแนบซ้ำตอนกดส่งขึ้นเรือ`)
+        setMsg(
+          flash.warn(`แนบรูปให้ ${failedNos.join(', ')} ไม่สำเร็จ — ระบบจะลองแนบซ้ำตอนกดส่งขึ้นเรือ`),
+        )
     } finally {
       setAttaching((n) => n - 1)
     }
@@ -172,7 +176,9 @@ export default function PierGroup({
       onShipped(`ส่งขึ้นเรือแล้ว ${done.length} ออเดอร์ของ ${customerName}`)
     } catch (e) {
       setMsg(
-        `ส่งขึ้นเรือแล้ว ${done.length} ออเดอร์ (เหลืออีก ${ready.length - done.length}) แล้วเกิดข้อผิดพลาด: ${(e as Error).message} — กดส่งขึ้นเรือแล้วอีกครั้งเพื่อทำต่อ`,
+        flash.error(
+          `ส่งขึ้นเรือแล้ว ${done.length} ออเดอร์ (เหลืออีก ${ready.length - done.length}) แล้วเกิดข้อผิดพลาด: ${(e as Error).message} — กดส่งขึ้นเรือแล้วอีกครั้งเพื่อทำต่อ`,
+        ),
       )
       setOrders((os) => (os ?? []).map((o) => (done.includes(o.id) ? { ...o, status: 'shipped' } : o)))
     } finally {
@@ -197,14 +203,26 @@ export default function PierGroup({
         </div>
       )}
 
-      {outstanding > 0 && (
-        <p className="alert alert-danger">เก็บเงินปลายทางรวม {formatTHB(outstanding)}</p>
-      )}
+      {outstanding > 0 && <AmountDue label="เก็บเงินปลายทางรวม" amount={outstanding} />}
 
       {ready.length === 0 ? (
         <EmptyState compact icon={Anchor} title="ไม่มีออเดอร์ของลูกค้ารายนี้ที่พร้อมส่งขึ้นเรือ" />
       ) : (
         <>
+          <dl className="grid grid-cols-2 gap-2 sm:grid-cols-4" aria-label="จำนวนลังที่ต้องลงเรือ">
+            <StatTile label="ลังกระดาษ" value={sumOf(ready, 'paper_box_count')} />
+            <StatTile label="ลังโฟม" value={sumOf(ready, 'foam_box_count')} />
+            <StatTile label="ชิ้น" value={sumOf(ready, 'piece_count')} />
+            <StatTile
+              label="รวม"
+              value={
+                sumOf(ready, 'paper_box_count') +
+                sumOf(ready, 'foam_box_count') +
+                sumOf(ready, 'piece_count')
+              }
+              emphasis
+            />
+          </dl>
           <ul className="card flex flex-col gap-1.5 text-sm">
             {ready.map((o) => (
               <li key={o.id} className="flex flex-wrap items-center justify-between gap-2">
@@ -280,7 +298,11 @@ export default function PierGroup({
           )}
         </>
       )}
-      {msg && <p className="muted">{msg}</p>}
+      <Notice flash={msg} />
     </div>
   )
 }
+
+type BoxField = 'paper_box_count' | 'foam_box_count' | 'piece_count'
+const sumOf = (os: Record<BoxField, number>[], f: BoxField) =>
+  os.reduce((n, o) => n + (o[f] ?? 0), 0)

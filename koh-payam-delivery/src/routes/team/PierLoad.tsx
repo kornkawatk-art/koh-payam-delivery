@@ -18,9 +18,12 @@ import { PageHeader } from '../../components/ui/PageHeader'
 import PierGroup from './PierGroup'
 import { groupByPhone } from '../../lib/groupOrders'
 import { Spinner } from '../../components/ui/Spinner'
-import { todayLocalISO, formatTHB } from '../../lib/format'
+import { todayLocalISO } from '../../lib/format'
 import { EmptyState } from '../../components/ui/EmptyState'
 import { BackLink } from '../../components/ui/BackLink'
+import { Notice, flash, type Flash } from '../../components/ui/Notice'
+import { AmountDue } from '../../components/ui/AmountDue'
+import { StatTile } from '../../components/ui/Stat'
 
 type Boat = { id: string; name: string }
 type PierOrder = {
@@ -64,7 +67,7 @@ export default function PierLoad() {
   const [pierName, setPierName] = useState('')
   const [pierNames, setPierNames] = useState<string[]>([])
   const [failed, setFailed] = useState(false)
-  const [msg, setMsg] = useState<string>()
+  const [msg, setMsg] = useState<Flash>()
 
   const load = useCallback(() => {
     setFailed(false)
@@ -93,7 +96,7 @@ export default function PierLoad() {
       await setOrderBoat(sel.id, boatId)
       setSel({ ...sel, boat_id: boatId, status: 'at_pier' })
     } catch (e) {
-      setMsg((e as Error).message)
+      setMsg(flash.error((e as Error).message))
     }
   }
 
@@ -103,14 +106,14 @@ export default function PierLoad() {
     try {
       await setOrderPierName(sel.id, pierName)
       await updateOrderStatus(sel.id, 'shipped')
-      setMsg('ส่งขึ้นเรือแล้ว')
+      setMsg(flash.ok('ส่งขึ้นเรือแล้ว'))
       setSel(null)
       setPhotoCount(0)
       setInitialPhotos(null)
       setPhotoBusy(false)
       load()
     } catch (e) {
-      setMsg((e as Error).message)
+      setMsg(flash.error((e as Error).message))
     }
   }
 
@@ -154,7 +157,7 @@ export default function PierLoad() {
         }}
         onShipped={(message) => {
           setSelGroup(null)
-          setMsg(message)
+          setMsg(flash.ok(message))
           load()
         }}
       />
@@ -255,7 +258,7 @@ export default function PierLoad() {
             ),
           )}
         </div>
-        {msg && <p className="muted">{msg}</p>}
+        <Notice flash={msg} />
       </div>
     )
 
@@ -267,10 +270,23 @@ export default function PierLoad() {
       </h1>
 
       {sel.outstanding_amount != null && sel.outstanding_amount > 0 && (
-        <p className="alert alert-danger">
-          เก็บเงินปลายทาง {formatTHB(sel.outstanding_amount)} ({sel.payment_method})
-        </p>
+        <AmountDue
+          label="เก็บเงินปลายทาง"
+          amount={sel.outstanding_amount}
+          note={sel.payment_method}
+        />
       )}
+
+      <dl className="grid grid-cols-2 gap-2 sm:grid-cols-4" aria-label="จำนวนลังที่ต้องลงเรือ">
+        <StatTile label="ลังกระดาษ" value={sel.paper_box_count} />
+        <StatTile label="ลังโฟม" value={sel.foam_box_count} />
+        <StatTile label="ชิ้น" value={sel.piece_count} />
+        <StatTile
+          label="รวม"
+          value={sel.paper_box_count + sel.foam_box_count + sel.piece_count}
+          emphasis
+        />
+      </dl>
 
       <section>
         <p className="section-title mb-2">เลือกเรือ</p>
@@ -323,7 +339,7 @@ export default function PierLoad() {
               await attachEvidencePhoto(sel.id, key, { stage: 'handoff' })
               setPhotoCount((c) => c + 1)
             } catch (e) {
-              setMsg((e as Error).message)
+              setMsg(flash.error((e as Error).message))
             }
           }}
           onRemoved={async (key) => {
@@ -344,7 +360,7 @@ export default function PierLoad() {
       {photoBusy && (
         <p className="muted text-xs">กำลังอัปโหลดรูป กรุณารอสักครู่ก่อนส่งขึ้นเรือ</p>
       )}
-      {msg && <p className="muted">{msg}</p>}
+      <Notice flash={msg} />
     </div>
   )
 }

@@ -187,9 +187,9 @@ test('shows the collect-cash alert when outstanding_amount > 0', async () => {
     payment_method: 'Pay On Delivery',
   })
   renderPage()
-  expect(
-    await screen.findByText('เก็บเงินปลายทาง ฿6,172.50 (Pay On Delivery)'),
-  ).toBeInTheDocument()
+  expect(await screen.findByText('เก็บเงินปลายทาง')).toBeInTheDocument()
+  expect(screen.getByText('฿6,172.50')).toBeInTheDocument()
+  expect(screen.getByText('Pay On Delivery')).toBeInTheDocument()
 })
 
 test('hides the collect-cash alert when outstanding_amount is 0 or null', async () => {

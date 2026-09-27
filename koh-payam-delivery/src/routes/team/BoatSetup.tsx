@@ -5,6 +5,7 @@ import { Anchor } from '@phosphor-icons/react'
 import { PageHeader } from '../../components/ui/PageHeader'
 import { todayLocalISO } from '../../lib/format'
 import { EmptyState } from '../../components/ui/EmptyState'
+import { Notice, flash, type Flash } from '../../components/ui/Notice'
 
 type Boat = { id: string; name: string }
 
@@ -13,7 +14,7 @@ export default function BoatSetup() {
   const [shipDayId, setShipDayId] = useState<string>()
   const [boats, setBoatsState] = useState<Boat[]>([])
   const [failed, setFailed] = useState(false)
-  const [msg, setMsg] = useState<string>()
+  const [msg, setMsg] = useState<Flash>()
 
   const load = useCallback(() => {
     setFailed(false)
@@ -38,11 +39,11 @@ export default function BoatSetup() {
     // Fail closed: if the count check errored or returned no number, do not
     // remove — a null count must never be treated as "zero orders bound".
     if (error || count == null) {
-      setMsg('ตรวจสอบออเดอร์ที่ผูกกับเรือไม่สำเร็จ ลองใหม่อีกครั้ง')
+      setMsg(flash.error('ตรวจสอบออเดอร์ที่ผูกกับเรือไม่สำเร็จ ลองใหม่อีกครั้ง'))
       return
     }
     if (count > 0) {
-      setMsg(`ลบไม่ได้: มี ${count} ออเดอร์ผูกกับเรือนี้แล้ว`)
+      setMsg(flash.error(`ลบไม่ได้: มี ${count} ออเดอร์ผูกกับเรือนี้แล้ว`))
       return
     }
     setBoatsState((b) => b.filter((x) => x.id !== id))
@@ -58,15 +59,17 @@ export default function BoatSetup() {
       // itself look like it failed (mirrors resolveClaim's "main action
       // succeeded, secondary step failed" message pattern in claims.ts).
       let text = 'บันทึกรายการเรือแล้ว'
+      let linksFailed = false
       try {
         const { sent, skipped } = await sendOrderLinks(date)
         if (!skipped) text += ` · ส่งลิงก์ไลน์ ${sent} ฉบับ`
       } catch (e) {
         text += ' แต่ส่งลิงก์ไลน์ไม่สำเร็จ: ' + (e as Error).message
+        linksFailed = true
       }
-      setMsg(text)
+      setMsg(linksFailed ? flash.warn(text) : flash.ok(text))
     } catch {
-      setMsg('บันทึกรายการเรือไม่สำเร็จ ลองใหม่อีกครั้ง')
+      setMsg(flash.error('บันทึกรายการเรือไม่สำเร็จ ลองใหม่อีกครั้ง'))
     }
   }
 
@@ -136,7 +139,7 @@ export default function BoatSetup() {
         <button className="btn btn-primary" onClick={save}>
           บันทึก
         </button>
-        {msg && <p className="muted">{msg}</p>}
+        <Notice flash={msg} />
       </div>
     </div>
   )

@@ -61,3 +61,22 @@ export function InfoItem({
     </div>
   )
 }
+
+/**
+ * The running total under the pack pages' paper/foam/piece inputs. The three
+ * parts are already visible in their own inputs, so only the sum is shown --
+ * large, in the gold "headline figure" style of StatTile's `emphasis`.
+ */
+export function TotalCount({ total }: { total: number }) {
+  return (
+    <div
+      className="flex w-fit items-center gap-3 rounded-lg bg-brand-soft px-3 py-2 ring-1 ring-brand/25"
+      role="status"
+      aria-label={`รวมทั้งหมด ${total} ลัง/ชิ้น`}
+    >
+      <span className="text-xs font-medium text-brand-ink">รวมทั้งหมด</span>
+      <span className="tnum text-2xl font-semibold leading-none text-ink">{total}</span>
+      <span className="text-xs text-brand-ink">ลัง/ชิ้น</span>
+    </div>
+  )
+}

@@ -1,12 +1,13 @@
 import { useCallback, useEffect, useState, type ReactNode } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { Boat, CheckCircle, Wallet, Warning } from '@phosphor-icons/react'
+import { Boat, CheckCircle, Warning } from '@phosphor-icons/react'
 import { t, type Lang } from './i18n'
 import OrderStatusTimeline from '../../components/OrderStatusTimeline'
 import CustomerClaimForm from './CustomerClaimForm'
 import { ZoomableImage } from '../../components/ui/ZoomableImage'
 import { StatTile, InfoItem } from '../../components/ui/Stat'
-import { formatDate, formatDateTime, formatTHB } from '../../lib/format'
+import { AmountDue } from '../../components/ui/AmountDue'
+import { formatDate, formatDateTime } from '../../lib/format'
 
 const FN = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/order-view`
 const ANON = import.meta.env.VITE_SUPABASE_ANON_KEY as string
@@ -200,15 +201,11 @@ export default function CustomerOrderView() {
 
       <section className="flex flex-col gap-3" aria-label={t(lang, 'boxes')}>
         {data.outstandingAmount != null && data.outstandingAmount > 0 && (
-          <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 rounded-xl bg-brand-soft px-4 py-3 ring-1 ring-brand/30">
-            <span className="flex items-center gap-2 text-sm font-medium text-brand-ink">
-              <Wallet size={18} aria-hidden="true" />
-              {t(lang, 'outstanding_amount_label')}
-            </span>
-            <span className="tnum text-2xl font-semibold tracking-tight text-ink">
-              {formatTHB(data.outstandingAmount)}
-            </span>
-          </div>
+          <AmountDue
+            tone="brand"
+            label={t(lang, 'outstanding_amount_label')}
+            amount={data.outstandingAmount}
+          />
         )}
         <h2 className="section-title">{t(lang, 'boxes')}</h2>
         <dl className="grid grid-cols-3 gap-2">
