@@ -96,11 +96,15 @@ test('the manual status-advance button is gone -- แพ็คของ / ใบ
   expect(label.className).toContain('text-lg')
 })
 
-test('shows the box/piece count summary line', async () => {
+test('shows the box/piece counts as labeled tiles, including the total', async () => {
   renderPage()
-  expect(
-    await screen.findByText('ลังกระดาษ 2 · ลังโฟม 1 · ชิ้น 3 · รวม 6'),
-  ).toBeInTheDocument()
+  await screen.findByText('ลังกระดาษ', { selector: 'dt' })
+  const value = (label: string) =>
+    screen.getByText(label, { selector: 'dt' }).parentElement!.querySelector('dd')
+  expect(value('ลังกระดาษ')).toHaveTextContent(/^2$/)
+  expect(value('ลังโฟม')).toHaveTextContent(/^1$/)
+  expect(value('ชิ้น')).toHaveTextContent(/^3$/)
+  expect(value('รวม')).toHaveTextContent(/^6$/)
 })
 
 test('shows the makro item code per line item', async () => {

@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useState, type ReactNode } from 'react'
 import { Link, useParams } from 'react-router-dom'
+import { Boat, CheckCircle, Wallet, Warning } from '@phosphor-icons/react'
 import { t, type Lang } from './i18n'
 import OrderStatusTimeline from '../../components/OrderStatusTimeline'
 import CustomerClaimForm from './CustomerClaimForm'
 import { ZoomableImage } from '../../components/ui/ZoomableImage'
+import { StatTile, InfoItem } from '../../components/ui/Stat'
 import { formatDate, formatDateTime, formatTHB } from '../../lib/format'
 
 const FN = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/order-view`
@@ -196,6 +198,31 @@ export default function CustomerOrderView() {
 
       <OrderStatusTimeline status={data.status} lang={lang} />
 
+      <section className="flex flex-col gap-3" aria-label={t(lang, 'boxes')}>
+        {data.outstandingAmount != null && data.outstandingAmount > 0 && (
+          <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 rounded-xl bg-brand-soft px-4 py-3 ring-1 ring-brand/30">
+            <span className="flex items-center gap-2 text-sm font-medium text-brand-ink">
+              <Wallet size={18} aria-hidden="true" />
+              {t(lang, 'outstanding_amount_label')}
+            </span>
+            <span className="tnum text-2xl font-semibold tracking-tight text-ink">
+              {formatTHB(data.outstandingAmount)}
+            </span>
+          </div>
+        )}
+        <h2 className="section-title">{t(lang, 'boxes')}</h2>
+        <dl className="grid grid-cols-3 gap-2">
+          <StatTile label={t(lang, 'paper')} value={data.paperBoxCount} />
+          <StatTile label={t(lang, 'foam')} value={data.foamBoxCount} />
+          <StatTile label={t(lang, 'pieces')} value={data.pieceCount} />
+        </dl>
+        {data.boatName && (
+          <dl>
+            <InfoItem icon={Boat} label={t(lang, 'boat')} value={data.boatName} />
+          </dl>
+        )}
+      </section>
+
       <section className="flex flex-col gap-2">
         <h2 className="section-title">{t(lang, 'items')}</h2>
         <div className="table-wrap table-flat">
@@ -233,42 +260,41 @@ export default function CustomerOrderView() {
         </div>
       </section>
 
-      <section className="flex flex-col gap-1.5 text-sm">
-        <h2 className="section-title">{t(lang, 'shortages_heading')}</h2>
-        {data.shortages.length === 0 ? (
-          <p className="muted">{t(lang, 'none')}</p>
-        ) : (
-          <>
-            <p className="muted">{t(lang, 'shortages_note')}</p>
-            <ul className="list-inside list-disc">
+      <section className="flex flex-col gap-2 text-sm">
+        <div className="flex items-center justify-between gap-3">
+          <h2 className="section-title">{t(lang, 'shortages_heading')}</h2>
+          {data.shortages.length === 0 ? (
+            <span className="badge badge-ok">
+              <CheckCircle size={12} weight="fill" aria-hidden="true" />
+              {t(lang, 'none')}
+            </span>
+          ) : (
+            <span className="badge badge-warn tnum">{data.shortages.length}</span>
+          )}
+        </div>
+        {data.shortages.length > 0 && (
+          <div className="rounded-xl bg-warn-soft px-3 py-2 ring-1 ring-warn/25">
+            <p className="flex items-center gap-1.5 py-1 text-xs font-medium text-warn-ink">
+              <Warning size={14} weight="fill" aria-hidden="true" />
+              {t(lang, 'shortages_note')}
+            </p>
+            <ul className="divide-y divide-warn/15">
               {data.shortages.map((s, i) => (
-                <li key={`${s.productName}-${i}`}>
-                  {s.productName} —{' '}
-                  {t(lang, 'shipped_of_ordered', {
-                    shipped: s.shippedQty,
-                    ordered: s.orderedQty,
-                  })}
+                <li
+                  key={`${s.productName}-${i}`}
+                  className="flex items-center justify-between gap-3 py-2"
+                >
+                  <span className="min-w-0 font-medium text-ink">{s.productName}</span>
+                  <span className="tnum shrink-0 text-xs font-semibold text-warn-ink">
+                    {t(lang, 'shipped_of_ordered', {
+                      shipped: s.shippedQty,
+                      ordered: s.orderedQty,
+                    })}
+                  </span>
                 </li>
               ))}
             </ul>
-          </>
-        )}
-      </section>
-
-      <section className="flex flex-col gap-1 rounded-lg bg-paper p-3 text-sm text-ink-soft">
-        <p>
-          {t(lang, 'boxes')}: {t(lang, 'paper')} {data.paperBoxCount} · {t(lang, 'foam')}{' '}
-          {data.foamBoxCount} · {t(lang, 'pieces')} {data.pieceCount}
-        </p>
-        {data.boatName && (
-          <p>
-            {t(lang, 'boat')}: {data.boatName}
-          </p>
-        )}
-        {data.outstandingAmount != null && data.outstandingAmount > 0 && (
-          <p>
-            {t(lang, 'outstanding_amount_label')}: {formatTHB(data.outstandingAmount)}
-          </p>
+          </div>
         )}
       </section>
 
