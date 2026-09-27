@@ -208,3 +208,27 @@ test('shows a Thai error on a load failure', async () => {
   renderPage()
   expect(await screen.findByText('โหลดรายงานของขาดไม่สำเร็จ')).toBeInTheDocument()
 })
+
+test('tapping a department bar in the chart filters the list to that department', async () => {
+  renderPage()
+  await screen.findByText('มะพร้าว')
+  await userEvent.click(screen.getByRole('button', { name: /^FV: ขาด 3 ครั้ง/ }))
+  expect(screen.getByRole('region', { name: 'แผนก FV' })).toBeInTheDocument()
+  expect(screen.queryByRole('region', { name: 'แผนก ไม่ทราบแผนก' })).not.toBeInTheDocument()
+})
+
+test('changing the range keeps the previous report on screen (marked busy) until the new one arrives', async () => {
+  renderPage()
+  await screen.findByText('มะพร้าว')
+  let resolve!: (r: Report) => void
+  getShortageReport.mockImplementationOnce(() => new Promise<Report>((r) => (resolve = r)))
+
+  await userEvent.click(screen.getByRole('button', { name: '7 วัน' }))
+  expect(screen.getByText('มะพร้าว')).toBeInTheDocument() // no skeleton flash
+  expect(screen.getByText('มะพร้าว').closest('[aria-busy]')).toHaveAttribute('aria-busy', 'true')
+
+  resolve(report)
+  await vi.waitFor(() =>
+    expect(screen.getByText('มะพร้าว').closest('[aria-busy]')).toHaveAttribute('aria-busy', 'false'),
+  )
+})

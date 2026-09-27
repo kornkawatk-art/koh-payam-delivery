@@ -29,7 +29,7 @@ export function AmountDue({
         {label}
       </span>
       <span className="flex flex-col items-end">
-        <span className="tnum text-2xl font-semibold tracking-tight text-ink">
+        <span className="text-2xl font-semibold tracking-tight text-ink">
           {formatTHB(amount)}
         </span>
         {note && <span className={`text-xs ${ink}`}>{note}</span>}

@@ -25,7 +25,7 @@ export function StatTile({
       <dt className={'text-xs font-medium ' + (emphasis ? 'text-brand-ink' : 'text-ink-soft')}>
         {label}
       </dt>
-      <dd className="tnum text-2xl font-semibold leading-tight tracking-tight text-ink">
+      <dd className="text-2xl font-semibold leading-tight tracking-tight text-ink">
         {value}
       </dd>
     </div>
@@ -75,7 +75,7 @@ export function TotalCount({ total }: { total: number }) {
       aria-label={`รวมทั้งหมด ${total} ลัง/ชิ้น`}
     >
       <span className="text-xs font-medium text-brand-ink">รวมทั้งหมด</span>
-      <span className="tnum text-2xl font-semibold leading-none text-ink">{total}</span>
+      <span className="text-2xl font-semibold leading-none text-ink">{total}</span>
       <span className="text-xs text-brand-ink">ลัง/ชิ้น</span>
     </div>
   )
