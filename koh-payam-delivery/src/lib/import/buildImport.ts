@@ -116,6 +116,9 @@ export type ParsedItem = {
   lineNo: number
   isShort: boolean
   isFresh: boolean
+  // Raw Makro "Dept" number as text ('' when the file has none); grouped
+  // into department owners by src/lib/departments.ts for the shortage report.
+  dept: string
 }
 
 export type ParsedOrder = {
@@ -293,7 +296,8 @@ export function buildImport(
     // are dry. A blank or unparseable Dept (e.g. an appliance line with no
     // department at all) defaults to dry, not "unknown" -- this is purely
     // a display grouping, so a safe default beats a third UI state.
-    const deptNum = dm.dept ? Number((r[dm.dept] ?? '').trim()) : NaN
+    const deptRaw = dm.dept ? (r[dm.dept] ?? '').trim() : ''
+    const deptNum = deptRaw ? Number(deptRaw) : NaN
     const isFresh = Number.isInteger(deptNum) && deptNum >= 1 && deptNum <= 5
     const list = itemsByOrder.get(orderNo) ?? []
     list.push({
@@ -306,6 +310,7 @@ export function buildImport(
       lineNo: list.length + 1,
       isShort,
       isFresh,
+      dept: deptRaw,
     })
     itemsByOrder.set(orderNo, list)
   }

@@ -257,6 +257,15 @@ test('buildImport: Dept 1-5 is fresh, Dept 6+ is dry (real fixture rows)', async
   expect(diapers.isFresh).toBe(false)
 })
 
+test('buildImport: keeps the raw Dept number on each line for the shortage report', async () => {
+  const { detail, order } = await fixtures()
+  const r = buildImport(detail, order, DEFAULT_DETAIL_MAPPING, DEFAULT_ORDER_MAPPING)
+  const p2 = r.orders.find((o) => o.makroOrderNo === 'P-002')!
+  expect(p2.items.find((i) => i.productName === 'ไข่ไก่ เบอร์ 2')!.dept).toBe('5')
+  const p6 = r.orders.find((o) => o.makroOrderNo === 'P-006')!
+  expect(p6.items.find((i) => i.productName === 'ผ้าอ้อมเด็ก')!.dept).toBe('10')
+})
+
 test('buildImport: a blank Dept column value defaults to dry, not a crash', async () => {
   const { detail, order } = await fixtures()
   const r = buildImport(detail, order, DEFAULT_DETAIL_MAPPING, DEFAULT_ORDER_MAPPING)
