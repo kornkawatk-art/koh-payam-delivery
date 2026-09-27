@@ -1,4 +1,5 @@
 import { supabase } from '../supabase'
+import { fetchWithTeamSession } from './teamFetch'
 
 const FN_BASE = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1`
 
@@ -55,16 +56,12 @@ export async function getShipDayLinksSentAt(shipDate: string): Promise<string | 
 export async function sendOrderLinks(
   shipDate: string,
 ): Promise<{ sent: number; failed: number; skipped: boolean }> {
-  const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
-    Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
-  }
-  const { data: sess } = await supabase.auth.getSession()
-  if (sess.session) headers.Authorization = `Bearer ${sess.session.access_token}`
-
-  const res = await fetch(`${FN_BASE}/send-order-links`, {
+  const res = await fetchWithTeamSession(`${FN_BASE}/send-order-links`, {
     method: 'POST',
-    headers,
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+    },
     body: JSON.stringify({ shipDate }),
   })
   if (!res.ok) throw new Error('ส่งลิงก์ไลน์ไม่สำเร็จ (' + res.status + ')')
