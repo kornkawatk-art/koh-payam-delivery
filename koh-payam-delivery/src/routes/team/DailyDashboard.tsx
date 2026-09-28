@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { listOrdersForDay, getShipDayLinksSentAt, sendOrderLinks } from '../../lib/api/shipDays'
 import { listBackordersForDay, type BackorderRow } from '../../lib/api/backorders'
@@ -181,42 +181,30 @@ export default function DailyDashboard() {
           </span>
           <span className="text-2xl font-semibold tracking-tight text-ink">{counts.total}</span>
         </div>
-        <div className="card flex flex-col gap-1 p-3 sm:p-4">
-          <span className="flex items-center gap-1.5 text-xs font-medium text-ink-soft">
-            <Package size={14} className="text-accent-amber" aria-hidden="true" />
-            แพ็คแล้ว
-          </span>
-          <span className="text-2xl font-semibold tracking-tight text-ink">
-            {counts.packed}/{counts.total}
-          </span>
-          <span
-            className="mt-1 h-1.5 overflow-hidden rounded-full bg-line"
-            role="progressbar"
-            aria-label="ความคืบหน้าการแพ็ค"
-            aria-valuemin={0}
-            aria-valuemax={counts.total}
-            aria-valuenow={counts.packed}
-          >
-            <span
-              className="block h-full rounded-full bg-ok transition-[width] duration-500"
-              style={{ width: `${counts.total ? (counts.packed / counts.total) * 100 : 0}%` }}
-            />
-          </span>
-        </div>
-        <div className="card flex flex-col gap-1 p-3 sm:p-4">
-          <span className="flex items-center gap-1.5 text-xs font-medium text-ink-soft">
-            <MapPin size={14} className="text-accent-teal" aria-hidden="true" />
-            ถึงท่าเรือ
-          </span>
-          <span className="text-2xl font-semibold tracking-tight text-ink">{counts.atPier}</span>
-        </div>
-        <div className="card flex flex-col gap-1 p-3 sm:p-4">
-          <span className="flex items-center gap-1.5 text-xs font-medium text-ink-soft">
-            <CheckCircle size={14} weight="fill" className="text-ok" aria-hidden="true" />
-            ส่งแล้ว
-          </span>
-          <span className="text-2xl font-semibold tracking-tight text-ink">{counts.shipped}</span>
-        </div>
+        <ProgressTile
+          icon={<Package size={14} className="text-accent-amber" aria-hidden="true" />}
+          label="แพ็คแล้ว"
+          progressLabel="ความคืบหน้าการแพ็ค"
+          done={counts.packed}
+          total={counts.total}
+          barClass="bg-accent-amber"
+        />
+        <ProgressTile
+          icon={<MapPin size={14} className="text-accent-teal" aria-hidden="true" />}
+          label="ถึงท่าเรือ"
+          progressLabel="ความคืบหน้าถึงท่าเรือ"
+          done={counts.atPier}
+          total={counts.total}
+          barClass="bg-accent-teal"
+        />
+        <ProgressTile
+          icon={<CheckCircle size={14} weight="fill" className="text-ok" aria-hidden="true" />}
+          label="ส่งแล้ว"
+          progressLabel="ความคืบหน้าการส่ง"
+          done={counts.shipped}
+          total={counts.total}
+          barClass="bg-ok"
+        />
       </div>
 
       {linksSentAt === null && rows.length > 0 && (
@@ -342,6 +330,52 @@ export default function DailyDashboard() {
           </table>
         </div>
       )}
+    </div>
+  )
+}
+
+/**
+ * A day-progress tile: "done/total" plus a bar, the bar in the same color as
+ * the tile's icon so each stage reads as its own track. The value stays the
+ * tile's direct child (the tests and screen readers find it there).
+ */
+function ProgressTile({
+  icon,
+  label,
+  progressLabel,
+  done,
+  total,
+  barClass,
+}: {
+  icon: ReactNode
+  label: string
+  progressLabel: string
+  done: number
+  total: number
+  barClass: string
+}) {
+  return (
+    <div className="card flex flex-col gap-1 p-3 sm:p-4">
+      <span className="flex items-center gap-1.5 text-xs font-medium text-ink-soft">
+        {icon}
+        {label}
+      </span>
+      <span className="text-2xl font-semibold tracking-tight text-ink">
+        {done}/{total}
+      </span>
+      <span
+        className="mt-1 h-1.5 overflow-hidden rounded-full bg-line"
+        role="progressbar"
+        aria-label={progressLabel}
+        aria-valuemin={0}
+        aria-valuemax={total}
+        aria-valuenow={done}
+      >
+        <span
+          className={`block h-full rounded-full transition-[width] duration-500 ${barClass}`}
+          style={{ width: `${total ? (done / total) * 100 : 0}%` }}
+        />
+      </span>
     </div>
   )
 }
