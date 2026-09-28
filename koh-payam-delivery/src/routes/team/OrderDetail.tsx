@@ -10,7 +10,7 @@ import { StatusBadge } from '../../components/ui/StatusBadge'
 import { PageSkeleton } from '../../components/ui/Skeleton'
 import { BackLink } from '../../components/ui/BackLink'
 import { InfoItem, StatTile } from '../../components/ui/Stat'
-import { ZoomableImage } from '../../components/ui/ZoomableImage'
+import { PhotoGallery } from '../../components/ui/PhotoGallery'
 import { splitFreshDry } from '../../lib/freshDry'
 import { useAuth } from '../../lib/auth'
 import { Notice, flash, type Flash } from '../../components/ui/Notice'
@@ -216,13 +216,9 @@ export default function OrderDetail() {
           <p className="muted mt-1">ไม่มีรูป</p>
         ) : (
           <div className="mt-1 flex flex-wrap gap-2">
-            {packPhotos.map((p) => (
-              <ZoomableImage
-                key={p.id ?? p.r2_key}
-                src={`${import.meta.env.VITE_R2_PUBLIC_BASE_URL}/${p.r2_key}`}
-                alt="หลักฐาน"
-              />
-            ))}
+            <PhotoGallery
+              photos={packPhotos.map((p) => ({ src: `${import.meta.env.VITE_R2_PUBLIC_BASE_URL}/${p.r2_key}`, alt: 'หลักฐาน' }))}
+            />
           </div>
         )}
       </section>
@@ -233,13 +229,9 @@ export default function OrderDetail() {
           <p className="muted mt-1">ไม่มีรูป</p>
         ) : (
           <div className="mt-1 flex flex-wrap gap-2">
-            {handoffPhotos.map((p) => (
-              <ZoomableImage
-                key={p.id ?? p.r2_key}
-                src={`${import.meta.env.VITE_R2_PUBLIC_BASE_URL}/${p.r2_key}`}
-                alt="หลักฐาน"
-              />
-            ))}
+            <PhotoGallery
+              photos={handoffPhotos.map((p) => ({ src: `${import.meta.env.VITE_R2_PUBLIC_BASE_URL}/${p.r2_key}`, alt: 'หลักฐาน' }))}
+            />
           </div>
         )}
       </section>
