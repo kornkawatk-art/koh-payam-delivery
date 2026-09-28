@@ -4,7 +4,7 @@ import { Boat, CheckCircle, Warning } from '@phosphor-icons/react'
 import { t, type Lang } from './i18n'
 import OrderStatusTimeline from '../../components/OrderStatusTimeline'
 import CustomerClaimForm from './CustomerClaimForm'
-import { ZoomableImage } from '../../components/ui/ZoomableImage'
+import { PhotoGallery } from '../../components/ui/PhotoGallery'
 import { StatTile, InfoItem } from '../../components/ui/Stat'
 import { AmountDue } from '../../components/ui/AmountDue'
 import { groupedItemRows } from '../../components/ui/ItemGroupHeader'
@@ -318,9 +318,14 @@ export default function CustomerOrderView() {
         <section className="flex flex-col gap-2 text-sm">
           <h2 className="section-title">{t(lang, 'evidence')}</h2>
           <div className="flex flex-wrap gap-2">
-            {data.evidencePhotos.map((src) => (
-              <ZoomableImage key={src} src={src} alt={t(lang, 'evidence')} />
-            ))}
+            <PhotoGallery
+              photos={data.evidencePhotos.map((src) => ({ src, alt: t(lang, 'evidence') }))}
+              labels={{
+                close: t(lang, 'gallery_close'),
+                prev: t(lang, 'gallery_prev'),
+                next: t(lang, 'gallery_next'),
+              }}
+            />
           </div>
         </section>
       )}

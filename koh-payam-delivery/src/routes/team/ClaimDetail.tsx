@@ -4,7 +4,7 @@ import { getClaim, resolveClaim } from '../../lib/api/claims'
 import { supabase } from '../../lib/supabase'
 import { PageSkeleton } from '../../components/ui/Skeleton'
 import { PageHeader } from '../../components/ui/PageHeader'
-import { ZoomableImage } from '../../components/ui/ZoomableImage'
+import { PhotoGallery } from '../../components/ui/PhotoGallery'
 
 const R2 = import.meta.env.VITE_R2_PUBLIC_BASE_URL as string
 
@@ -125,9 +125,12 @@ export default function ClaimDetail() {
         <p className="section-title">รูปจากลูกค้า</p>
         <div className="flex flex-wrap gap-2">
           {(c.claim_photos ?? []).length === 0 && <p className="muted">ไม่มีรูป</p>}
-          {(c.claim_photos ?? []).map((p: any) => (
-            <ZoomableImage key={p.r2_key} src={`${R2}/${p.r2_key}`} alt="รูปจากลูกค้า" />
-          ))}
+          <PhotoGallery
+            photos={(c.claim_photos ?? []).map((p: any) => ({
+              src: `${R2}/${p.r2_key}`,
+              alt: 'รูปจากลูกค้า',
+            }))}
+          />
         </div>
       </section>
 
@@ -137,11 +140,11 @@ export default function ClaimDetail() {
           {evi.filter((p) => p.stage === 'pack').length === 0 && (
             <p className="muted">ไม่มีรูป</p>
           )}
-          {evi
-            .filter((p) => p.stage === 'pack')
-            .map((p) => (
-              <ZoomableImage key={p.url} src={p.url} alt="รูปหลักฐานของทีม" />
-            ))}
+          <PhotoGallery
+            photos={evi
+              .filter((p) => p.stage === 'pack')
+              .map((p) => ({ src: p.url, alt: 'รูปหลักฐานของทีม' }))}
+          />
         </div>
       </section>
 
@@ -151,11 +154,11 @@ export default function ClaimDetail() {
           {evi.filter((p) => p.stage !== 'pack').length === 0 && (
             <p className="muted">ไม่มีรูป</p>
           )}
-          {evi
-            .filter((p) => p.stage !== 'pack')
-            .map((p) => (
-              <ZoomableImage key={p.url} src={p.url} alt="รูปหลักฐานของทีม" />
-            ))}
+          <PhotoGallery
+            photos={evi
+              .filter((p) => p.stage !== 'pack')
+              .map((p) => ({ src: p.url, alt: 'รูปหลักฐานของทีม' }))}
+          />
         </div>
       </section>
 

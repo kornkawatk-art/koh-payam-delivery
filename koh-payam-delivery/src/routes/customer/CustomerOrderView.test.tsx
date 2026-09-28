@@ -86,7 +86,8 @@ test('evidence photo thumbnail can be tapped to enlarge, and dismissed', async (
   await user.click(thumb[0].closest('button')!)
   // enlarged version: a second img with the same alt now on screen
   expect(await screen.findAllByAltText('Delivery photos')).toHaveLength(2)
-  await user.click(screen.getByRole('button', { name: 'ปิด' }))
+  // the viewer's buttons follow the page language (English by default)
+  await user.click(screen.getByRole('button', { name: 'Close' }))
   expect(await screen.findAllByAltText('Delivery photos')).toHaveLength(1)
 })
 
