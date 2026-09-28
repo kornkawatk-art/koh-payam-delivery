@@ -16,6 +16,7 @@ import { useAuth } from '../../lib/auth'
 import { Notice, flash, type Flash } from '../../components/ui/Notice'
 import { AmountDue } from '../../components/ui/AmountDue'
 import { groupedItemRows } from '../../components/ui/ItemGroupHeader'
+import { StickerPrintButton } from '../../components/StickerPrint'
 
 export default function OrderDetail() {
   const { id } = useParams()
@@ -139,12 +140,15 @@ export default function OrderDetail() {
         >
           แพ็คของ
         </Link>
-        <Link
+        <StickerPrintButton
           className="btn btn-warn min-h-[3.25rem] flex-1 text-lg"
-          to={`/order/${id}/label`}
-        >
-          ใบเขียนหน้าลัง
-        </Link>
+          customer={order}
+          counts={{
+            paper: order.paper_box_count ?? 0,
+            foam: order.foam_box_count ?? 0,
+            piece: order.piece_count ?? 0,
+          }}
+        />
       </div>
 
       <div className="card flex flex-col gap-2 text-sm">

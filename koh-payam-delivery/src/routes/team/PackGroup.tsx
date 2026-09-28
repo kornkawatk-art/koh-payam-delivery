@@ -17,6 +17,7 @@ import { Warning } from '@phosphor-icons/react'
 import { PackActionBar, PackItemRow, type ItemState } from './PackOrder'
 import { TotalCount } from '../../components/ui/Stat'
 import { groupedItemRows } from '../../components/ui/ItemGroupHeader'
+import { StickerPrintButton } from '../../components/StickerPrint'
 
 const R2 = import.meta.env.VITE_R2_PUBLIC_BASE_URL as string
 
@@ -137,20 +138,22 @@ export default function PackGroup() {
     })
   }
 
+  const packInput = () => ({
+    primaryId: primary!.id,
+    otherIds: others.map((o) => o.id),
+    paperCount: paper,
+    foamCount: foam,
+    pieceCount: piece,
+    packerName,
+    itemPacked: editableItems.map((i) => ({ id: i.id, packed: packedIds.has(i.id) })),
+  })
+
   async function save(markPacked: boolean) {
     if (!primary) return
     setBusy(true)
     setMsg(undefined)
     try {
-      await savePackGroup({
-        primaryId: primary.id,
-        otherIds: others.map((o) => o.id),
-        paperCount: paper,
-        foamCount: foam,
-        pieceCount: piece,
-        packerName,
-        itemPacked: editableItems.map((i) => ({ id: i.id, packed: packedIds.has(i.id) })),
-      })
+      await savePackGroup(packInput())
       if (!markPacked) {
         setMsg('บันทึกแล้ว')
         return
@@ -345,7 +348,18 @@ export default function PackGroup() {
               ))}
             </datalist>
           </label>
-          <TotalCount total={paper + foam + piece} />
+          <div className="flex flex-wrap items-center gap-3">
+            <TotalCount total={paper + foam + piece} />
+            {/* one numbered set for the whole customer, saved first */}
+            <StickerPrintButton
+              customer={primary}
+              counts={{ paper, foam, piece }}
+              beforePrint={async () => {
+                await savePackGroup(packInput())
+              }}
+              disabled={saveBlocked}
+            />
+          </div>
           <section className="flex flex-col gap-2 border-t border-line pt-4">
             <p className="section-title">รูปหลักฐานตอนแพ็ค</p>
             <PhotoCapture

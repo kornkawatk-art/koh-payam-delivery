@@ -14,10 +14,10 @@ import ClaimDetail from './routes/team/ClaimDetail'
 import LineContacts from './routes/team/LineContacts'
 import AuditLog from './routes/team/AuditLog'
 import ShortageReport from './routes/team/ShortageReport'
+import CustomerAliases from './routes/team/CustomerAliases'
 import OrderDetail from './routes/team/OrderDetail'
 import PackOrder from './routes/team/PackOrder'
 import PackGroup from './routes/team/PackGroup'
-import LabelSheet from './routes/team/LabelSheet'
 import CustomerOrderView from './routes/customer/CustomerOrderView'
 import LineRegister from './routes/customer/LineRegister'
 
@@ -130,9 +130,16 @@ export default function App() {
                 </RequireRole>
               }
             />
+            <Route
+              path="/customer-aliases"
+              element={
+                <RequireRole path="/customer-aliases">
+                  <CustomerAliases />
+                </RequireRole>
+              }
+            />
             <Route path="/order/:id" element={<OrderDetail />} />
             <Route path="/order/:id/pack" element={<PackOrder />} />
-            <Route path="/order/:id/label" element={<LabelSheet />} />
             <Route path="/customer/:date/:phone/pack" element={<PackGroup />} />
           </Route>
           <Route path="*" element={<Navigate to="/" replace />} />
