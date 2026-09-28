@@ -433,3 +433,68 @@
     bottom: max(0.75rem, env(safe-area-inset-bottom));
   }
 }
+
+/* ---- Box stickers (50 x 30 mm, one per page) -------------------------- */
+.sticker {
+  box-sizing: border-box;
+  width: 50mm;
+  height: 30mm;
+  padding: 1.5mm 2mm;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1mm;
+  overflow: hidden;
+  color: #000;
+  background: #fff;
+  font-family: 'IBM Plex Sans Thai', Inter, system-ui, sans-serif;
+  text-align: center;
+}
+
+.sticker-name {
+  max-width: 100%;
+  font-weight: 700;
+  line-height: 1.15;
+  overflow-wrap: anywhere;
+}
+
+.sticker-meta {
+  font-size: 3.6mm;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+.sticker-meta b {
+  font-size: 4.4mm;
+}
+
+.sticker-preview {
+  border: 1px dashed theme('colors.line.strong');
+  border-radius: 2mm;
+  overflow: hidden;
+}
+
+.sticker-print-root {
+  display: none;
+}
+
+@media print {
+  body.printing-stickers > *:not(.sticker-print-root) {
+    display: none !important;
+  }
+
+  body.printing-stickers .sticker-print-root {
+    display: block;
+  }
+
+  body.printing-stickers .sticker-print-root .sticker {
+    break-after: page;
+    page-break-after: always;
+  }
+
+  body.printing-stickers .sticker-print-root .sticker:last-child {
+    break-after: auto;
+    page-break-after: auto;
+  }
+}

@@ -7,6 +7,7 @@ import {
   ChatCircle,
   ClockCounterClockwise,
   ChartBar,
+  Tag,
   type Icon,
 } from '@phosphor-icons/react'
 
@@ -24,6 +25,7 @@ export type NavAccent =
   | 'line'
   | 'slate'
   | 'violet'
+  | 'cyan'
 
 export const NAV: { path: string; label: string; roles: Role[]; icon: Icon; accent: NavAccent }[] =
   [
@@ -64,6 +66,13 @@ export const NAV: { path: string; label: string; roles: Role[]; icon: Icon; acce
       roles: ['manager'],
       icon: ChartBar,
       accent: 'violet',
+    },
+    {
+      path: '/customer-aliases',
+      label: 'ชื่อย่อลูกค้า',
+      roles: ['manager'],
+      icon: Tag,
+      accent: 'cyan',
     },
   ]
 

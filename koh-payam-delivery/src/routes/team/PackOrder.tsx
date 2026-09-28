@@ -14,6 +14,7 @@ import { PageHeader } from '../../components/ui/PageHeader'
 import { splitFreshDry } from '../../lib/freshDry'
 import { TotalCount } from '../../components/ui/Stat'
 import { groupedItemRows } from '../../components/ui/ItemGroupHeader'
+import { StickerPrintButton } from '../../components/StickerPrint'
 
 const R2 = import.meta.env.VITE_R2_PUBLIC_BASE_URL as string
 
@@ -73,18 +74,20 @@ export default function PackOrder() {
   if (failed) return <p className="alert alert-danger">โหลดออเดอร์ไม่สำเร็จ</p>
   if (!order) return <PageSkeleton />
 
+  const packInput = () => ({
+    orderId: id!,
+    paperCount: paper,
+    foamCount: foam,
+    pieceCount: piece,
+    packerName,
+    itemPacked: items.map((it) => ({ id: it.id, packed: packedIds.has(it.id) })),
+  })
+
   async function save(markPacked: boolean) {
     setBusy(true)
     setMsg(undefined)
     try {
-      await savePack({
-        orderId: id!,
-        paperCount: paper,
-        foamCount: foam,
-        pieceCount: piece,
-        packerName,
-        itemPacked: items.map((it) => ({ id: it.id, packed: packedIds.has(it.id) })),
-      })
+      await savePack(packInput())
       if (markPacked) await updateOrderStatus(id!, 'packed')
       setMsg(markPacked ? 'บันทึกและทำเครื่องหมายแพ็คเสร็จแล้ว' : 'บันทึกแล้ว')
     } catch (e) {
@@ -260,7 +263,18 @@ export default function PackOrder() {
             ))}
           </datalist>
         </label>
-        <TotalCount total={paper + foam + piece} />
+        <div className="flex flex-wrap items-center gap-3">
+          <TotalCount total={paper + foam + piece} />
+          {/* saves the counts first, so the stickers match what's recorded */}
+          <StickerPrintButton
+            customer={order}
+            counts={{ paper, foam, piece }}
+            beforePrint={async () => {
+              await savePack(packInput())
+            }}
+            disabled={saveBlocked}
+          />
+        </div>
         <section className="flex flex-col gap-2 border-t border-line pt-4">
           <p className="section-title">รูปหลักฐานตอนแพ็ค</p>
           <PhotoCapture

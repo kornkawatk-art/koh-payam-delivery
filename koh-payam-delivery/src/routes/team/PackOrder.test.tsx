@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Routes, Route } from 'react-router-dom'
 import PackOrder from './PackOrder'
@@ -46,6 +46,11 @@ vi.mock('../../components/PhotoCapture', () => ({
       <button onClick={() => onBusyChange?.(false)}>mock-photo-idle</button>
     </>
   ),
+}))
+vi.mock('../../lib/api/customerAliases', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../lib/api/customerAliases')>()),
+  getShortName: vi.fn().mockResolvedValue('JJ'),
+  saveShortName: vi.fn().mockResolvedValue(undefined),
 }))
 vi.mock('../../lib/api/backorders', () => ({
   listPendingBackordersForOrder: (...a: unknown[]) => listPendingBackordersForOrder(...a),
@@ -497,4 +502,25 @@ test('"บันทึก + แพ็คเสร็จ" stays locked without a 
   expect(packBtn).toBeDisabled() // spaces don't count
   // plain save stays available for saving progress
   expect(screen.getByRole('button', { name: 'บันทึก' })).toBeEnabled()
+})
+
+test('"พิมพ์สติ๊กเกอร์" counts the boxes typed so far and saves them before printing', async () => {
+  window.print = vi.fn()
+  renderPage()
+  await screen.findByText('rice')
+  const paper = screen.getByLabelText(/ลังกระดาษ/)
+  await userEvent.clear(paper)
+  await userEvent.type(paper, '2')
+  const piece = screen.getByLabelText(/จำนวนชิ้น/)
+  await userEvent.clear(piece)
+  await userEvent.type(piece, '1')
+
+  await userEvent.click(screen.getByRole('button', { name: 'พิมพ์สติ๊กเกอร์ (3 ดวง)' }))
+  const dialog = screen.getByRole('dialog', { name: 'พิมพ์สติ๊กเกอร์' })
+  await within(dialog).findByDisplayValue('JJ')
+  await userEvent.click(within(dialog).getByRole('button', { name: 'พิมพ์' }))
+
+  await waitFor(() => expect(window.print).toHaveBeenCalled())
+  expect(savePack).toHaveBeenCalledWith(expect.objectContaining({ paperCount: 2, pieceCount: 1 }))
+  document.body.classList.remove('printing-stickers')
 })

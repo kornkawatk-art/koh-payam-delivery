@@ -56,4 +56,10 @@ export const NAV_ACCENT_CLASSES: Record<
     activeBg: 'bg-accent-violet-soft',
     activeText: 'text-accent-violet',
   },
+  cyan: {
+    icon: 'text-accent-cyan',
+    chipBg: 'bg-accent-cyan-soft',
+    activeBg: 'bg-accent-cyan-soft',
+    activeText: 'text-accent-cyan',
+  },
 }

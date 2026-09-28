@@ -80,7 +80,7 @@ test('shows the customer link and copies it to the clipboard', async () => {
   expect(navigator.clipboard.writeText).toHaveBeenCalledWith(link)
 })
 
-test('the manual status-advance button is gone -- แพ็คของ / ใบเขียนหน้าลัง are the only big action buttons, colored green/amber', async () => {
+test('the manual status-advance button is gone -- แพ็คของ / พิมพ์สติ๊กเกอร์ are the only big action buttons, colored green/amber', async () => {
   renderPage()
   await screen.findByText(order.customer_name_en, { exact: false })
   expect(screen.queryByText(/^เปลี่ยนเป็น /)).not.toBeInTheDocument()
@@ -90,10 +90,11 @@ test('the manual status-advance button is gone -- แพ็คของ / ใบ
   expect(pack.className).toContain('btn-ok')
   expect(pack.className).toContain('text-lg')
 
-  const label = screen.getByRole('link', { name: 'ใบเขียนหน้าลัง' })
-  expect(label).toHaveAttribute('href', '/order/ord1/label')
-  expect(label.className).toContain('btn-warn')
-  expect(label.className).toContain('text-lg')
+  // the A4 hand-write sheet is gone; stickers print from here (fixture: 2+1+3 = 6)
+  expect(screen.queryByRole('link', { name: 'ใบเขียนหน้าลัง' })).not.toBeInTheDocument()
+  const stickers = screen.getByRole('button', { name: 'พิมพ์สติ๊กเกอร์ (6 ดวง)' })
+  expect(stickers.className).toContain('btn-warn')
+  expect(stickers.className).toContain('text-lg')
 })
 
 test('shows the box/piece counts as labeled tiles, including the total', async () => {
