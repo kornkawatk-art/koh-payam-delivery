@@ -11,6 +11,14 @@ vi.mock('../lib/image', () => ({
 vi.mock('../lib/api/photos', () => ({
   requestUploadUrl: (...a: unknown[]) => requestUploadUrl(...a),
 }))
+// The in-page camera: a fake stream and a fixed shot, so the camera tests run
+// the real CameraSheet + upload path without a device.
+vi.mock('../lib/camera', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../lib/camera')>()),
+  openRearCamera: vi.fn().mockResolvedValue({ getTracks: () => [] }),
+  grabFrame: vi.fn().mockResolvedValue(new File(['x'], 'camera.jpg', { type: 'image/jpeg' })),
+  stopStream: vi.fn(),
+}))
 
 const fetchMock = vi.fn()
 
@@ -313,4 +321,34 @@ test('a prop change to initialPhotos after mount is ignored (never re-seeds/clob
     />,
   )
   expect(screen.getByText('1 รูป')).toBeInTheDocument() // still 1, not re-seeded to 2
+})
+
+test('team evidence: "เปิดกล้อง" opens the in-page camera and each shot goes through the normal upload', async () => {
+  const onUploaded = vi.fn()
+  render(<PhotoCapture scope="evidence" orderId="o1" onUploaded={onUploaded} stage="pack" />)
+  await userEvent.click(screen.getByRole('button', { name: 'เปิดกล้อง' }))
+  const shutter = await screen.findByRole('button', { name: 'ถ่าย' })
+  await waitFor(() => expect(shutter).toBeEnabled())
+  await userEvent.click(shutter)
+  await waitFor(() => expect(onUploaded).toHaveBeenCalledWith('evidence/o1/key-1.jpg'))
+  expect(requestUploadUrl).toHaveBeenCalledWith(
+    expect.objectContaining({ scope: 'evidence', orderId: 'o1', stage: 'pack' }),
+    expect.any(AbortSignal),
+  )
+  // camera stays open for the next shot; "เสร็จ" closes it, and the photo is listed
+  await userEvent.click(screen.getByRole('button', { name: 'เสร็จ' }))
+  expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+  expect(screen.getByText('1 รูป')).toBeInTheDocument()
+})
+
+test('the device picker stays available as the fallback next to the camera', () => {
+  render(<PhotoCapture scope="evidence" orderId="o1" onUploaded={() => {}} />)
+  expect(screen.getByRole('button', { name: 'เปิดกล้อง' })).toBeInTheDocument()
+  expect(input()).toBeInTheDocument()
+})
+
+test('customer claim photos keep the plain picker only (no in-page camera)', () => {
+  render(<PhotoCapture scope="claim" token="t" onUploaded={() => {}} />)
+  expect(screen.queryByRole('button', { name: 'เปิดกล้อง' })).not.toBeInTheDocument()
+  expect(input()).toBeInTheDocument()
 })

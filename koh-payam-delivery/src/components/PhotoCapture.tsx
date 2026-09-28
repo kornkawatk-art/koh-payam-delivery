@@ -1,5 +1,6 @@
 import { useState, type ChangeEvent } from 'react'
-import { Trash } from '@phosphor-icons/react'
+import { Camera, Trash } from '@phosphor-icons/react'
+import { CameraSheet } from './CameraSheet'
 import { compressImage } from '../lib/image'
 import { requestUploadUrl } from '../lib/api/photos'
 
@@ -116,6 +117,11 @@ export default function PhotoCapture({
   // removal is in flight (disables that thumbnail's buttons only).
   const [confirmingKey, setConfirmingKey] = useState<string | null>(null)
   const [removingKey, setRemovingKey] = useState<string | null>(null)
+  // Team evidence photos get the in-page camera (see lib/camera.ts for why
+  // it replaces the old capture="environment" handoff); customers' claim
+  // photos keep the plain picker only.
+  const camera = scope === 'evidence'
+  const [cameraOpen, setCameraOpen] = useState(false)
 
   function updateBusy(v: boolean) {
     setBusy(v)
@@ -146,7 +152,12 @@ export default function PhotoCapture({
       setErr('ไม่ได้เลือกรูป กรุณาลองอีกครั้ง')
       return
     }
+    await uploadFiles(picked)
+  }
 
+  // Compress + upload each file (picked from the device, or shot with the
+  // in-page camera), stopping at the photo cap.
+  async function uploadFiles(picked: File[]) {
     const files = picked.slice(0, Math.max(0, limit - keys.length))
     if (files.length === 0) return
 
@@ -220,8 +231,21 @@ export default function PhotoCapture({
 
   return (
     <div className="flex flex-col gap-2">
+      {camera && (
+        <button
+          type="button"
+          className="btn btn-primary w-full sm:w-fit"
+          onClick={() => setCameraOpen(true)}
+          disabled={atMax || busy}
+        >
+          <Camera size={18} weight="bold" aria-hidden="true" />
+          เปิดกล้อง
+        </button>
+      )}
       <p className="text-xs text-ink-faint">
-        ถ่ายรูปด้วยกล้องมือถือก่อน แล้วกดปุ่มด้านล่างเพื่อแนบรูปที่ถ่ายไว้
+        {camera
+          ? 'หรือแนบรูปจากเครื่อง (รูปที่ถ่ายไว้แล้ว):'
+          : 'ถ่ายรูปด้วยกล้องมือถือก่อน แล้วกดปุ่มด้านล่างเพื่อแนบรูปที่ถ่ายไว้'}
       </p>
       <input
         key={inputGen}
@@ -312,6 +336,15 @@ export default function PhotoCapture({
           )
         })}
       </div>
+      {cameraOpen && (
+        <CameraSheet
+          onCapture={(file) => void uploadFiles([file])}
+          onClose={() => setCameraOpen(false)}
+          busy={busy}
+          taken={keys.length}
+          remaining={limit - keys.length}
+        />
+      )}
     </div>
   )
 }
