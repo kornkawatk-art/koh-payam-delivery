@@ -15,6 +15,7 @@ import { splitFreshDry } from '../../lib/freshDry'
 import { useAuth } from '../../lib/auth'
 import { Notice, flash, type Flash } from '../../components/ui/Notice'
 import { AmountDue } from '../../components/ui/AmountDue'
+import { groupedItemRows } from '../../components/ui/ItemGroupHeader'
 
 export default function OrderDetail() {
   const { id } = useParams()
@@ -168,6 +169,7 @@ export default function OrderDetail() {
           <table className="data-table stack-table">
             <thead>
               <tr>
+                <th className="w-10 text-right">#</th>
                 <th>แพ็ค</th>
                 <th>รหัสสินค้า</th>
                 <th>สินค้า</th>
@@ -178,32 +180,14 @@ export default function OrderDetail() {
               </tr>
             </thead>
             <tbody>
-              {showFreshDrySplit ? (
-                <>
-                  {freshItems.length > 0 && (
-                    <tr className="row-divider">
-                      <td colSpan={7} className="bg-paper text-xs font-semibold text-ink-soft">
-                        ของสด ({freshItems.length})
-                      </td>
-                    </tr>
-                  )}
-                  {freshItems.map((it) => (
-                    <OrderDetailItemRow key={it.id} item={it} />
-                  ))}
-                  {dryItems.length > 0 && (
-                    <tr className="row-divider">
-                      <td colSpan={7} className="bg-paper text-xs font-semibold text-ink-soft">
-                        ของแห้ง ({dryItems.length})
-                      </td>
-                    </tr>
-                  )}
-                  {dryItems.map((it) => (
-                    <OrderDetailItemRow key={it.id} item={it} />
-                  ))}
-                </>
-              ) : (
-                items.map((it) => <OrderDetailItemRow key={it.id} item={it} />)
-              )}
+              {groupedItemRows({
+                split: showFreshDrySplit,
+                fresh: freshItems,
+                dry: dryItems,
+                all: items,
+                colSpan: 8,
+                row: (it, no) => <OrderDetailItemRow key={it.id} item={it} no={no} />,
+              })}
             </tbody>
           </table>
         </div>
@@ -333,9 +317,12 @@ export default function OrderDetail() {
   )
 }
 
-function OrderDetailItemRow({ item: it }: { item: any }) {
+function OrderDetailItemRow({ item: it, no }: { item: any; no: number }) {
   return (
     <tr>
+      <td className="row-no" aria-label={`ลำดับที่ ${no}`}>
+        {no}
+      </td>
       <td className="stack-tick">
         <input
           type="checkbox"

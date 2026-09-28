@@ -13,6 +13,7 @@ import { PageSkeleton } from '../../components/ui/Skeleton'
 import { PageHeader } from '../../components/ui/PageHeader'
 import { splitFreshDry } from '../../lib/freshDry'
 import { TotalCount } from '../../components/ui/Stat'
+import { groupedItemRows } from '../../components/ui/ItemGroupHeader'
 
 const R2 = import.meta.env.VITE_R2_PUBLIC_BASE_URL as string
 
@@ -170,6 +171,7 @@ export default function PackOrder() {
           <table className="data-table stack-table">
             <thead>
               <tr>
+                <th className="w-10 text-right">#</th>
                 <th>แพ็ค</th>
                 <th>รหัสสินค้า</th>
                 <th>สินค้า</th>
@@ -180,49 +182,22 @@ export default function PackOrder() {
               </tr>
             </thead>
             <tbody>
-              {showFreshDrySplit ? (
-                <>
-                  {freshItems.length > 0 && (
-                    <tr className="row-divider">
-                      <td colSpan={7} className="bg-paper text-xs font-semibold text-ink-soft">
-                        ของสด ({freshItems.length})
-                      </td>
-                    </tr>
-                  )}
-                  {freshItems.map((it) => (
-                    <PackItemRow
-                      key={it.id}
-                      item={it}
-                      checked={packedIds.has(it.id)}
-                      onToggle={toggleItemPacked}
-                    />
-                  ))}
-                  {dryItems.length > 0 && (
-                    <tr className="row-divider">
-                      <td colSpan={7} className="bg-paper text-xs font-semibold text-ink-soft">
-                        ของแห้ง ({dryItems.length})
-                      </td>
-                    </tr>
-                  )}
-                  {dryItems.map((it) => (
-                    <PackItemRow
-                      key={it.id}
-                      item={it}
-                      checked={packedIds.has(it.id)}
-                      onToggle={toggleItemPacked}
-                    />
-                  ))}
-                </>
-              ) : (
-                items.map((it) => (
+              {groupedItemRows({
+                split: showFreshDrySplit,
+                fresh: freshItems,
+                dry: dryItems,
+                all: items,
+                colSpan: 8,
+                row: (it, no) => (
                   <PackItemRow
                     key={it.id}
+                    no={no}
                     item={it}
                     checked={packedIds.has(it.id)}
                     onToggle={toggleItemPacked}
                   />
-                ))
-              )}
+                ),
+              })}
             </tbody>
           </table>
         </div>
@@ -320,12 +295,15 @@ export default function PackOrder() {
 
 export function PackItemRow({
   item: it,
+  no,
   checked,
   onToggle,
   orderNo,
   disabled,
 }: {
   item: ItemState
+  /** Running line number shown in the "#" column. */
+  no: number
   checked: boolean
   onToggle: (id: string) => void
   // Combined pack page only: which PO this line came from, and whether it is
@@ -340,6 +318,9 @@ export function PackItemRow({
       className={(disabled ? '' : 'row-tap ') + (checked ? 'row-done' : '')}
       onClick={disabled ? undefined : () => onToggle(it.id)}
     >
+      <td className="row-no" aria-label={`ลำดับที่ ${no}`}>
+        {no}
+      </td>
       <td className="stack-tick">
         <input
           type="checkbox"
