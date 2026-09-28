@@ -93,7 +93,13 @@ export default function PierGroup({
       : null
   const outstanding = ready.reduce((n, o) => n + (o.outstanding_amount > 0 ? o.outstanding_amount : 0), 0)
   const canShip =
-    ready.length > 0 && !!boatId && allKeys.length >= 1 && !photoBusy && attaching === 0 && !busy
+    ready.length > 0 &&
+    !!boatId &&
+    allKeys.length >= 1 &&
+    pierName.trim() !== '' &&
+    !photoBusy &&
+    attaching === 0 &&
+    !busy
 
   async function chooseBoat(id: string) {
     setMsg(undefined)
@@ -259,8 +265,9 @@ export default function PierGroup({
           </section>
 
           <label className="field">
-            <span className="field-label">ชื่อคนลงเรือ</span>
+            <span className="field-label field-label-required">ชื่อคนลงเรือ</span>
             <input
+              required
               list="pier-name-options"
               className="w-56"
               value={pierName}
@@ -293,6 +300,9 @@ export default function PierGroup({
           >
             ส่งขึ้นเรือแล้ว ({ready.length} ออเดอร์)
           </button>
+          {!pierName.trim() && (
+            <p className="muted text-xs">ต้องกรอกชื่อคนลงเรือก่อนกดส่งขึ้นเรือแล้ว</p>
+          )}
           {(photoBusy || attaching > 0) && (
             <p className="muted text-xs">กำลังอัปโหลดรูป กรุณารอสักครู่ก่อนส่งขึ้นเรือ</p>
           )}

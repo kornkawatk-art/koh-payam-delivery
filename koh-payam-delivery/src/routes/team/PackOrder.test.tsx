@@ -59,6 +59,7 @@ const order = {
   paper_box_count: 0,
   foam_box_count: 0,
   piece_count: 0,
+  packer_name: 'ทีมแพ็ค', // required to finish packing; pre-filled like a revisit
   order_items: [
     {
       id: 'i1',
@@ -141,7 +142,7 @@ test('"บันทึก" records the box count via savePack', async () => {
     paperCount: 3,
     foamCount: 0,
     pieceCount: 0,
-    packerName: '',
+    packerName: 'ทีมแพ็ค',
     itemPacked: [
       { id: 'i1', packed: false },
       { id: 'i2', packed: false },
@@ -170,7 +171,7 @@ test('typing into all three count fields passes the right pieceCount to savePack
     paperCount: 2,
     foamCount: 1,
     pieceCount: 5,
-    packerName: '',
+    packerName: 'ทีมแพ็ค',
     itemPacked: [
       { id: 'i1', packed: false },
       { id: 'i2', packed: false },
@@ -185,6 +186,7 @@ test('typing a packer name passes it through to savePack, and the pack gate is u
   renderPage()
   await screen.findByText('rice')
   const packerInput = screen.getByLabelText('ชื่อคนแพ็ค')
+  await userEvent.clear(packerInput)
   await userEvent.type(packerInput, 'สมชาย')
 
   const packBtn = screen.getByRole('button', { name: 'บันทึก + แพ็คเสร็จ' })
@@ -251,7 +253,7 @@ test('"บันทึก + แพ็คเสร็จ" is gated on a pack phot
   const packBtn = screen.getByRole('button', { name: 'บันทึก + แพ็คเสร็จ' })
   expect(packBtn).toBeDisabled()
   expect(
-    screen.getByText('ต้องถ่ายรูปลังที่แพ็คเสร็จอย่างน้อย 1 รูป กรอกจำนวนลัง/ชิ้นอย่างน้อย 1 และติ๊กสินค้าครบทุกรายการ'),
+    screen.getByText('ต้องถ่ายรูปลังที่แพ็คเสร็จอย่างน้อย 1 รูป กรอกจำนวนลัง/ชิ้นอย่างน้อย 1 กรอกชื่อคนแพ็ค และติ๊กสินค้าครบทุกรายการ'),
   ).toBeInTheDocument()
 
   // a box count alone does not open the gate
@@ -278,7 +280,7 @@ test('"บันทึก + แพ็คเสร็จ" is gated on a pack phot
   await userEvent.click(cb2)
   expect(packBtn).toBeEnabled()
   expect(
-    screen.queryByText('ต้องถ่ายรูปลังที่แพ็คเสร็จอย่างน้อย 1 รูป กรอกจำนวนลัง/ชิ้นอย่างน้อย 1 และติ๊กสินค้าครบทุกรายการ'),
+    screen.queryByText('ต้องถ่ายรูปลังที่แพ็คเสร็จอย่างน้อย 1 รูป กรอกจำนวนลัง/ชิ้นอย่างน้อย 1 กรอกชื่อคนแพ็ค และติ๊กสินค้าครบทุกรายการ'),
   ).not.toBeInTheDocument()
 
   // plain "บันทึก" is never gated by photos/boxes/ticks
@@ -473,4 +475,26 @@ test('the bottom action bar shows how many items are ticked out of the total', a
   expect(screen.getByText('ติ๊กแล้ว 1/2')).toBeInTheDocument()
   await userEvent.click(screen.getByRole('button', { name: 'เลือกทั้งหมด' }))
   expect(screen.getByText('ติ๊กแล้ว 2/2')).toBeInTheDocument()
+})
+
+test('"บันทึก + แพ็คเสร็จ" stays locked without a packer name, even when everything else is done', async () => {
+  renderPage()
+  await screen.findByText('rice')
+  const paper = screen.getByLabelText(/ลังกระดาษ/)
+  await userEvent.clear(paper)
+  await userEvent.type(paper, '2')
+  await userEvent.click(screen.getByRole('button', { name: 'mock-upload' }))
+  await waitFor(() => expect(attachEvidencePhoto).toHaveBeenCalled())
+  await userEvent.click(screen.getByRole('button', { name: 'เลือกทั้งหมด' }))
+  const packBtn = screen.getByRole('button', { name: 'บันทึก + แพ็คเสร็จ' })
+  expect(packBtn).toBeEnabled() // pre-filled name + photo + box + all ticked
+
+  const name = screen.getByLabelText('ชื่อคนแพ็ค')
+  expect(name).toBeRequired()
+  await userEvent.clear(name)
+  expect(packBtn).toBeDisabled()
+  await userEvent.type(name, '   ')
+  expect(packBtn).toBeDisabled() // spaces don't count
+  // plain save stays available for saving progress
+  expect(screen.getByRole('button', { name: 'บันทึก' })).toBeEnabled()
 })

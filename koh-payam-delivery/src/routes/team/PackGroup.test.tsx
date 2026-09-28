@@ -72,7 +72,7 @@ const base = (id: string, no: string, status: string, items: object[], extra: ob
   paper_box_count: 0,
   foam_box_count: 0,
   piece_count: 0,
-  packer_name: null,
+  packer_name: 'ทีมแพ็ค', // required to finish packing; pre-filled like a revisit
   evidence_photos: [],
   order_items: items,
   ...extra,
@@ -188,6 +188,7 @@ test('plain "บันทึก" saves via savePackGroup with primary/others + o
   const piece = screen.getByLabelText(/จำนวนชิ้น/)
   await userEvent.clear(piece)
   await userEvent.type(piece, '4')
+  await userEvent.clear(screen.getByLabelText('ชื่อคนแพ็ค'))
   await userEvent.type(screen.getByLabelText('ชื่อคนแพ็ค'), 'สมชาย')
   await userEvent.click(screen.getByRole('checkbox', { name: 'แพ็คแล้ว: rice' }))
   await userEvent.click(screen.getByRole('button', { name: 'บันทึก' }))
@@ -408,4 +409,19 @@ test('tapping the row of an already-packed line does not untick it', async () =>
   await userEvent.click(screen.getByText('sugar'))
   const sugar = screen.getByRole('checkbox', { name: 'แพ็คแล้ว: sugar' }) as HTMLInputElement
   expect(sugar.checked).toBe(true)
+})
+
+test('combined "บันทึก + แพ็คเสร็จ" also requires the packer name', async () => {
+  renderPage()
+  await screen.findByText('rice')
+  const paper = screen.getByLabelText(/ลังกระดาษ/)
+  await userEvent.clear(paper)
+  await userEvent.type(paper, '2')
+  await userEvent.click(screen.getByRole('button', { name: 'mock-upload' }))
+  await waitFor(() => expect(attachEvidencePhoto).toHaveBeenCalled())
+  await userEvent.click(screen.getByRole('button', { name: 'เลือกทั้งหมด' }))
+  const packBtn = screen.getByRole('button', { name: 'บันทึก + แพ็คเสร็จ' })
+  expect(packBtn).toBeEnabled()
+  await userEvent.clear(screen.getByLabelText('ชื่อคนแพ็ค'))
+  expect(packBtn).toBeDisabled()
 })
