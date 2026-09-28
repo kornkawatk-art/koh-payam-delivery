@@ -114,6 +114,17 @@ test('summarises status progress for the day as icon-labeled count tiles', async
   expect(within(chipRow).getByText('ถึงท่าเรือ')).toBeInTheDocument()
   expect(within(chipRow).getByText('ส่งแล้ว')).toBeInTheDocument()
   expect(within(chipRow).getByText('ออเดอร์ทั้งหมด')).toBeInTheDocument()
+  // ถึงท่าเรือ / ส่งแล้ว get the same X/total + bar (fixture: 3 POs, 1 shipped,
+  // and a shipped PO has necessarily passed the pier too).
+  expect(within(chipRow).getByRole('progressbar', { name: 'ความคืบหน้าถึงท่าเรือ' })).toHaveAttribute(
+    'aria-valuenow',
+    '1',
+  )
+  expect(within(chipRow).getByRole('progressbar', { name: 'ความคืบหน้าการส่ง' })).toHaveAttribute(
+    'aria-valuemax',
+    '3',
+  )
+  expect(within(chipRow).getAllByText('1/3')).toHaveLength(2)
   expect(within(chipRow).getByRole('progressbar', { name: 'ความคืบหน้าการแพ็ค' })).toHaveAttribute(
     'aria-valuenow',
     '3',
