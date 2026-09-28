@@ -68,7 +68,7 @@ const orders = [
     outstanding_amount: null,
     payment_method: null,
     packer_name: null,
-    pier_name: null,
+    pier_name: 'ทีมท่าเรือ', // required to ship; pre-filled like a revisit
   },
   {
     id: 'o2',
@@ -82,7 +82,7 @@ const orders = [
     outstanding_amount: null,
     payment_method: null,
     packer_name: null,
-    pier_name: null,
+    pier_name: 'ทีมท่าเรือ', // required to ship; pre-filled like a revisit
   },
 ]
 
@@ -191,6 +191,7 @@ test('typing a pier name and shipping calls setOrderPierName then updateOrderSta
   render(<PierLoad />)
   await userEvent.click(await screen.findByRole('button', { name: /PO-1/ }))
   await userEvent.click(screen.getByRole('button', { name: 'เรือ 2' }))
+  await userEvent.clear(screen.getByLabelText('ชื่อคนลงเรือ'))
   await userEvent.type(screen.getByLabelText('ชื่อคนลงเรือ'), 'สมหญิง')
   await userEvent.click(screen.getByRole('button', { name: 'mock-upload' }))
   const ship = screen.getByRole('button', { name: 'ส่งขึ้นเรือแล้ว' })
@@ -391,4 +392,19 @@ test('the selected order shows paper / foam / piece / total tiles so staff can c
   expect(value('ลังโฟม')).toHaveTextContent(/^1$/)
   expect(value('ชิ้น')).toHaveTextContent(/^0$/)
   expect(value('รวม')).toHaveTextContent(/^3$/)
+})
+
+test('"ส่งขึ้นเรือแล้ว" stays locked without a pier name and says why', async () => {
+  render(<PierLoad />)
+  await userEvent.click(await screen.findByRole('button', { name: /PO-1/ }))
+  await userEvent.click(screen.getByRole('button', { name: 'เรือ 2' }))
+  await userEvent.click(screen.getByRole('button', { name: 'mock-upload' }))
+  const ship = screen.getByRole('button', { name: 'ส่งขึ้นเรือแล้ว' })
+  await waitFor(() => expect(ship).toBeEnabled())
+
+  const name = screen.getByLabelText('ชื่อคนลงเรือ')
+  expect(name).toBeRequired()
+  await userEvent.clear(name)
+  expect(ship).toBeDisabled()
+  expect(screen.getByText('ต้องกรอกชื่อคนลงเรือก่อนกดส่งขึ้นเรือแล้ว')).toBeInTheDocument()
 })

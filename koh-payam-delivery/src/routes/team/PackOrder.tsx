@@ -94,13 +94,19 @@ export default function PackOrder() {
     }
   }
 
-  // I: marking an order packed needs at least one "packed box" evidence photo,
+  // I: marking an order packed needs the packer's name (required so every
+  // packed PO says who packed it), at least one "packed box" evidence photo,
   // at least one item counted -- some POs ship as loose pieces with no
   // paper/foam box at all, so the count can come from any of the three
   // fields -- AND every line item ticked as physically packed. The plain
   // "บันทึก" save stays ungated.
   const allItemsPacked = items.length > 0 && items.every((it) => packedIds.has(it.id))
-  const packGateBlocked = !(packPhotoCount >= 1 && paper + foam + piece >= 1 && allItemsPacked)
+  const packGateBlocked = !(
+    packPhotoCount >= 1 &&
+    paper + foam + piece >= 1 &&
+    packerName.trim() !== '' &&
+    allItemsPacked
+  )
 
   function toggleItemPacked(itemId: string) {
     setPackedIds((s) => {
@@ -240,9 +246,10 @@ export default function PackOrder() {
           </label>
         </div>
         <label className="field">
-          <span className="field-label">ชื่อคนแพ็ค</span>
+          <span className="field-label field-label-required">ชื่อคนแพ็ค</span>
           <input
-            list="packer-name-options"
+            required
+          list="packer-name-options"
             className="w-56"
             value={packerName}
             onChange={(e) => setPackerName(e.target.value)}
@@ -410,7 +417,7 @@ export function PackActionBar({
       {!saveBlocked && packGateBlocked && (
         <p className="muted text-xs">
           ต้องถ่ายรูปลังที่แพ็คเสร็จอย่างน้อย 1 รูป กรอกจำนวนลัง/ชิ้นอย่างน้อย 1
-          และติ๊กสินค้าครบทุกรายการ
+          กรอกชื่อคนแพ็ค และติ๊กสินค้าครบทุกรายการ
         </p>
       )}
       {msg && (

@@ -213,6 +213,13 @@
     @apply text-sm font-medium text-ink;
   }
 
+  /* Required field: a red asterisk drawn by CSS, so it never becomes part of
+     the label's text (screen readers get the input's own "required"). */
+  .field-label-required::after {
+    content: ' *';
+    @apply text-danger;
+  }
+
   .badge {
     @apply inline-flex items-center gap-1 whitespace-nowrap rounded-full border px-2.5 py-0.5 text-xs font-medium;
   }

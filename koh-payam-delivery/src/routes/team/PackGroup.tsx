@@ -112,6 +112,7 @@ export default function PackGroup() {
     primary &&
     packPhotoCount >= 1 &&
     paper + foam + piece >= 1 &&
+    packerName.trim() !== '' &&
     allEditablePacked
   )
   const saveBlocked = busy || photoBusy
@@ -330,9 +331,10 @@ export default function PackGroup() {
             </label>
           </div>
           <label className="field">
-            <span className="field-label">ชื่อคนแพ็ค</span>
+            <span className="field-label field-label-required">ชื่อคนแพ็ค</span>
             <input
-              list="packer-name-options"
+              required
+          list="packer-name-options"
               className="w-56"
               value={packerName}
               onChange={(e) => setPackerName(e.target.value)}

@@ -62,7 +62,7 @@ const po = (id: string, no: string, status: string, extra: object = {}) => ({
   foam_box_count: 0,
   piece_count: 0,
   outstanding_amount: 0,
-  pier_name: null,
+  pier_name: 'ทีมท่าเรือ', // required to ship; pre-filled like a revisit
   packed_with_order_id: null,
   evidence_photos: [],
   ...extra,
@@ -167,6 +167,7 @@ test('shipping sets the pier name and marks every ready PO shipped in order, the
   renderPanel()
   await screen.findByText('PO-1')
   await readyForShip()
+  await userEvent.clear(screen.getByLabelText('ชื่อคนลงเรือ'))
   await userEvent.type(screen.getByLabelText('ชื่อคนลงเรือ'), 'สมหมาย')
   await userEvent.click(screen.getByRole('button', { name: /ส่งขึ้นเรือแล้ว/ }))
 
@@ -355,4 +356,15 @@ test('a boat shortfall re-reads the orders instead of marking every PO as on tha
   await waitFor(() => expect(listOrdersForCustomerDay.mock.calls.length).toBe(before + 1))
   // server data still has no boat on the POs -> nothing highlighted
   expect(screen.getByRole('button', { name: 'เรือ 1' }).className).not.toContain('bg-ink')
+})
+
+test('group ship stays locked without a pier name and says why', async () => {
+  renderPanel()
+  await screen.findByText('PO-1')
+  await readyForShip()
+  const ship = screen.getByRole('button', { name: /ส่งขึ้นเรือแล้ว/ })
+  expect(ship).toBeEnabled() // pre-filled name
+  await userEvent.clear(screen.getByLabelText('ชื่อคนลงเรือ'))
+  expect(ship).toBeDisabled()
+  expect(screen.getByText('ต้องกรอกชื่อคนลงเรือก่อนกดส่งขึ้นเรือแล้ว')).toBeInTheDocument()
 })

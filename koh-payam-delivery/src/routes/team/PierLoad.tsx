@@ -309,8 +309,9 @@ export default function PierLoad() {
       </section>
 
       <label className="field">
-        <span className="field-label">ชื่อคนลงเรือ</span>
+        <span className="field-label field-label-required">ชื่อคนลงเรือ</span>
         <input
+          required
           list="pier-name-options"
           className="w-56"
           value={pierName}
@@ -353,10 +354,13 @@ export default function PierLoad() {
       <button
         className="btn btn-primary min-h-[3.25rem] w-full text-lg"
         onClick={ship}
-        disabled={!sel.boat_id || photoCount < 1 || photoBusy}
+        disabled={!sel.boat_id || photoCount < 1 || photoBusy || !pierName.trim()}
       >
         ส่งขึ้นเรือแล้ว
       </button>
+      {!pierName.trim() && (
+        <p className="muted text-xs">ต้องกรอกชื่อคนลงเรือก่อนกดส่งขึ้นเรือแล้ว</p>
+      )}
       {photoBusy && (
         <p className="muted text-xs">กำลังอัปโหลดรูป กรุณารอสักครู่ก่อนส่งขึ้นเรือ</p>
       )}
