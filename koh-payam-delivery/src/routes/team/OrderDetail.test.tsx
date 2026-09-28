@@ -265,3 +265,22 @@ test('does not show the shipped warning for a non-shipped order', async () => {
   expect(screen.queryByText(/ส่งขึ้นเรือแล้ว/)).not.toBeInTheDocument()
   expect(screen.getByText(/พิมพ์เลขออเดอร์ PO-1 เพื่อยืนยันการลบถาวร/)).toBeInTheDocument()
 })
+
+test('items carry a running number that continues from ของสด into ของแห้ง, under tinted headers', async () => {
+  getOrder.mockReset().mockResolvedValue({
+    ...order,
+    order_items: [
+      { ...order.order_items[0], id: 'i1', product_name: 'rice', is_fresh: false },
+      { ...order.order_items[0], id: 'i2', product_name: 'tomato', is_fresh: true },
+      { ...order.order_items[0], id: 'i3', product_name: 'lime', is_fresh: true },
+    ],
+  })
+  const { container } = renderPage()
+  await screen.findByText('rice')
+  // fresh first (tomato 1, lime 2), then dry continues (rice 3)
+  const nos = Array.from(container.querySelectorAll('td.row-no')).map((td) => td.textContent)
+  expect(nos).toEqual(['1', '2', '3'])
+  expect(screen.getByText('rice').closest('tr')!.querySelector('td.row-no')).toHaveTextContent('3')
+  expect(screen.getByText('ของสด (2)').closest('tr')).toHaveClass('item-group-fresh')
+  expect(screen.getByText('ของแห้ง (1)').closest('tr')).toHaveClass('item-group-dry')
+})

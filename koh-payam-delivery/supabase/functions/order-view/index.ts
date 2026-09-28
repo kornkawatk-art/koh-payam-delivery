@@ -63,7 +63,7 @@ Deno.serve(async (req) => {
   const { data: o, error } = await admin
     .from('orders')
     .select(
-      '*, order_items(product_name,makro_item_id,qty_ordered,qty_shipped,shortage_qty,status,line_no), evidence_photos(r2_key,taken_at), claims(id,type,description,status,resolution,created_at,refund_amount,claim_items(qty,order_items(product_name,makro_item_id))), ship_days(boats)',
+      '*, order_items(product_name,makro_item_id,qty_ordered,qty_shipped,shortage_qty,status,line_no,is_fresh), evidence_photos(r2_key,taken_at), claims(id,type,description,status,resolution,created_at,refund_amount,claim_items(qty,order_items(product_name,makro_item_id))), ship_days(boats)',
     )
     .eq('link_token', token)
     .single()
@@ -134,6 +134,9 @@ Deno.serve(async (req) => {
       orderedQty: Number(i.qty_ordered),
       shippedQty: Number(i.qty_shipped),
       isShort: i.status === 'short',
+      // null for orders imported before fresh/dry was captured -> the page
+      // shows one flat list, same as the team's order detail.
+      isFresh: typeof i.is_fresh === 'boolean' ? i.is_fresh : null,
     })),
     shortages: items
       .filter((i) => i.status === 'short')

@@ -7,6 +7,7 @@ import CustomerClaimForm from './CustomerClaimForm'
 import { ZoomableImage } from '../../components/ui/ZoomableImage'
 import { StatTile, InfoItem } from '../../components/ui/Stat'
 import { AmountDue } from '../../components/ui/AmountDue'
+import { groupedItemRows } from '../../components/ui/ItemGroupHeader'
 import { formatDate, formatDateTime } from '../../lib/format'
 
 const FN = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/order-view`
@@ -18,6 +19,8 @@ type Item = {
   orderedQty: number
   shippedQty: number
   isShort: boolean
+  // null/absent for orders imported before fresh/dry was captured
+  isFresh?: boolean | null
 }
 type Claim = {
   id: string
@@ -226,6 +229,7 @@ export default function CustomerOrderView() {
           <table className="data-table stack-table">
             <thead>
               <tr>
+                <th className="w-10 text-right">#</th>
                 <th>{t(lang, 'col_item_id')}</th>
                 <th>{t(lang, 'col_item')}</th>
                 <th>{t(lang, 'col_ordered')}</th>
@@ -233,25 +237,40 @@ export default function CustomerOrderView() {
               </tr>
             </thead>
             <tbody>
-              {data.items.map((it, i) => (
-                <tr key={`${it.productName}-${i}`} className={it.isShort ? 'bg-warn-soft' : ''}>
-                  <td data-label={t(lang, 'col_item_id')} className="tnum">
-                    {it.itemId}
-                  </td>
-                  <td className="stack-lead">
-                    {it.productName}
-                    {it.isShort && (
-                      <span className="badge badge-warn ml-1.5">{t(lang, 'badge_short')}</span>
-                    )}
-                  </td>
-                  <td data-label={t(lang, 'col_ordered')} className="tnum">
-                    {it.orderedQty}
-                  </td>
-                  <td data-label={t(lang, 'col_shipped')} className="tnum">
-                    {it.shippedQty}
-                  </td>
-                </tr>
-              ))}
+              {(() => {
+                // Same layout as the team's order detail: fresh then dry under
+                // tinted headers, one running line number across both. Display
+                // only -- data.items keeps its line order for the claim form.
+                const split = data.items.some((it) => it.isFresh != null)
+                return groupedItemRows({
+                  split,
+                  fresh: data.items.filter((it) => it.isFresh === true),
+                  dry: data.items.filter((it) => it.isFresh !== true),
+                  all: data.items,
+                  colSpan: 5,
+                  labels: { fresh: t(lang, 'group_fresh'), dry: t(lang, 'group_dry') },
+                  row: (it, no) => (
+                    <tr key={`${it.productName}-${no}`} className={it.isShort ? 'bg-warn-soft' : ''}>
+                      <td className="row-no">{no}</td>
+                      <td data-label={t(lang, 'col_item_id')} className="tnum">
+                        {it.itemId}
+                      </td>
+                      <td className="stack-lead">
+                        {it.productName}
+                        {it.isShort && (
+                          <span className="badge badge-warn ml-1.5">{t(lang, 'badge_short')}</span>
+                        )}
+                      </td>
+                      <td data-label={t(lang, 'col_ordered')} className="tnum">
+                        {it.orderedQty}
+                      </td>
+                      <td data-label={t(lang, 'col_shipped')} className="tnum">
+                        {it.shippedQty}
+                      </td>
+                    </tr>
+                  ),
+                })
+              })()}
             </tbody>
           </table>
         </div>

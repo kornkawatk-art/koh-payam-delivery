@@ -94,6 +94,21 @@
     @apply cursor-not-allowed;
   }
 
+  /* A read-only "already packed" tick (order detail, a packed PO on the
+     combined pack page): browsers paint disabled checkboxes gray, which read
+     as "not done". Draw it as a solid green tick instead -- same element and
+     semantics (still a checked, disabled checkbox), only the look changes. */
+  input[type='checkbox']:disabled:checked {
+    -webkit-appearance: none;
+    appearance: none;
+    border: 0;
+    border-radius: 0.375rem;
+    cursor: default;
+    background-color: theme('colors.ok.DEFAULT');
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='white' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3.5 8.4l3 3 6-6.6'/%3E%3C/svg%3E");
+    background-size: 100% 100%;
+  }
+
   input[type='file'] {
     @apply cursor-pointer py-2 text-sm text-ink-soft;
   }
@@ -378,6 +393,30 @@
 
     .stack-table tbody tr.row-divider td {
       @apply bg-paper;
+    }
+  }
+
+  /* ของสด / ของแห้ง group header rows in item tables: tinted so the split
+     is visible while scrolling (fresh green, dry gold). Specific enough to
+     beat both the row-hover wash and the phone-card divider style. */
+  .data-table tbody tr.item-group.item-group-fresh td {
+    @apply bg-ok-soft text-ok-ink;
+  }
+
+  .data-table tbody tr.item-group.item-group-dry td {
+    @apply bg-brand-soft text-brand-ink;
+  }
+
+  /* Running line number ("#") in item tables. */
+  .data-table td.row-no {
+    @apply w-10 whitespace-nowrap text-right text-xs text-ink-faint;
+    font-variant-numeric: tabular-nums;
+  }
+
+  @media (max-width: 639.98px) {
+    .stack-table tbody td.row-no {
+      @apply w-auto justify-start pr-2 pt-1.5 text-left;
+      order: -3;
     }
   }
 

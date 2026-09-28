@@ -16,6 +16,7 @@ import { pickPrimary } from '../../lib/groupOrders'
 import { Warning } from '@phosphor-icons/react'
 import { PackActionBar, PackItemRow, type ItemState } from './PackOrder'
 import { TotalCount } from '../../components/ui/Stat'
+import { groupedItemRows } from '../../components/ui/ItemGroupHeader'
 
 const R2 = import.meta.env.VITE_R2_PUBLIC_BASE_URL as string
 
@@ -189,22 +190,16 @@ export default function PackGroup() {
   }
 
   const { show: showSplit, fresh, dry } = splitFreshDry(items)
-  const row = (it: GroupItem) => (
+  const row = (it: GroupItem, no: number) => (
     <PackItemRow
       key={it.id}
+      no={no}
       item={it}
       orderNo={it.orderNo}
       checked={packedIds.has(it.id)}
       disabled={!it.editable}
       onToggle={toggleItemPacked}
     />
-  )
-  const divider = (label: string, n: number) => (
-    <tr className="row-divider">
-      <td colSpan={8} className="bg-paper text-xs font-semibold text-ink-soft">
-        {label} ({n})
-      </td>
-    </tr>
   )
 
   return (
@@ -272,6 +267,7 @@ export default function PackGroup() {
           <table className="data-table stack-table">
             <thead>
               <tr>
+                <th className="w-10 text-right">#</th>
                 <th>แพ็ค</th>
                 <th>ออเดอร์</th>
                 <th>รหัสสินค้า</th>
@@ -283,16 +279,14 @@ export default function PackGroup() {
               </tr>
             </thead>
             <tbody>
-              {showSplit ? (
-                <>
-                  {fresh.length > 0 && divider('ของสด', fresh.length)}
-                  {fresh.map(row)}
-                  {dry.length > 0 && divider('ของแห้ง', dry.length)}
-                  {dry.map(row)}
-                </>
-              ) : (
-                items.map(row)
-              )}
+              {groupedItemRows({
+                split: showSplit,
+                fresh,
+                dry,
+                all: items,
+                colSpan: 9,
+                row,
+              })}
             </tbody>
           </table>
         </div>

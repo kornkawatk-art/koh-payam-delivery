@@ -243,3 +243,32 @@ test('with no shortages, shows a green "None" badge beside the heading', async (
   expect(await screen.findByText('None')).toHaveClass('badge-ok')
   expect(screen.queryByText(/Out of stock/)).not.toBeInTheDocument()
 })
+
+test('items are numbered and, when the order has fresh/dry data, split like the team view', async () => {
+  fetchMock.mockReset().mockResolvedValue(
+    ok({
+      ...payload,
+      items: [
+        { ...payload.items[0], isFresh: false },
+        { ...payload.items[1], productName: 'Lime', isFresh: true },
+      ],
+    }),
+  )
+  const { container } = renderAt()
+  await screen.findByText('Rice 5kg')
+  expect(screen.getByText('Fresh (1)').closest('tr')).toHaveClass('item-group-fresh')
+  expect(screen.getByText('Dry goods (1)').closest('tr')).toHaveClass('item-group-dry')
+  expect(Array.from(container.querySelectorAll('td.row-no')).map((td) => td.textContent)).toEqual([
+    '1',
+    '2',
+  ])
+  // fresh (Lime) is line 1, dry (Rice) line 2
+  expect(screen.getByText('Rice 5kg').closest('tr')!.querySelector('td.row-no')).toHaveTextContent('2')
+})
+
+test('an order without fresh/dry data stays one numbered list (no group headers)', async () => {
+  const { container } = renderAt()
+  await screen.findByText('Rice 5kg')
+  expect(screen.queryByText(/Fresh \(/)).not.toBeInTheDocument()
+  expect(container.querySelectorAll('td.row-no')).toHaveLength(2)
+})
