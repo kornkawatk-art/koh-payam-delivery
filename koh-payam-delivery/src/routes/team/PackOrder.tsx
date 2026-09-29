@@ -15,6 +15,7 @@ import { splitFreshDry } from '../../lib/freshDry'
 import { TotalCount } from '../../components/ui/Stat'
 import { groupedItemRows } from '../../components/ui/ItemGroupHeader'
 import { StickerPrintButton } from '../../components/StickerPrint'
+import { ShippingAddress } from '../../components/ui/ShippingAddress'
 
 const R2 = import.meta.env.VITE_R2_PUBLIC_BASE_URL as string
 
@@ -145,6 +146,8 @@ export default function PackOrder() {
         back={{ to: `/order/${id}`, label: 'รายละเอียดออเดอร์' }}
         title={`แพ็ค · ${order.makro_order_no} · ${order.customer_name_en}`}
       />
+
+      <ShippingAddress addresses={[order.shipping_address]} />
 
       {backorders.length > 0 && (
         <div className="alert alert-warn">

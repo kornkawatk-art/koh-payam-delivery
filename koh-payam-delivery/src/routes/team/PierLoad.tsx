@@ -150,6 +150,7 @@ export default function PierLoad() {
       <PierGroup
         date={date}
         phone={selGroup.phone}
+        name={selGroup.name}
         boats={boats}
         onBack={() => {
           setSelGroup(null)

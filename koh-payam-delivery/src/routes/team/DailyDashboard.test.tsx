@@ -216,7 +216,7 @@ const groupOrders = () => [
   {
     id: '2',
     makro_order_no: 'PO-2',
-    customer_name_en: 'BLUE VIEW ANNEX',
+    customer_name_en: 'Blue  View', // same shop, Makro spacing/case differs
     status: 'imported',
     boat_id: null,
     paper_box_count: 0,
@@ -250,7 +250,7 @@ test('POs sharing a customer_phone collapse into one group row (N PO, progress, 
   expect(within(row).getByText('5')).toBeInTheDocument() // PO-1: 2 boxes, PO-2: 3 pieces
   expect(within(row).getByRole('link', { name: 'แพ็ครวม' })).toHaveAttribute(
     'href',
-    expect.stringMatching(/^\/customer\/\d{4}-\d{2}-\d{2}\/0826289533\/pack$/),
+    expect.stringMatching(/^\/customer\/\d{4}-\d{2}-\d{2}\/0826289533\/pack\?name=BLUE%20VIEW$/),
   )
   // collapsed by default: the member POs are hidden, the lone PO-3 is a normal row
   expect(screen.queryByRole('link', { name: 'PO-1' })).not.toBeInTheDocument()
@@ -493,4 +493,21 @@ test('a customer group row sums the shortages of its POs', async () => {
   renderPage()
   const groupRow = (await screen.findByText('2 PO')).closest('tr')!
   expect(within(groupRow).getByText('ขาด 3')).toBeInTheDocument()
+})
+
+test('the same owner (same phone) with a different shop name is NOT grouped -- each shop packs and ships on its own', async () => {
+  const [a, b, c] = groupOrders()
+  vi.mocked(listOrdersForDay).mockResolvedValueOnce([a, { ...b, customer_name_en: 'ZIGGY RESORT' }, c])
+  renderPage()
+  await screen.findByText('SUNSET')
+  expect(screen.queryByText('2 PO')).not.toBeInTheDocument()
+  expect(screen.getByText('PO-1')).toBeInTheDocument()
+  expect(screen.getByText('PO-2')).toBeInTheDocument()
+})
+
+test('the combined-pack link carries the shop name so only that shop\u2019s POs load', async () => {
+  vi.mocked(listOrdersForDay).mockResolvedValueOnce(groupOrders())
+  renderPage()
+  const link = await screen.findByRole('link', { name: 'แพ็ครวม' })
+  expect(link.getAttribute('href')).toMatch(/\/pack\?name=BLUE%20VIEW$/)
 })

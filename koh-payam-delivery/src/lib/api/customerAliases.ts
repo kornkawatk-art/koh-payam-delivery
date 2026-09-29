@@ -1,17 +1,20 @@
 import { supabase } from '../supabase'
+import { normCustomerName } from '../groupOrders'
 
 /**
  * Short names for box stickers ("JJ Payam" -> "JJ"), one per customer.
- * A customer is identified the way the app groups a customer's POs: by
- * phone when the order has one (digits only, so "082-628 9533" and
- * "0826289533" match), else by the upper-cased trimmed name.
+ * A customer is identified the way the app groups a customer's POs: phone
+ * AND name -- one owner (one phone) can run several shops, each its own
+ * Makro account name and its own sticker name. Phone is digits only ("082-628
+ * 9533" == "0826289533"); name is normalized (normCustomerName). No phone:
+ * name alone. Must match the key rewrite in 0025_customer_per_shop.sql.
  */
 export type CustomerRef = { customer_phone?: string | null; customer_name_en?: string | null }
 
 export function customerKey(o: CustomerRef): string {
   const digits = (o.customer_phone ?? '').replace(/\D/g, '')
-  if (digits) return `phone:${digits}`
-  return `name:${(o.customer_name_en ?? '').trim().toUpperCase()}`
+  const name = normCustomerName(o.customer_name_en)
+  return digits ? `phone:${digits}|name:${name}` : `name:${name}`
 }
 
 /** A first guess when no short name is saved yet: the name's first word. */
