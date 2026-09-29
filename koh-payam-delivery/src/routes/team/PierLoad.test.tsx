@@ -355,7 +355,11 @@ test('opening a customer row shows the group panel for that customer and phone',
   render(<PierLoad />)
   await userEvent.click(await screen.findByRole('button', { name: /BLUE VIEW/ }))
   expect(await screen.findByText('เลือกเรือ (ทุกออเดอร์ไปเรือลำเดียวกัน)')).toBeInTheDocument()
-  expect(listOrdersForCustomerDay).toHaveBeenCalledWith(expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/), '0811111111')
+  expect(listOrdersForCustomerDay).toHaveBeenCalledWith(
+    expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/),
+    '0811111111',
+    'BLUE VIEW',
+  )
   // back returns to the list
   await userEvent.click(screen.getByRole('button', { name: 'กลับ' }))
   expect(await screen.findByRole('button', { name: /BLUE VIEW/ })).toBeInTheDocument()

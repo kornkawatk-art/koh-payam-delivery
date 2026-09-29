@@ -17,6 +17,7 @@ import { Notice, flash, type Flash } from '../../components/ui/Notice'
 import { AmountDue } from '../../components/ui/AmountDue'
 import { groupedItemRows } from '../../components/ui/ItemGroupHeader'
 import { StickerPrintButton } from '../../components/StickerPrint'
+import { ShippingAddress } from '../../components/ui/ShippingAddress'
 
 export default function OrderDetail() {
   const { id } = useParams()
@@ -123,6 +124,8 @@ export default function OrderDetail() {
           <InfoItem icon={Anchor} label="คนลงเรือ" value={order.pier_name} />
         </dl>
       </section>
+      <ShippingAddress addresses={[order.shipping_address]} />
+
       {order.packed_with?.makro_order_no && (
         <p className="alert alert-info">
           แพ็ครวมกับออเดอร์{' '}

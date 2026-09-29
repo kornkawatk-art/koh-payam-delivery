@@ -6,6 +6,7 @@ import { makeLinkToken } from '../token'
 import type { ParsedOrder } from '../import/buildImport'
 import { itemRow, planItemSync, type ExistingItem } from '../import/itemSync'
 import { canTransition, type OrderStatus } from '../status'
+import { normCustomerName } from '../groupOrders'
 
 export type OtherDayOrder = { makro_order_no: string; ship_date: string; status: string }
 
@@ -84,6 +85,7 @@ export async function commitImport(
           status: 'imported',
           link_token: makeLinkToken(),
           sub_district: o.subDistrict,
+          shipping_address: o.shippingAddress || null,
           makro_order_status: o.makroOrderStatus,
           payment_method: o.paymentMethod,
           payment_status: o.paymentStatus,
@@ -106,6 +108,7 @@ export async function commitImport(
         .update({
           customer_name_en: o.customerName,
           sub_district: o.subDistrict,
+          shipping_address: o.shippingAddress || null,
           makro_order_status: o.makroOrderStatus,
           payment_method: o.paymentMethod,
           payment_status: o.paymentStatus,
@@ -201,7 +204,11 @@ export async function getOrder(orderId: string) {
 // Every PO one customer (same phone) has on one ship date, with items and pack
 // photos, for the combined pack page. Ordered by makro_order_no so the first
 // not-yet-packed row is a stable "primary" PO.
-export async function listOrdersForCustomerDay(shipDate: string, phone: string) {
+// One customer's POs for a day: same phone and -- when `name` is given --
+// the same (normalized) customer name, since one owner can run several shops
+// that pack and ship separately (see groupByPhone). A link without a name
+// (older bookmark) keeps the phone-only behavior.
+export async function listOrdersForCustomerDay(shipDate: string, phone: string, name?: string | null) {
   const { data, error } = await supabase
     .from('orders')
     .select('*, order_items(*), evidence_photos(*)')
@@ -209,7 +216,10 @@ export async function listOrdersForCustomerDay(shipDate: string, phone: string) 
     .eq('customer_phone', phone)
     .order('makro_order_no')
   if (error) throw new Error('โหลดออเดอร์ของลูกค้าไม่สำเร็จ: ' + error.message)
-  return (data ?? []) as any[]
+  const rows = (data ?? []) as any[]
+  if (!name) return rows
+  const want = normCustomerName(name)
+  return rows.filter((o) => normCustomerName(o.customer_name_en) === want)
 }
 
 export async function updateOrderStatus(orderId: string, next: OrderStatus) {

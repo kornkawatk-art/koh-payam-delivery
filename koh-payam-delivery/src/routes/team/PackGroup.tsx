@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { Link, useParams, useSearchParams } from 'react-router-dom'
 import { listOrdersForCustomerDay, updateOrderStatus } from '../../lib/api/orders'
 import { savePackGroup, listDistinctPackerNames } from '../../lib/api/pack'
 import { attachEvidencePhoto, removeEvidencePhoto } from '../../lib/api/photos'
@@ -18,6 +18,7 @@ import { PackActionBar, PackItemRow, type ItemState } from './PackOrder'
 import { TotalCount } from '../../components/ui/Stat'
 import { groupedItemRows } from '../../components/ui/ItemGroupHeader'
 import { StickerPrintButton } from '../../components/StickerPrint'
+import { ShippingAddress } from '../../components/ui/ShippingAddress'
 
 const R2 = import.meta.env.VITE_R2_PUBLIC_BASE_URL as string
 
@@ -29,6 +30,10 @@ type TaggedBackorder = BackorderRow & { orderNo: string }
 // first not-yet-packed one); the pack action only touches POs still 'imported'.
 export default function PackGroup() {
   const { date, phone } = useParams()
+  // The shop's Makro name: one owner (one phone) can run several shops that
+  // pack separately. Absent on an old link -> all of that phone's POs.
+  const [search] = useSearchParams()
+  const shopName = search.get('name')
   const [orders, setOrders] = useState<any[] | null>(null)
   const [packedIds, setPackedIds] = useState<Set<string>>(new Set())
   const [backorders, setBackorders] = useState<TaggedBackorder[]>([])
@@ -44,7 +49,7 @@ export default function PackGroup() {
   const [failed, setFailed] = useState(false)
 
   useEffect(() => {
-    listOrdersForCustomerDay(date!, phone!)
+    listOrdersForCustomerDay(date!, phone!, shopName)
       .then((os) => {
         setOrders(os)
         setPackedIds(
@@ -76,7 +81,7 @@ export default function PackGroup() {
     listDistinctPackerNames()
       .then(setPackerNames)
       .catch(() => setPackerNames([]))
-  }, [date, phone])
+  }, [date, phone, shopName])
 
   const packable = useMemo(() => (orders ?? []).filter((o) => o.status === 'imported'), [orders])
   const primary = useMemo(() => pickPrimary(packable), [packable])
@@ -229,6 +234,8 @@ export default function PackGroup() {
           กลับหน้างานวันนี้
         </Link>
       </div>
+
+      <ShippingAddress addresses={orders.map((o) => o.shipping_address)} />
 
       {willReset.length > 0 && (
         <div className="alert alert-warn flex items-start gap-2">

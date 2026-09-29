@@ -257,6 +257,7 @@ test('re-import of an existing order syncs without touching protected columns', 
   expect(patch).toEqual({
     customer_name_en: 'A',
     sub_district: 'เกาะพยาม',
+    shipping_address: 'x', // names the shop, may carry box instructions
     makro_order_status: 'Completed',
     payment_method: 'Pay On Delivery',
     payment_status: 'Unpaid',

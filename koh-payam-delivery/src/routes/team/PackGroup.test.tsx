@@ -97,7 +97,7 @@ beforeEach(() => {
 const renderPage = () =>
   render(
     <MemoryRouter
-      initialEntries={['/customer/2026-10-01/0811111111/pack']}
+      initialEntries={['/customer/2026-10-01/0811111111/pack?name=BLUE%20VIEW']}
       future={{ v7_startTransition: true, v7_relativeSplatPath: true }}
     >
       <Routes>
@@ -119,7 +119,7 @@ const satisfyGate = async () => {
 test('loads by ship date + phone from the URL and merges every PO into one list tagged with its PO number', async () => {
   renderPage()
   await screen.findByText('rice')
-  expect(listOrdersForCustomerDay).toHaveBeenCalledWith('2026-10-01', '0811111111')
+  expect(listOrdersForCustomerDay).toHaveBeenCalledWith('2026-10-01', '0811111111', 'BLUE VIEW')
   expect(screen.getByText('sugar')).toBeInTheDocument()
   expect(screen.getByText('salt')).toBeInTheDocument()
   const ricePO = within(screen.getByText('rice').closest('tr')!).getByText('PO-1')

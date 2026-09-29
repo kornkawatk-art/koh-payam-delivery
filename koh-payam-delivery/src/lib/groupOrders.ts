@@ -10,32 +10,50 @@ export type DayEntry<T extends Groupable> =
   | { kind: 'group'; phone: string; name: string; orders: T[] }
 
 /**
- * Collapse one day's orders into per-customer entries: orders sharing the
- * same non-blank phone (the caller already scoped them to one ship date)
- * become one group; everything else stays a single entry. Entries keep the
- * order in which their first PO appeared; POs inside a group are sorted by
- * order number, which is also how the pack page picks its "primary" PO.
+ * The same customer name however Makro spaced or cased it ("สุวิทย์  เพชร์รัตน์"
+ * with two spaces == "สุวิทย์ เพชร์รัตน์"). Must match the SQL normalization in
+ * 0025_customer_per_shop.sql.
+ */
+export const normCustomerName = (name: string | null | undefined) =>
+  (name ?? '').trim().replace(/\s+/g, ' ').toUpperCase()
+
+/**
+ * Collapse one day's orders into per-customer entries. A customer is a phone
+ * AND a name: one owner (one phone) often runs several shops/resorts, each
+ * with its own Makro account name, and those must pack, label and ship
+ * separately. Orders sharing a non-blank phone and the same (normalized)
+ * name become one group; everything else stays a single entry. Entries keep
+ * the order in which their first PO appeared; POs inside a group are sorted
+ * by order number, which is also how the pack page picks its "primary" PO.
  */
 export function groupByPhone<T extends Groupable>(orders: T[]): DayEntry<T>[] {
-  const byPhone = new Map<string, T[]>()
-  for (const o of orders) {
+  const keyOf = (o: T) => {
     const phone = (o.customer_phone ?? '').trim()
-    if (!phone) continue
-    byPhone.set(phone, [...(byPhone.get(phone) ?? []), o])
+    return phone ? `${phone}|${normCustomerName(o.customer_name_en)}` : ''
+  }
+  const byKey = new Map<string, T[]>()
+  for (const o of orders) {
+    const k = keyOf(o)
+    if (k) byKey.set(k, [...(byKey.get(k) ?? []), o])
   }
   const entries: DayEntry<T>[] = []
   const emitted = new Set<string>()
   for (const o of orders) {
-    const phone = (o.customer_phone ?? '').trim()
-    const members = phone ? byPhone.get(phone)! : null
+    const k = keyOf(o)
+    const members = k ? byKey.get(k)! : null
     if (!members || members.length < 2) {
       entries.push({ kind: 'single', order: o })
       continue
     }
-    if (emitted.has(phone)) continue
-    emitted.add(phone)
+    if (emitted.has(k)) continue
+    emitted.add(k)
     const sorted = [...members].sort((a, b) => a.makro_order_no.localeCompare(b.makro_order_no))
-    entries.push({ kind: 'group', phone, name: sorted[0].customer_name_en, orders: sorted })
+    entries.push({
+      kind: 'group',
+      phone: (o.customer_phone ?? '').trim(),
+      name: sorted[0].customer_name_en,
+      orders: sorted,
+    })
   }
   return entries
 }

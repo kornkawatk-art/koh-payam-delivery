@@ -91,7 +91,14 @@ beforeEach(() => {
 
 const renderPanel = () =>
   render(
-    <PierGroup date="2026-10-01" phone="0811111111" boats={boats} onBack={onBack} onShipped={onShipped} />,
+    <PierGroup
+      date="2026-10-01"
+      phone="0811111111"
+      name="BLUE VIEW"
+      boats={boats}
+      onBack={onBack}
+      onShipped={onShipped}
+    />,
   )
 
 const readyForShip = async () => {
@@ -109,7 +116,7 @@ test('lists only the ready POs, warns about POs still waiting to be packed, and 
   expect(screen.queryByText('PO-4')).not.toBeInTheDocument() // already shipped
   expect(screen.getByText(/อีก 1 ออเดอร์ของลูกค้ารายนี้ยังรอแพ็ค \(PO-3\)/)).toBeInTheDocument()
   expect(screen.getByText(/แพ็ครวมกับ PO-1/)).toBeInTheDocument()
-  expect(listOrdersForCustomerDay).toHaveBeenCalledWith('2026-10-01', '0811111111')
+  expect(listOrdersForCustomerDay).toHaveBeenCalledWith('2026-10-01', '0811111111', 'BLUE VIEW')
 })
 
 test('choosing a boat assigns it to every ready PO at once (and never to waiting/shipped ones)', async () => {

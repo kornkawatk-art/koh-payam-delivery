@@ -422,7 +422,7 @@ function GroupRows({
           <span className="font-medium">{group.name}</span>
           <Link
             className="btn btn-ok btn-sm ml-2"
-            to={`/customer/${date}/${encodeURIComponent(group.phone)}/pack`}
+            to={`/customer/${date}/${encodeURIComponent(group.phone)}/pack?name=${encodeURIComponent(group.name)}`}
           >
             แพ็ครวม
           </Link>

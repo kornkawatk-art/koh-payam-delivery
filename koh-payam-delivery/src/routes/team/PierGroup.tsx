@@ -28,12 +28,15 @@ type Boat = { id: string; name: string }
 export default function PierGroup({
   date,
   phone,
+  name,
   boats,
   onBack,
   onShipped,
 }: {
   date: string
   phone: string
+  /** The shop's Makro name -- one owner's shops ship separately. */
+  name?: string | null
   boats: Boat[]
   onBack: () => void
   onShipped: (message: string) => void
@@ -51,7 +54,7 @@ export default function PierGroup({
   const [busy, setBusy] = useState(false)
 
   useEffect(() => {
-    listOrdersForCustomerDay(date, phone)
+    listOrdersForCustomerDay(date, phone, name)
       .then((os) => {
         setOrders(os)
         setPhotoKeys(
@@ -70,7 +73,7 @@ export default function PierGroup({
     listDistinctPierNames()
       .then(setPierNames)
       .catch(() => setPierNames([]))
-  }, [date, phone])
+  }, [date, phone, name])
 
   const ready = useMemo(() => (orders ?? []).filter((o) => READY.includes(o.status)), [orders])
   const waiting = useMemo(() => (orders ?? []).filter((o) => o.status === 'imported'), [orders])
@@ -109,7 +112,7 @@ export default function PierGroup({
         // Some POs were shipped/changed elsewhere: re-read the truth instead of
         // marking every local PO as on this boat.
         setMsg(flash.warn(`เลือกเรือให้ได้ ${n} จาก ${readyIds.length} ออเดอร์ (บางออเดอร์ถูกส่งไปแล้ว)`))
-        setOrders(await listOrdersForCustomerDay(date, phone))
+        setOrders(await listOrdersForCustomerDay(date, phone, name))
         return
       }
       setOrders((os) =>

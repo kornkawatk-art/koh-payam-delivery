@@ -1,4 +1,4 @@
-import { groupByPhone, entryHasUnpacked, entryOrders, pickPrimary } from './groupOrders'
+import { groupByPhone, entryHasUnpacked, entryOrders, pickPrimary, normCustomerName } from './groupOrders'
 
 const o = (id: string, no: string, name: string, phone: string | null, status = 'imported') => ({
   id,
@@ -68,4 +68,27 @@ test('pickPrimary ignores handoff-only photos and zero counts', () => {
     cand('b'),
   ])
   expect(r?.id).toBe('a') // nothing owns state -> plain first
+})
+
+test('one owner (same phone) with several shops: each shop name is its own customer', () => {
+  const entries = groupByPhone([
+    o('1', 'PO-1', 'เต้ย Ziggy', '0811111111'),
+    o('2', 'PO-2', 'แคท Gympansea', '0811111111'),
+    o('3', 'PO-3', 'เต้ย Ziggy', '0811111111'),
+  ])
+  expect(entries).toHaveLength(2)
+  const ziggy = entries.find((e) => e.kind === 'group')!
+  expect(ziggy.kind === 'group' && ziggy.orders.map((x) => x.id)).toEqual(['1', '3'])
+  expect(entries.find((e) => e.kind === 'single')).toMatchObject({ order: { id: '2' } })
+})
+
+test('Makro spacing/case differences in a name do not split one shop', () => {
+  expect(normCustomerName('  สุวิทย์   เพชร์รัตน์ ')).toBe('สุวิทย์ เพชร์รัตน์')
+  expect(normCustomerName('blue  view')).toBe('BLUE VIEW')
+  const entries = groupByPhone([
+    o('1', 'PO-1', 'สุวิทย์ เพชร์รัตน์', '0822222222'),
+    o('2', 'PO-2', 'สุวิทย์  เพชร์รัตน์', '0822222222'),
+  ])
+  expect(entries).toHaveLength(1)
+  expect(entries[0].kind).toBe('group')
 })
