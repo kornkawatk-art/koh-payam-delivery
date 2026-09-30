@@ -57,3 +57,16 @@ export function nameFontMm(name: string): number {
   const visible = name.replace(COMBINING, '').length || 1
   return Math.max(4, Math.min(13, 46 / (visible * 0.62)))
 }
+
+/** Most boxes/pieces a single order can record; beyond this is a typo. */
+export const MAX_COUNT = 999
+
+/**
+ * A box/piece count from what was typed: a whole number from 0 to MAX_COUNT.
+ * "-1" -> 0, "2.5" -> 2, "" -> 0 -- the database only accepts whole numbers
+ * >= 0 and would otherwise reject the save with an English error.
+ */
+export function toCount(raw: string): number {
+  const n = Math.floor(Number(raw))
+  return Number.isFinite(n) ? Math.min(MAX_COUNT, Math.max(0, n)) : 0
+}

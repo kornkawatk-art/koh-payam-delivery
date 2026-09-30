@@ -7,7 +7,8 @@
 //
 // Auth is done here (config.toml sets verify_jwt = false because customers hit
 // the 'claim' path with no Supabase session):
-//   - scope 'evidence': requires a valid team session in `Authorization: Bearer`
+//   - scope 'evidence': requires a valid session of an ACTIVE team member in
+//                       `Authorization: Bearer`, and an orderId that exists
 //   - scope 'claim'   : requires an order `link_token` whose order is `shipped`
 //                       and still inside the 48h claim window (from `shipped_at`)
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
@@ -44,11 +45,25 @@ Deno.serve(async (req) => {
 
     let folder: string
     if (scope === 'evidence') {
-      const jwt = req.headers.get('Authorization')?.replace('Bearer ', '')
+      const jwt = req.headers.get('Authorization')?.replace(/^Bearer\s+/i, '').trim()
       const { data: u } = await admin.auth.getUser(jwt ?? '')
       if (!u.user) return new Response('unauthorized', { status: 401, headers: cors })
+      // A real session is not enough: a deactivated staff account (or any
+      // newly created account, which starts inactive) must not be able to
+      // mint upload URLs into the public bucket. Mirrors
+      // public.is_team_member() and the same check in send-order-links.
+      const { data: profile } = await admin
+        .from('profiles')
+        .select('is_active')
+        .eq('id', u.user.id)
+        .maybeSingle()
+      if (!profile?.is_active) return new Response('forbidden', { status: 403, headers: cors })
       if (!orderId) return new Response('orderId required', { status: 400, headers: cors })
-      folder = `evidence/${orderId}`
+      // Only real orders get an evidence folder (orderId is used as a key
+      // prefix, so an arbitrary string must not become one).
+      const { data: order } = await admin.from('orders').select('id').eq('id', orderId).maybeSingle()
+      if (!order) return new Response('order not found', { status: 404, headers: cors })
+      folder = `evidence/${order.id}`
     } else if (scope === 'claim') {
       if (!token) return new Response('token required', { status: 400, headers: cors })
       const { data: o } = await admin

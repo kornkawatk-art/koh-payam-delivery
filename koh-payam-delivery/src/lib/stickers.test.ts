@@ -1,4 +1,4 @@
-import { nameFontMm, parseStickerSelection, stickerList } from './stickers'
+import { nameFontMm, parseStickerSelection, stickerList, toCount } from './stickers'
 
 test('one sticker per box and piece, numbered 1..N across all kinds in order', () => {
   const s = stickerList({ paper: 2, foam: 1, piece: 2 })
@@ -34,4 +34,13 @@ test('name size: big for short names, shrinks for long ones, with a floor', () =
   expect(nameFontMm('ก่ก่ก่ก่ก่ก่ก่ก่ก่ก่')).toBe(nameFontMm('กกกกกกกกกก'))
   expect(nameFontMm('ก่ก่ก่ก่ก่ก่ก่ก่ก่ก่')).toBeLessThan(13)
   expect(nameFontMm('X'.repeat(80))).toBe(4)
+})
+
+test('toCount: typed box counts become whole numbers from 0 to 999', () => {
+  expect(toCount('3')).toBe(3)
+  expect(toCount('-1')).toBe(0)
+  expect(toCount('2.7')).toBe(2)
+  expect(toCount('')).toBe(0)
+  expect(toCount('abc')).toBe(0)
+  expect(toCount('100000')).toBe(999)
 })

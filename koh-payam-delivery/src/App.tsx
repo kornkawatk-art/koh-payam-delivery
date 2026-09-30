@@ -1,3 +1,5 @@
+import { Suspense } from 'react'
+import { lazyPage } from './lib/lazyPage'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider, useAuth } from './lib/auth'
 import { canAccess } from './lib/roles'
@@ -5,21 +7,25 @@ import AppShell from './components/AppShell'
 import Login from './routes/team/Login'
 import TwoFactorSetup from './routes/team/TwoFactorSetup'
 import TwoFactorChallenge from './routes/team/TwoFactorChallenge'
-import DailyDashboard from './routes/team/DailyDashboard'
-import ImportOrders from './routes/team/ImportOrders'
-import BoatSetup from './routes/team/BoatSetup'
-import PierLoad from './routes/team/PierLoad'
-import ClaimsQueue from './routes/team/ClaimsQueue'
-import ClaimDetail from './routes/team/ClaimDetail'
-import LineContacts from './routes/team/LineContacts'
-import AuditLog from './routes/team/AuditLog'
-import ShortageReport from './routes/team/ShortageReport'
-import CustomerAliases from './routes/team/CustomerAliases'
-import OrderDetail from './routes/team/OrderDetail'
-import PackOrder from './routes/team/PackOrder'
-import PackGroup from './routes/team/PackGroup'
-import CustomerOrderView from './routes/customer/CustomerOrderView'
-import LineRegister from './routes/customer/LineRegister'
+
+// Every page except login/2FA loads on demand: one 1.6 MB bundle made a
+// customer opening a LINE link download the Excel reader, the QR scanner and
+// every team page first. Each page is now its own chunk.
+const DailyDashboard = lazyPage(() => import('./routes/team/DailyDashboard'))
+const ImportOrders = lazyPage(() => import('./routes/team/ImportOrders'))
+const BoatSetup = lazyPage(() => import('./routes/team/BoatSetup'))
+const PierLoad = lazyPage(() => import('./routes/team/PierLoad'))
+const ClaimsQueue = lazyPage(() => import('./routes/team/ClaimsQueue'))
+const ClaimDetail = lazyPage(() => import('./routes/team/ClaimDetail'))
+const LineContacts = lazyPage(() => import('./routes/team/LineContacts'))
+const AuditLog = lazyPage(() => import('./routes/team/AuditLog'))
+const ShortageReport = lazyPage(() => import('./routes/team/ShortageReport'))
+const CustomerAliases = lazyPage(() => import('./routes/team/CustomerAliases'))
+const OrderDetail = lazyPage(() => import('./routes/team/OrderDetail'))
+const PackOrder = lazyPage(() => import('./routes/team/PackOrder'))
+const PackGroup = lazyPage(() => import('./routes/team/PackGroup'))
+const CustomerOrderView = lazyPage(() => import('./routes/customer/CustomerOrderView'))
+const LineRegister = lazyPage(() => import('./routes/customer/LineRegister'))
 
 const LOADING = (
   <div className="flex min-h-screen items-center justify-center text-sm text-ink-soft">
@@ -50,6 +56,7 @@ export default function App() {
   return (
     <AuthProvider>
       <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+        <Suspense fallback={LOADING}>
         <Routes>
           <Route path="/login" element={<Login />} />
           {/* Customer order link — no team session; the link_token is the only credential. */}
@@ -144,6 +151,7 @@ export default function App() {
           </Route>
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
+        </Suspense>
       </BrowserRouter>
     </AuthProvider>
   )
