@@ -1,10 +1,11 @@
-import { useEffect, useState } from 'react'
+import { Suspense, useEffect, useState } from 'react'
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
 import { List, SignOut } from '@phosphor-icons/react'
 import { useAuth } from '../lib/auth'
 import { NAV, canAccess } from '../lib/roles'
 import { NAV_ACCENT_CLASSES } from '../lib/navAccentStyles'
 import { useAppUpdate } from '../lib/useAppUpdate'
+import { PageSkeleton } from './ui/Skeleton'
 
 export default function AppShell() {
   const { profile, signOut } = useAuth()
@@ -123,7 +124,10 @@ export default function AppShell() {
       {/* Content */}
       <div className="min-w-0 flex-1">
         <main className="container-page py-6 sm:py-8">
-          <Outlet />
+          {/* pages load on demand -- keep the menu up while one arrives */}
+          <Suspense fallback={<PageSkeleton />}>
+            <Outlet />
+          </Suspense>
         </main>
       </div>
 

@@ -36,6 +36,9 @@ export default function DailyDashboard() {
   const [linkSendMsg, setLinkSendMsg] = useState<string>()
 
   const load = useCallback(async () => {
+    // A date picker being cleared/edited passes through '' -- don't query
+    // (or create a ship day) for a blank date; keep what's on screen.
+    if (!date) return
     setFailed(false)
     try {
       setRows(await listOrdersForDay(date))
@@ -45,6 +48,7 @@ export default function DailyDashboard() {
   }, [date])
 
   useEffect(() => {
+    if (!date) return
     let active = true
     listBackordersForDay(date)
       .then((b) => {

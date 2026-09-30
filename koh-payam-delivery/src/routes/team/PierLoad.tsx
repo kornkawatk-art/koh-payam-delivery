@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { getOrCreateShipDay, listOrdersForDay } from '../../lib/api/shipDays'
 import {
   setOrderBoat,
@@ -70,6 +70,9 @@ export default function PierLoad() {
   const [msg, setMsg] = useState<Flash>()
 
   const load = useCallback(() => {
+    // A date picker being cleared/edited passes through '' -- don't query
+    // (or create a ship day) for a blank date; keep what's on screen.
+    if (!date) return
     setFailed(false)
     Promise.all([getOrCreateShipDay(date), listOrdersForDay(date)])
       .then(([day, list]) => {
@@ -100,8 +103,15 @@ export default function PierLoad() {
     }
   }
 
+  // One ship at a time: a second tap mid-ship would run it again and report
+  // an error ("already shipped") right after the first one succeeded.
+  const [shipping, setShipping] = useState(false)
+  const shipInFlight = useRef(false)
+
   async function ship() {
-    if (!sel) return
+    if (!sel || shipInFlight.current) return
+    shipInFlight.current = true
+    setShipping(true)
     setMsg(undefined)
     try {
       await setOrderPierName(sel.id, pierName)
@@ -114,6 +124,9 @@ export default function PierLoad() {
       load()
     } catch (e) {
       setMsg(flash.error((e as Error).message))
+    } finally {
+      shipInFlight.current = false
+      setShipping(false)
     }
   }
 
@@ -355,7 +368,7 @@ export default function PierLoad() {
       <button
         className="btn btn-primary min-h-[3.25rem] w-full text-lg"
         onClick={ship}
-        disabled={!sel.boat_id || photoCount < 1 || photoBusy || !pierName.trim()}
+        disabled={!sel.boat_id || photoCount < 1 || photoBusy || !pierName.trim() || shipping}
       >
         ส่งขึ้นเรือแล้ว
       </button>

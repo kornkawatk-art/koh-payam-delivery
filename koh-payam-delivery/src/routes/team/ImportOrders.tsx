@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type ChangeEvent } from 'react'
+import { useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react'
 import { parseMakroFile, detectFileKind, type RawRow } from '../../lib/import/parseMakroFile'
 import {
   buildImport,
@@ -48,6 +48,11 @@ export default function ImportOrders() {
   const [dateTouched, setDateTouched] = useState(false)
   const [result, setResult] = useState<BuildResult | null>(null)
   const [importMsg, setImportMsg] = useState<string>()
+  // A second tap while an import is running would start a second, concurrent
+  // commitImport -- both could see a PO as "new" and create it twice. The ref
+  // blocks it even before React re-renders the button as disabled.
+  const [importing, setImporting] = useState(false)
+  const importInFlight = useRef(false)
   const [error, setError] = useState<string>()
   // POs in this file that already exist on another ship day (they'll be skipped)
   const [alreadyImported, setAlreadyImported] = useState<OtherDayOrder[]>([])
@@ -132,8 +137,11 @@ export default function ImportOrders() {
   }
 
   async function doImport() {
-    if (!result) return
+    if (!result || importInFlight.current) return
+    importInFlight.current = true
+    setImporting(true)
     setError(undefined)
+    setImportMsg(undefined)
     try {
       const r = await commitImport(shipDate, result.orders)
       setImportMsg(
@@ -142,6 +150,9 @@ export default function ImportOrders() {
       )
     } catch (e) {
       setError((e as Error).message)
+    } finally {
+      importInFlight.current = false
+      setImporting(false)
     }
   }
 
@@ -319,9 +330,9 @@ export default function ImportOrders() {
           <button
             className="btn btn-primary w-full sm:w-auto"
             onClick={doImport}
-            disabled={toImport.length === 0}
+            disabled={toImport.length === 0 || importing}
           >
-            นำเข้า {toImport.length} ออเดอร์
+            {importing ? 'กำลังนำเข้า…' : `นำเข้า ${toImport.length} ออเดอร์`}
           </button>
         </div>
       )}

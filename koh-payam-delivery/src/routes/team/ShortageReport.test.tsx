@@ -244,3 +244,19 @@ test('"วันนี้" fetches just today (from = to) and shows as pressed; 
   expect(from).toBe(to)
   expect(within(periods).getByRole('button', { name: 'วันนี้' })).toHaveAttribute('aria-pressed', 'true')
 })
+
+test('a "from" date after the "to" date is swapped, and a cleared date keeps the last valid one', async () => {
+  renderPage()
+  await screen.findByText('มะพร้าว')
+  const toField = screen.getByLabelText('ถึง') as HTMLInputElement
+  await userEvent.clear(toField)
+  await userEvent.type(toField, '2026-01-31')
+  const fromField = screen.getByLabelText('จาก') as HTMLInputElement
+  await userEvent.clear(fromField) // a blank date never queries
+  await userEvent.type(fromField, '2026-03-01') // after "to" -> swapped
+  expect(getShortageReport).toHaveBeenLastCalledWith('2026-01-31', '2026-03-01')
+  for (const [from, to] of getShortageReport.mock.calls) {
+    expect(from).not.toBe('')
+    expect(to).not.toBe('')
+  }
+})

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { getOrCreateShipDay, sendOrderLinks, setBoats } from '../../lib/api/shipDays'
 import { supabase } from '../../lib/supabase'
 import { Anchor } from '@phosphor-icons/react'
@@ -17,6 +17,9 @@ export default function BoatSetup() {
   const [msg, setMsg] = useState<Flash>()
 
   const load = useCallback(() => {
+    // A date picker being cleared/edited passes through '' -- don't query
+    // (or create a ship day) for a blank date; keep what's on screen.
+    if (!date) return
     setFailed(false)
     getOrCreateShipDay(date)
       .then((d) => {
@@ -49,8 +52,15 @@ export default function BoatSetup() {
     setBoatsState((b) => b.filter((x) => x.id !== id))
   }
 
+  // Saving also sends the customers' LINE links: a second tap mid-save must
+  // not start a second send.
+  const [saving, setSaving] = useState(false)
+  const saveInFlight = useRef(false)
+
   async function save() {
-    if (!shipDayId) return
+    if (!shipDayId || saveInFlight.current) return
+    saveInFlight.current = true
+    setSaving(true)
     setMsg(undefined)
     try {
       await setBoats(shipDayId, boats)
@@ -70,6 +80,9 @@ export default function BoatSetup() {
       setMsg(linksFailed ? flash.warn(text) : flash.ok(text))
     } catch {
       setMsg(flash.error('บันทึกรายการเรือไม่สำเร็จ ลองใหม่อีกครั้ง'))
+    } finally {
+      saveInFlight.current = false
+      setSaving(false)
     }
   }
 
@@ -136,8 +149,8 @@ export default function BoatSetup() {
       </div>
 
       <div className="flex items-center gap-3">
-        <button className="btn btn-primary" onClick={save}>
-          บันทึก
+        <button className="btn btn-primary" onClick={save} disabled={saving}>
+          {saving ? 'กำลังบันทึก…' : 'บันทึก'}
         </button>
         <Notice flash={msg} />
       </div>

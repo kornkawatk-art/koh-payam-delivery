@@ -39,6 +39,10 @@ function daysAgo(n: number): string {
 
 type Preset = { id: string; label: string; range: () => [string, string] }
 
+// A cleared date field is ignored (keeps the last valid date); a "from" after
+// the "to" is swapped rather than silently returning an empty report.
+const ordered = (a: string, b: string): [string, string] => (a <= b ? [a, b] : [b, a])
+
 const PRESETS: Preset[] = [
   { id: 'today', label: 'วันนี้', range: () => [daysAgo(0), daysAgo(0)] },
   { id: '7d', label: '7 วัน', range: () => [daysAgo(6), daysAgo(0)] },
@@ -80,12 +84,17 @@ export default function ShortageReport() {
   // A range change keeps the previous report on screen (faded) until the new
   // one lands -- no skeleton flash or layout jump. Only the first load shows
   // a skeleton. Responses that arrive out of order are ignored.
+  // The range actually queried: a "from" after the "to" is swapped, and a
+  // half-edited (blank) date doesn't query at all.
+  const [rangeFrom, rangeTo] = ordered(fromDate, toDate)
+
   const load = useCallback(() => {
+    if (!rangeFrom || !rangeTo) return Promise.resolve()
     const req = ++latest.current
     setFailed(false)
     setLoading(true)
     setOpenKey(null)
-    return getShortageReport(fromDate, toDate)
+    return getShortageReport(rangeFrom, rangeTo)
       .then((r) => {
         if (req === latest.current) setReport(r)
       })
@@ -95,7 +104,7 @@ export default function ShortageReport() {
       .finally(() => {
         if (req === latest.current) setLoading(false)
       })
-  }, [fromDate, toDate])
+  }, [rangeFrom, rangeTo])
 
   useEffect(() => {
     void load()
@@ -121,15 +130,15 @@ export default function ShortageReport() {
 
   const bars = useMemo(() => (report ? deptBars(report) : []), [report])
   const trend = useMemo(
-    () => (report ? shortageTrend(report, fromDate, toDate) : null),
-    [report, fromDate, toDate],
+    () => (report ? shortageTrend(report, rangeFrom, rangeTo) : null),
+    [report, rangeFrom, rangeTo],
   )
 
   async function exportExcel() {
     if (!report) return
     setExportMsg(undefined)
     try {
-      await downloadShortageExcel(report, fromDate, toDate)
+      await downloadShortageExcel(report, rangeFrom, rangeTo)
     } catch (e) {
       setExportMsg(flash.error('ดาวน์โหลด Excel ไม่สำเร็จ: ' + (e as Error).message))
     }
@@ -217,7 +226,7 @@ export default function ShortageReport() {
 
           <div className="grid gap-4 lg:grid-cols-2">
             <DeptBarChart bars={bars} active={deptFilter} onSelect={setDeptFilter} />
-            {trend && <TrendColumnChart key={`${fromDate}_${toDate}`} trend={trend} />}
+            {trend && <TrendColumnChart key={`${rangeFrom}_${rangeTo}`} trend={trend} />}
           </div>
 
           <div
@@ -248,8 +257,8 @@ export default function ShortageReport() {
               <DeptSection
                 key={g.code}
                 group={g}
-                from={fromDate}
-                to={toDate}
+                from={rangeFrom}
+                to={rangeTo}
                 maxCount={maxCount}
                 openKey={openKey}
                 onToggle={(k) => setOpenKey((cur) => (cur === k ? null : k))}

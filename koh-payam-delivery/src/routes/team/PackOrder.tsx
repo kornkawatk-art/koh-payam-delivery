@@ -16,6 +16,7 @@ import { TotalCount } from '../../components/ui/Stat'
 import { groupedItemRows } from '../../components/ui/ItemGroupHeader'
 import { StickerPrintButton } from '../../components/StickerPrint'
 import { ShippingAddress } from '../../components/ui/ShippingAddress'
+import { MAX_COUNT, toCount } from '../../lib/stickers'
 
 const R2 = import.meta.env.VITE_R2_PUBLIC_BASE_URL as string
 
@@ -222,9 +223,12 @@ export default function PackOrder() {
             <input
               type="number"
               min={0}
+              max={MAX_COUNT}
+              step={1}
+              inputMode="numeric"
               className="w-24"
               value={paper}
-              onChange={(e) => setPaper(+e.target.value)}
+              onChange={(e) => setPaper(toCount(e.target.value))}
               onFocus={(e) => e.target.select()}
             />
           </label>
@@ -233,9 +237,12 @@ export default function PackOrder() {
             <input
               type="number"
               min={0}
+              max={MAX_COUNT}
+              step={1}
+              inputMode="numeric"
               className="w-24"
               value={foam}
-              onChange={(e) => setFoam(+e.target.value)}
+              onChange={(e) => setFoam(toCount(e.target.value))}
               onFocus={(e) => e.target.select()}
             />
           </label>
@@ -244,9 +251,12 @@ export default function PackOrder() {
             <input
               type="number"
               min={0}
+              max={MAX_COUNT}
+              step={1}
+              inputMode="numeric"
               className="w-24"
               value={piece}
-              onChange={(e) => setPiece(+e.target.value)}
+              onChange={(e) => setPiece(toCount(e.target.value))}
               onFocus={(e) => e.target.select()}
             />
           </label>
