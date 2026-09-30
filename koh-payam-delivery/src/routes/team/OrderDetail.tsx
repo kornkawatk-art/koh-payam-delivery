@@ -54,6 +54,10 @@ export default function OrderDetail() {
   const photos: any[] = order.evidence_photos ?? []
   const packPhotos = photos.filter((p) => p.stage === 'pack')
   const handoffPhotos = photos.filter((p) => p.stage !== 'pack')
+  // Items short on an EARLIER order of this customer that ride along with
+  // this one. They are not in this order's item list, so without this box
+  // the dashboard's "ของค้างส่ง" link lands on a page that never mentions them.
+  const owedHere = backorders.filter((b) => b.target_order_id === id && b.status === 'pending')
 
   async function regen() {
     setBusy(true)
@@ -125,6 +129,23 @@ export default function OrderDetail() {
         </dl>
       </section>
       <ShippingAddress addresses={[order.shipping_address]} />
+
+      {owedHere.length > 0 && (
+        <div className="alert alert-warn">
+          <p className="flex items-center gap-1.5 font-semibold">
+            <Warning size={16} weight="fill" aria-hidden="true" />
+            ของค้างส่งจากออเดอร์ก่อนหน้า — ต้องแพ็คเพิ่มไปกับออเดอร์นี้
+          </p>
+          <ul className="mt-1.5 list-disc pl-5">
+            {owedHere.map((b) => (
+              <li key={b.id}>
+                {b.product_name} x{b.qty}
+              </li>
+            ))}
+          </ul>
+          <p className="mt-1 text-sm">ไม่อยู่ในรายการสินค้าด้านล่าง เพราะเป็นของที่ขาดจากรอบก่อน</p>
+        </div>
+      )}
 
       {order.packed_with?.makro_order_no && (
         <p className="alert alert-info">
@@ -251,9 +272,11 @@ export default function OrderDetail() {
           <ul className="mt-1 flex flex-col gap-1 text-ink-soft">
             {backorders.map((b) => (
               <li key={b.id}>
-                {b.product_name} x{b.qty} · {b.reason} · {b.status}
-                {b.source_order_id === id ? ' (ต้นทาง)' : ''}
-                {b.target_order_id === id ? ' (ปลายทาง)' : ''}
+                {b.product_name} x{b.qty} ·{' '}
+                {b.reason === 'claim_resend' ? 'ส่งชดเชยเคลม' : 'ของขาด'} ·{' '}
+                {b.status === 'fulfilled' ? 'ส่งแล้ว' : 'รอส่ง'}
+                {b.source_order_id === id ? ' (ขาดจากออเดอร์นี้)' : ''}
+                {b.target_order_id === id ? ' (ส่งไปกับออเดอร์นี้)' : ''}
               </li>
             ))}
           </ul>

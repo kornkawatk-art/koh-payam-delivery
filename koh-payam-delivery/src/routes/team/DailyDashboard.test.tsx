@@ -163,7 +163,7 @@ test('shows a pending-backorder banner linking to the destination order', async 
     },
   ])
   renderPage()
-  expect(await screen.findByText('ของค้างส่ง 1 รายการรอส่งวันนี้')).toBeInTheDocument()
+  expect(await screen.findByText('ของค้างส่งจากรอบก่อน 1 รายการ ต้องแพ็คเพิ่มวันนี้')).toBeInTheDocument()
   expect(screen.getByRole('link', { name: /rice x2/ })).toHaveAttribute('href', '/order/1')
 })
 
