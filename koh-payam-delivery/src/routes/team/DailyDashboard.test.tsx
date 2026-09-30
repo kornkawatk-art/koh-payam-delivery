@@ -149,22 +149,25 @@ test('order number links through to the order detail route', async () => {
   expect(link).toHaveAttribute('href', '/order/1')
 })
 
-test('shows a pending-backorder banner linking to the destination order', async () => {
-  listBackordersForDay.mockResolvedValueOnce([
+test("lists only this day's short lines, each linking to its order", async () => {
+  vi.mocked(listOrdersForDay).mockResolvedValueOnce([
     {
-      id: 'b1',
-      source_order_id: 's1',
-      reason: 'shortage',
-      product_name: 'rice',
-      qty: 2,
-      target_ship_date: '2026-10-01',
-      target_order_id: '1',
-      status: 'pending',
+      id: '1',
+      makro_order_no: 'PO-1',
+      customer_name_en: 'BLUE VIEW',
+      status: 'imported',
+      item_statuses: [
+        { status: 'ok', product_name: 'rice', qty_ordered: 2, qty_shipped: 2, shortage_qty: 0 },
+        { status: 'short', product_name: 'coconut', qty_ordered: 1, qty_shipped: 0, shortage_qty: 0 },
+        { status: 'short', product_name: 'chili', qty_ordered: 5, qty_shipped: 2, shortage_qty: 3 },
+      ],
     },
   ])
   renderPage()
-  expect(await screen.findByText('ของค้างส่งจากรอบก่อน 1 รายการ ต้องแพ็คเพิ่มวันนี้')).toBeInTheDocument()
-  expect(screen.getByRole('link', { name: /rice x2/ })).toHaveAttribute('href', '/order/1')
+  expect(await screen.findByText('ของขาดวันนี้ 2 รายการ')).toBeInTheDocument()
+  expect(screen.getByRole('link', { name: 'coconut x1' })).toHaveAttribute('href', '/order/1')
+  expect(screen.getByRole('link', { name: 'chili x3' })).toHaveAttribute('href', '/order/1')
+  expect(screen.queryByRole('link', { name: /rice/ })).not.toBeInTheDocument()
 })
 
 test('the "รวม" column sums paper + foam + piece counts', async () => {

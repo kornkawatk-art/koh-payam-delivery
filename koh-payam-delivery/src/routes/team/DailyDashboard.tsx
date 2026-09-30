@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { listOrdersForDay, getShipDayLinksSentAt, sendOrderLinks } from '../../lib/api/shipDays'
-import { listBackordersForDay, type BackorderRow } from '../../lib/api/backorders'
 import { supabase } from '../../lib/supabase'
 import {
   House,
@@ -27,7 +26,6 @@ export default function DailyDashboard() {
   const [date, setDate] = useState(todayLocalISO())
   const [rows, setRows] = useState<any[] | null>(null)
   const [failed, setFailed] = useState(false)
-  const [backorders, setBackorders] = useState<BackorderRow[]>([])
   const [q, setQ] = useState('')
   const [scanOpen, setScanOpen] = useState(false)
   // undefined = not loaded yet (don't flash the banner while unknown)
@@ -44,21 +42,6 @@ export default function DailyDashboard() {
       setRows(await listOrdersForDay(date))
     } catch {
       setFailed(true)
-    }
-  }, [date])
-
-  useEffect(() => {
-    if (!date) return
-    let active = true
-    listBackordersForDay(date)
-      .then((b) => {
-        if (active) setBackorders(b)
-      })
-      .catch(() => {
-        if (active) setBackorders([])
-      })
-    return () => {
-      active = false
     }
   }, [date])
 
@@ -159,6 +142,24 @@ export default function DailyDashboard() {
         </button>
       </div>
     )
+
+  // Lines Makro under-shipped on THIS day's orders (not older carry-over --
+  // that shows on the order and pack pages of the order it rides with).
+  const todayShort = (rows ?? []).flatMap((o: any) =>
+    (o.item_statuses ?? [])
+      .filter((i: any) => i.status === 'short')
+      .map((i: any, n: number) => ({
+        key: `${o.id}:${n}`,
+        orderId: o.id as string,
+        customerName: o.customer_name_en as string,
+        productName: i.product_name as string,
+        qty:
+          Number(i.shortage_qty) > 0
+            ? Number(i.shortage_qty)
+            : Math.max(0, Number(i.qty_ordered) - Number(i.qty_shipped)),
+      })),
+  )
+
   if (!rows) return <PageSkeleton rows={6} />
 
   return (
@@ -235,27 +236,19 @@ export default function DailyDashboard() {
         </div>
       )}
 
-      {backorders.length > 0 && (
+      {todayShort.length > 0 && (
         <div className="alert alert-warn">
           <p className="flex items-center gap-1.5 font-semibold">
             <Warning size={16} weight="fill" aria-hidden="true" />
-            ของค้างส่งจากรอบก่อน {backorders.length} รายการ ต้องแพ็คเพิ่มวันนี้
-          </p>
-          <p className="mt-0.5 text-sm">
-            ของที่ขาดจากออเดอร์ก่อนหน้า ส่งไปกับออเดอร์วันนี้ของลูกค้าคนเดิม — กดเพื่อดูออเดอร์ที่ต้องแพ็คเพิ่ม
+            ของขาดวันนี้ {todayShort.length} รายการ
           </p>
           <ul className="mt-1.5 list-disc pl-5">
-            {backorders.map((b) => (
-              <li key={b.id}>
-                {b.target_order_id ? (
-                  <Link className="link" to={`/order/${b.target_order_id}`}>
-                    {b.product_name} x{b.qty}
-                  </Link>
-                ) : (
-                  <span>
-                    {b.product_name} x{b.qty}
-                  </span>
-                )}
+            {todayShort.map((s) => (
+              <li key={s.key}>
+                <Link className="link" to={`/order/${s.orderId}`}>
+                  {s.productName} x{s.qty}
+                </Link>
+                <span className="text-sm"> · {s.customerName}</span>
               </li>
             ))}
           </ul>
