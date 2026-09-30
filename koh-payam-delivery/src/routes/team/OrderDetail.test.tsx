@@ -285,3 +285,17 @@ test('items carry a running number that continues from ของสด into ข�
   expect(screen.getByText('ของสด (2)').closest('tr')).toHaveClass('item-group-fresh')
   expect(screen.getByText('ของแห้ง (1)').closest('tr')).toHaveClass('item-group-dry')
 })
+
+test('items owed from an earlier order are called out as extra to pack, not mixed with this order', async () => {
+  listRelatedBackordersForOrder.mockResolvedValue([
+    // owed here from an earlier order -> highlighted
+    { id: 'b1', source_order_id: 'old', reason: 'shortage', product_name: 'พริกขี้หนู', qty: 2, target_ship_date: '2026-10-01', target_order_id: 'ord1', status: 'pending' },
+    // short on THIS order, owed to a later one -> not "extra to pack here"
+    { id: 'b2', source_order_id: 'ord1', reason: 'shortage', product_name: 'มะพร้าว', qty: 1, target_ship_date: null, target_order_id: null, status: 'pending' },
+  ])
+  renderPage()
+  const box = (await screen.findByText(/ต้องแพ็คเพิ่มไปกับออเดอร์นี้/)).closest('.alert') as HTMLElement
+  expect(box).toHaveTextContent('พริกขี้หนู x2')
+  expect(box).not.toHaveTextContent('มะพร้าว')
+  expect(screen.getByText(/มะพร้าว x1 · ของขาด · รอส่ง \(ขาดจากออเดอร์นี้\)/)).toBeInTheDocument()
+})

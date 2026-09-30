@@ -239,7 +239,10 @@ export default function DailyDashboard() {
         <div className="alert alert-warn">
           <p className="flex items-center gap-1.5 font-semibold">
             <Warning size={16} weight="fill" aria-hidden="true" />
-            ของค้างส่ง {backorders.length} รายการรอส่งวันนี้
+            ของค้างส่งจากรอบก่อน {backorders.length} รายการ ต้องแพ็คเพิ่มวันนี้
+          </p>
+          <p className="mt-0.5 text-sm">
+            ของที่ขาดจากออเดอร์ก่อนหน้า ส่งไปกับออเดอร์วันนี้ของลูกค้าคนเดิม — กดเพื่อดูออเดอร์ที่ต้องแพ็คเพิ่ม
           </p>
           <ul className="mt-1.5 list-disc pl-5">
             {backorders.map((b) => (
