@@ -273,3 +273,17 @@ test('an order without fresh/dry data stays one numbered list (no group headers)
   expect(screen.queryByText(/Fresh \(/)).not.toBeInTheDocument()
   expect(container.querySelectorAll('td.row-no')).toHaveLength(2)
 })
+
+test("the header names the order's own island, not always Koh Payam", async () => {
+  fetchMock.mockResolvedValue(ok({ ...payload, island: 'chang' }))
+  renderAt()
+  expect(await screen.findByText('Koh Chang')).toBeInTheDocument()
+  expect(screen.queryByText('Koh Payam')).not.toBeInTheDocument()
+})
+
+test('an order whose island is not picked yet gets a neutral header', async () => {
+  fetchMock.mockResolvedValue(ok({ ...payload, island: null }))
+  renderAt()
+  await screen.findByText(/PO-1001/)
+  expect(screen.getByText('Order tracking')).toBeInTheDocument()
+})

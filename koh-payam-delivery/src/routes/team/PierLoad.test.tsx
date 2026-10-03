@@ -60,6 +60,7 @@ const orders = [
     id: 'o1',
     makro_order_no: 'PO-1',
     customer_name_en: 'BLUE VIEW',
+    island: 'payam',
     status: 'packed',
     boat_id: null,
     paper_box_count: 2,
@@ -74,6 +75,7 @@ const orders = [
     id: 'o2',
     makro_order_no: 'PO-2',
     customer_name_en: 'RED SUN',
+    island: 'payam',
     status: 'shipped',
     boat_id: null,
     paper_box_count: 0,
@@ -411,4 +413,26 @@ test('"ส่งขึ้นเรือแล้ว" stays locked without a pie
   await userEvent.clear(name)
   expect(ship).toBeDisabled()
   expect(screen.getByText('ต้องกรอกชื่อคนลงเรือก่อนกดส่งขึ้นเรือแล้ว')).toBeInTheDocument()
+})
+
+test('an order with no island yet cannot ship, and says a manager must pick it', async () => {
+  listOrdersForDay.mockReset().mockResolvedValue([{ ...orders[0], island: null }])
+  render(<PierLoad />)
+  await userEvent.click(await screen.findByRole('button', { name: /PO-1/ }))
+  await userEvent.click(screen.getByRole('button', { name: 'เรือ 2' }))
+  await userEvent.click(screen.getByRole('button', { name: 'mock-upload' }))
+  expect(screen.getByRole('button', { name: 'ส่งขึ้นเรือแล้ว' })).toBeDisabled()
+  expect(screen.getByText(/ยังไม่ระบุเกาะ — ให้หัวหน้าเลือกเกาะ/)).toBeInTheDocument()
+})
+
+test('a day with two islands gets island chips that filter the list', async () => {
+  listOrdersForDay.mockReset().mockResolvedValue([
+    orders[0],
+    { ...orders[0], id: 'o3', makro_order_no: 'PO-3', customer_name_en: 'CHANG HUT', island: 'chang', customer_phone: '0999' },
+  ])
+  render(<PierLoad />)
+  expect(await screen.findByRole('button', { name: /PO-3/ })).toBeInTheDocument()
+  await userEvent.click(screen.getByRole('button', { name: 'เกาะช้าง' }))
+  expect(screen.queryByRole('button', { name: /PO-1/ })).not.toBeInTheDocument()
+  expect(screen.getByRole('button', { name: /PO-3/ })).toBeInTheDocument()
 })

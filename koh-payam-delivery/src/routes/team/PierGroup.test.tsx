@@ -56,6 +56,7 @@ const po = (id: string, no: string, status: string, extra: object = {}) => ({
   id,
   makro_order_no: no,
   customer_name_en: 'BLUE VIEW',
+  island: 'payam',
   status,
   boat_id: null,
   paper_box_count: 0,

@@ -281,6 +281,7 @@ export default function PackOrder() {
           {/* saves the counts first, so the stickers match what's recorded */}
           <StickerPrintButton
             customer={order}
+            island={order.island}
             counts={{ paper, foam, piece }}
             beforePrint={async () => {
               await savePack(packInput())

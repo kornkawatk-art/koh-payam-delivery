@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { Printer, X } from '@phosphor-icons/react'
 import { nameFontMm, parseStickerSelection, stickerList, type Sticker } from '../lib/stickers'
+import { islandName } from '../lib/islands'
 import {
   getShortName,
   saveShortName,
@@ -11,10 +12,16 @@ import {
 
 type Counts = { paper: number; foam: number; piece: number }
 
-/** One 50 x 30 mm sticker: the customer's short name, then "3 / 29 · ลังโฟม". */
-function StickerFace({ name, s }: { name: string; s: Sticker }) {
+/**
+ * One 50 x 30 mm sticker: the island (small, so boat crews load the right
+ * boat -- left off while the order's island is still unpicked), the
+ * customer's short name, then "3 / 29 · ลังโฟม".
+ */
+function StickerFace({ name, s, island }: { name: string; s: Sticker; island?: unknown }) {
+  const where = islandName(island)
   return (
     <div className="sticker">
+      {where && <div className="sticker-island">{where}</div>}
       <div className="sticker-name" style={{ fontSize: `${nameFontMm(name)}mm` }}>
         {name}
       </div>
@@ -35,12 +42,14 @@ function StickerFace({ name, s }: { name: string; s: Sticker }) {
  */
 export function StickerPrintButton({
   customer,
+  island,
   counts,
   beforePrint,
   disabled,
   className = 'btn btn-secondary w-full sm:w-fit',
 }: {
   customer: CustomerRef
+  island?: unknown
   counts: Counts
   beforePrint?: () => Promise<void>
   disabled?: boolean
@@ -62,6 +71,7 @@ export function StickerPrintButton({
       {open && (
         <StickerPrintDialog
           customer={customer}
+          island={island}
           counts={counts}
           beforePrint={beforePrint}
           onClose={() => setOpen(false)}
@@ -73,11 +83,13 @@ export function StickerPrintButton({
 
 export function StickerPrintDialog({
   customer,
+  island,
   counts,
   beforePrint,
   onClose,
 }: {
   customer: CustomerRef
+  island?: unknown
   counts: Counts
   beforePrint?: () => Promise<void>
   onClose: () => void
@@ -174,7 +186,7 @@ export function StickerPrintDialog({
           <div className="flex flex-col items-center gap-1.5">
             <span className="text-xs text-ink-faint">ตัวอย่าง (ขนาดจริง 50×30 มม.)</span>
             <div className="sticker-preview">
-              <StickerFace name={trimmed} s={all[0]} />
+              <StickerFace name={trimmed} s={all[0]} island={island} />
             </div>
           </div>
         )}
@@ -227,7 +239,7 @@ export function StickerPrintDialog({
             {/* page size only while stickers print, so nothing else is affected */}
             <style>{'@page { size: 50mm 30mm; margin: 0; }'}</style>
             {printing.map((s) => (
-              <StickerFace key={s.no} name={trimmed} s={s} />
+              <StickerFace key={s.no} name={trimmed} s={s} island={island} />
             ))}
           </div>,
           document.body,

@@ -2,6 +2,7 @@ import { supabase } from '../supabase'
 import { getOrCreateShipDay } from './shipDays'
 import { linkBackordersToDay, syncShortageBackorders } from './backorders'
 import { logAction } from './audit'
+import type { Island } from '../islands'
 import { makeLinkToken } from '../token'
 import type { ParsedOrder } from '../import/buildImport'
 import { itemRow, planItemSync, type ExistingItem } from '../import/itemSync'
@@ -91,6 +92,7 @@ export async function commitImport(
           payment_status: o.paymentStatus,
           outstanding_amount: o.outstandingAmount,
           customer_phone: o.customerPhone,
+          island: o.island,
         })
         .select('id')
         .single()
@@ -237,6 +239,19 @@ export async function updateOrderStatus(orderId: string, next: OrderStatus) {
   const { error: e2 } = await supabase.from('orders').update({ status: next }).eq('id', orderId)
   if (e2) throw new Error(e2.message)
   await logAction('status_change', 'order', orderId, { from: (cur as any).status, to: next })
+}
+
+// A manager fixes (or, for a pier-only address, first sets) which island an
+// order goes to. Never touched by a re-import, so this choice sticks.
+export async function setOrderIsland(orderId: string, island: Island) {
+  const { data, error } = await supabase
+    .from('orders')
+    .update({ island })
+    .eq('id', orderId)
+    .select('id')
+  if (error) throw new Error('บันทึกเกาะไม่สำเร็จ: ' + error.message)
+  if (!data || data.length === 0) throw new Error('บันทึกเกาะไม่สำเร็จ (ไม่พบออเดอร์)')
+  await logAction('island_set', 'order', orderId, { island })
 }
 
 export async function setOrderBoat(orderId: string, boatId: string) {

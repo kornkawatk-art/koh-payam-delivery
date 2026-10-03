@@ -370,6 +370,7 @@ export default function PackGroup() {
             {/* one numbered set for the whole customer, saved first */}
             <StickerPrintButton
               customer={primary}
+              island={primary.island}
               counts={{ paper, foam, piece }}
               beforePrint={async () => {
                 await savePackGroup(packInput())

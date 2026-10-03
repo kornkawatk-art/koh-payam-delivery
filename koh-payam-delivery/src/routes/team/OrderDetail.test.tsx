@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Routes, Route } from 'react-router-dom'
 import OrderDetail from './OrderDetail'
@@ -7,12 +7,14 @@ const getOrder = vi.fn()
 const regenTokenLink = vi.fn().mockResolvedValue('o_new')
 const deleteOrder = vi.fn().mockResolvedValue(undefined)
 const listRelatedBackordersForOrder = vi.fn().mockResolvedValue([])
+const setOrderIsland = vi.fn().mockResolvedValue(undefined)
 const useAuthMock = vi.fn()
 
 vi.mock('../../lib/api/orders', () => ({
   getOrder: (...a: unknown[]) => getOrder(...a),
   regenTokenLink: (...a: unknown[]) => regenTokenLink(...a),
   deleteOrder: (...a: unknown[]) => deleteOrder(...a),
+  setOrderIsland: (...a: unknown[]) => setOrderIsland(...a),
 }))
 vi.mock('../../lib/api/backorders', () => ({
   listRelatedBackordersForOrder: (...a: unknown[]) => listRelatedBackordersForOrder(...a),
@@ -29,6 +31,7 @@ const order = {
   status: 'imported',
   link_token: 'o_test123',
   sub_district: 'เกาะพยาม',
+  island: 'payam',
   paper_box_count: 2,
   foam_box_count: 1,
   piece_count: 3,
@@ -298,4 +301,21 @@ test('items owed from an earlier order are called out as extra to pack, not mixe
   expect(box).toHaveTextContent('พริกขี้หนู x2')
   expect(box).not.toHaveTextContent('มะพร้าว')
   expect(screen.getByText(/มะพร้าว x1 · ของขาด · รอส่ง \(ขาดจากออเดอร์นี้\)/)).toBeInTheDocument()
+})
+
+test('"ส่งที่" shows the island; a manager can switch it', async () => {
+  renderPage()
+  const summary = await screen.findByRole('region', { name: 'สรุปการจัดส่ง' })
+  expect(within(summary).getByText('เกาะพยาม')).toBeInTheDocument()
+  await userEvent.selectOptions(screen.getByRole('combobox', { name: 'เกาะที่ส่ง' }), 'chang')
+  expect(setOrderIsland).toHaveBeenCalledWith('ord1', 'chang')
+})
+
+test('an untagged order warns; a packer sees who must pick, with no picker', async () => {
+  getOrder.mockResolvedValue({ ...order, island: null })
+  useAuthMock.mockReturnValue({ profile: { id: 'u2', name: 'แพ็ค', role: 'packer' } })
+  renderPage()
+  expect(await screen.findByText(/ให้หัวหน้าเลือกเกาะก่อนส่งขึ้นเรือ/)).toBeInTheDocument()
+  expect(screen.getAllByText('ยังไม่ระบุเกาะ').length).toBeGreaterThan(0)
+  expect(screen.queryByRole('combobox', { name: 'เกาะที่ส่ง' })).not.toBeInTheDocument()
 })

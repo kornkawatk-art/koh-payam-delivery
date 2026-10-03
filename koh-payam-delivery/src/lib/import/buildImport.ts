@@ -1,4 +1,5 @@
 import type { RawRow } from './parseMakroFile'
+import type { Island } from '../islands'
 
 // --- Mapping shapes -------------------------------------------------------------
 
@@ -132,14 +133,16 @@ export type ParsedOrder = {
   paymentStatus: string | null
   outstandingAmount: number
   customerPhone: string | null
+  // null = the address only names the shared Paknam pier; a manager picks.
+  island: Island | null
   items: ParsedItem[]
 }
 
 export type BuildResult = {
-  orders: ParsedOrder[] // เฉพาะพยาม + มีรายการ
-  skippedNoItems: string[] // พยามใน B แต่ไม่มีใน A
+  orders: ParsedOrder[] // เฉพาะออเดอร์เกาะ + มีรายการ
+  skippedNoItems: string[] // ออเดอร์เกาะใน B แต่ไม่มีใน A
   skippedNotDirect: string[] // เลข PO ลงท้าย B = ไม่ได้ส่งจากแม็คโครโดยตรง
-  skippedNotPayam: number // นับ order ที่ไม่ใช่พยาม
+  skippedNotIsland: number // นับ order ที่ไม่ใช่ส่งเกาะ
   cancelledLinesDropped: number
   shippedAllZero: boolean // true ถ้าทุกบรรทัด shippedQty==0 -> UI เตือน
 }
@@ -201,6 +204,31 @@ export function isPayam(o: { subDistrict: string; shippingAddress: string }): bo
   )
 }
 
+// Koh Chang (Ranong) sits in ตำบลปากน้ำ alongside plenty of mainland
+// addresses, so -- like Payam's บางนอน case -- only the island's name in the
+// address is trusted, never the sub-district.
+const CHANG_NAME = /เกาะช้าง|ko\s*h?\s*chang/i
+// Boats to BOTH islands leave from the Paknam municipal pier, so an address
+// that names only the pier can't say which island (and might even be a
+// mainland customer near it): import it untagged for a manager to decide.
+const PAKNAM_PIER = /ท่าเรือ\s*เทศบาล\s*(?:ตำบล\s*)?ปากน้ำ/
+
+/**
+ * Which island an order goes to: an island, 'unknown' (pier only -- import
+ * it, a manager picks), or null (not an island order -- skip). Payam is
+ * checked first, so an address naming Payam always wins.
+ */
+export function classifyIsland(o: {
+  subDistrict: string
+  shippingAddress: string
+}): Island | 'unknown' | null {
+  if (isPayam(o)) return 'payam'
+  const text = `${o.subDistrict ?? ''} ${o.shippingAddress ?? ''}`
+  if (CHANG_NAME.test(text)) return 'chang'
+  if (PAKNAM_PIER.test(text)) return 'unknown'
+  return null
+}
+
 export function validateMapping(
   kind: 'detail' | 'order',
   headers: string[],
@@ -233,16 +261,17 @@ export function buildImport(
   dm: DetailMapping,
   om: OrderMapping,
 ): BuildResult {
-  // 1. index order rows by orderNo, keep only พยาม
+  // 1. index order rows by orderNo, keep only island orders
   const payamOrders = new Map<string, ParsedOrder>()
-  let skippedNotPayam = 0
+  let skippedNotIsland = 0
   for (const r of orderRows) {
     const orderNo = (r[om.orderNo] ?? '').trim()
     if (!orderNo) continue
     const subDistrict = (r[om.subDistrict] ?? '').trim()
     const shippingAddress = (r[om.shippingAddress] ?? '').trim()
-    if (!isPayam({ subDistrict, shippingAddress })) {
-      skippedNotPayam++
+    const island = classifyIsland({ subDistrict, shippingAddress })
+    if (!island) {
+      skippedNotIsland++
       continue
     }
     const makroOrderStatus = om.orderStatus ? (r[om.orderStatus] ?? '').trim() : ''
@@ -260,6 +289,7 @@ export function buildImport(
       paymentStatus: paymentStatus || null,
       outstandingAmount: om.outstandingAmount ? toNum(r[om.outstandingAmount]) : 0,
       customerPhone: customerPhone || null,
+      island: island === 'unknown' ? null : island,
       items: [],
     })
   }
@@ -349,7 +379,7 @@ export function buildImport(
     orders,
     skippedNoItems,
     skippedNotDirect,
-    skippedNotPayam,
+    skippedNotIsland,
     cancelledLinesDropped,
     shippedAllZero,
   }

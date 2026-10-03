@@ -9,6 +9,7 @@ import { StatTile, InfoItem } from '../../components/ui/Stat'
 import { AmountDue } from '../../components/ui/AmountDue'
 import { groupedItemRows } from '../../components/ui/ItemGroupHeader'
 import { formatDate, formatDateTime } from '../../lib/format'
+import { islandName } from '../../lib/islands'
 
 const FN = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/order-view`
 const ANON = import.meta.env.VITE_SUPABASE_ANON_KEY as string
@@ -34,6 +35,7 @@ type Claim = {
 type OrderView = {
   orderNo: string
   customerNameEn: string
+  island?: string | null
   shipDate: string
   status: string
   boatName: string | null
@@ -131,7 +133,7 @@ export default function CustomerOrderView() {
               KP
             </span>
             <span className="text-sm font-semibold text-ink">
-              {lang === 'th' ? 'เกาะพยาม' : 'Koh Payam'}
+              {islandName(data?.island, lang) ?? (lang === 'th' ? 'ติดตามออเดอร์' : 'Order tracking')}
             </span>
           </div>
           {toggle}

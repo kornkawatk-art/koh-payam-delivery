@@ -119,6 +119,8 @@ Deno.serve(async (req) => {
   const body = {
     orderNo: o.makro_order_no,
     customerNameEn: o.customer_name_en,
+    // 'payam' | 'chang', or null while a manager hasn't picked it yet
+    island: o.island ?? null,
     shipDate: o.ship_date,
     status: o.status,
     boatName: boat?.name ?? null,

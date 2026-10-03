@@ -32,7 +32,7 @@ export default function Login() {
             KP
           </span>
           <h1 className="page-title">เข้าสู่ระบบทีมงาน</h1>
-          <p className="muted">ระบบจัดส่งสินค้าเกาะพยาม</p>
+          <p className="muted">ระบบจัดส่งสินค้าเกาะ</p>
         </div>
 
         <form onSubmit={onSubmit} className="card flex flex-col gap-4">
