@@ -1,4 +1,5 @@
 import { supabase } from '../supabase'
+import { islandName } from '../islands'
 
 export type AuditLogRow = { id: number; createdAt: string; message: string }
 
@@ -86,6 +87,9 @@ function buildMessage(
 
     case 'pier_name_set':
       return `บันทึกชื่อคนลงเรือ "${meta.pierName}" ให้ออเดอร์ ${orderNo(r.entity_id)}${by}`
+
+    case 'island_set':
+      return `ตั้งเกาะของออเดอร์ ${orderNo(r.entity_id)} เป็น${islandName(meta.island) ?? meta.island}${by}`
 
     case 'regen_link':
       return `สร้างลิงก์ลูกค้าใหม่ให้ออเดอร์ ${orderNo(r.entity_id)}${by}`

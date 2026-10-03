@@ -93,3 +93,17 @@ test('a blank name cannot be printed', async () => {
   await userEvent.clear(await screen.findByDisplayValue('JJ'))
   expect(within(dialog).getByRole('button', { name: 'พิมพ์' })).toBeDisabled()
 })
+
+test('the sticker carries the island (small) once the order has one, and none while unpicked', async () => {
+  const { unmount } = render(<StickerPrintButton customer={customer} island="chang" counts={counts} />)
+  await userEvent.click(screen.getByRole('button', { name: 'พิมพ์สติ๊กเกอร์ (3 ดวง)' }))
+  const dialog = screen.getByRole('dialog', { name: 'พิมพ์สติ๊กเกอร์' })
+  expect(await within(dialog).findByText('เกาะช้าง')).toBeInTheDocument()
+  unmount()
+
+  render(<StickerPrintButton customer={customer} island={null} counts={counts} />)
+  await userEvent.click(screen.getByRole('button', { name: 'พิมพ์สติ๊กเกอร์ (3 ดวง)' }))
+  const d2 = screen.getByRole('dialog', { name: 'พิมพ์สติ๊กเกอร์' })
+  await within(d2).findByText(/ตัวอย่าง/)
+  expect(within(d2).queryByText(/^เกาะ/)).not.toBeInTheDocument()
+})

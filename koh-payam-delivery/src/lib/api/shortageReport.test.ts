@@ -93,7 +93,7 @@ test('query shape: selects item code + dept via an inner join, filters status=sh
   await getShortageReport('2026-09-01', '2026-09-10')
   const sel = calls.find((c) => c[0] === 'select')
   expect(sel[1]).toBe(
-    'product_name, makro_item_id, dept, qty_ordered, qty_shipped, shortage_qty, order_id, orders!inner(makro_order_no, customer_name_en, ship_date)',
+    'product_name, makro_item_id, dept, qty_ordered, qty_shipped, shortage_qty, order_id, orders!inner(makro_order_no, customer_name_en, ship_date, island)',
   )
   expect(calls).toContainEqual(['eq', 'status', 'short'])
   expect(calls).toContainEqual(['gte', 'orders.ship_date', '2026-09-01'])

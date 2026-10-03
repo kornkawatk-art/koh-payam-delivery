@@ -10,6 +10,7 @@ export type ShortageDetailRow = {
   orderId: string
   makroOrderNo: string
   customerNameEn: string
+  island?: string | null
   shipDate: string
   qty: number
 }
@@ -52,7 +53,12 @@ type RawShortageRow = {
   qty_shipped: number
   shortage_qty: number | null
   order_id: string
-  orders: { makro_order_no: string; customer_name_en: string; ship_date: string } | null
+  orders: {
+    makro_order_no: string
+    customer_name_en: string
+    ship_date: string
+    island?: string | null
+  } | null
 }
 
 type ProductAcc = {
@@ -83,7 +89,7 @@ export async function getShortageReport(
   const { data, error } = await supabase
     .from('order_items')
     .select(
-      'product_name, makro_item_id, dept, qty_ordered, qty_shipped, shortage_qty, order_id, orders!inner(makro_order_no, customer_name_en, ship_date)',
+      'product_name, makro_item_id, dept, qty_ordered, qty_shipped, shortage_qty, order_id, orders!inner(makro_order_no, customer_name_en, ship_date, island)',
     )
     .eq('status', 'short')
     .gte('orders.ship_date', fromDate)
@@ -124,6 +130,7 @@ export async function getShortageReport(
         orderId: r.order_id,
         makroOrderNo: r.orders.makro_order_no,
         customerNameEn: r.orders.customer_name_en,
+        island: r.orders.island ?? null,
         shipDate: r.orders.ship_date,
         qty: round2(qty),
       })

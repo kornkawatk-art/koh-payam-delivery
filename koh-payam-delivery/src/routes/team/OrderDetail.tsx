@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link, useParams, useNavigate } from 'react-router-dom'
 import { Anchor, MapPin, Package, Warning } from '@phosphor-icons/react'
-import { getOrder, regenTokenLink, deleteOrder } from '../../lib/api/orders'
+import { getOrder, regenTokenLink, deleteOrder, setOrderIsland } from '../../lib/api/orders'
+import { ISLAND_LIST, ISLANDS, isIsland, islandName, type Island } from '../../lib/islands'
 import {
   listRelatedBackordersForOrder,
   type BackorderRow,
@@ -73,6 +74,20 @@ export default function OrderDetail() {
     }
   }
 
+  async function changeIsland(next: Island) {
+    setBusy(true)
+    setMsg(undefined)
+    try {
+      await setOrderIsland(id!, next)
+      load()
+      setMsg(flash.ok(`ตั้งเกาะเป็น${ISLANDS[next].th}แล้ว`))
+    } catch (e) {
+      setMsg(flash.error((e as Error).message))
+    } finally {
+      setBusy(false)
+    }
+  }
+
   async function doDelete() {
     setBusy(true)
     setMsg(undefined)
@@ -123,11 +138,48 @@ export default function OrderDetail() {
           />
         </dl>
         <dl className="grid gap-3 border-t border-line pt-4 sm:grid-cols-3">
-          <InfoItem icon={MapPin} label="ส่งที่" value={order.sub_district} />
+          <InfoItem icon={MapPin} label="ส่งที่" value={islandName(order.island) ?? 'ยังไม่ระบุเกาะ'} />
           <InfoItem icon={Package} label="คนแพ็ค" value={order.packer_name} />
           <InfoItem icon={Anchor} label="คนลงเรือ" value={order.pier_name} />
         </dl>
       </section>
+      {(!isIsland(order.island) || profile?.role === 'manager') && (
+        <section
+          className={`flex flex-col gap-2 text-sm ${isIsland(order.island) ? '' : 'alert alert-warn'}`}
+          aria-label="เกาะที่ส่ง"
+        >
+          {!isIsland(order.island) && (
+            <p className="flex items-center gap-1.5 font-semibold">
+              <Warning size={16} weight="fill" aria-hidden="true" />
+              ยังไม่ระบุเกาะ — ที่อยู่มีแค่ท่าเรือเทศบาลปากน้ำ
+              {profile?.role === 'manager'
+                ? ' เลือกเกาะด้านล่าง (ถ้าเป็นลูกค้าบนฝั่ง ลบออเดอร์ได้ที่ท้ายหน้า)'
+                : ' ให้หัวหน้าเลือกเกาะก่อนส่งขึ้นเรือ'}
+            </p>
+          )}
+          {profile?.role === 'manager' && (
+            <label className="flex flex-wrap items-center gap-2">
+              <span className="field-label">เกาะที่ส่ง</span>
+              <select
+                className="w-auto"
+                value={isIsland(order.island) ? order.island : ''}
+                disabled={busy}
+                onChange={(e) => {
+                  if (isIsland(e.target.value)) void changeIsland(e.target.value)
+                }}
+              >
+                {!isIsland(order.island) && <option value="">— เลือกเกาะ —</option>}
+                {ISLAND_LIST.map((i) => (
+                  <option key={i} value={i}>
+                    {ISLANDS[i].th}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
+        </section>
+      )}
+
       <ShippingAddress addresses={[order.shipping_address]} />
 
       {owedHere.length > 0 && (
@@ -167,6 +219,7 @@ export default function OrderDetail() {
         <StickerPrintButton
           className="btn btn-warn min-h-[3.25rem] flex-1 text-lg"
           customer={order}
+          island={order.island}
           counts={{
             paper: order.paper_box_count ?? 0,
             foam: order.foam_box_count ?? 0,

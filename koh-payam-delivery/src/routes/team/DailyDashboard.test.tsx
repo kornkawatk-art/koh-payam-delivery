@@ -35,6 +35,7 @@ vi.mock('../../lib/api/shipDays', () => ({
       id: '1',
       makro_order_no: 'PO-1',
       customer_name_en: 'BLUE VIEW',
+      island: 'payam',
       status: 'packed',
       boat_id: null,
       paper_box_count: 2,
@@ -46,6 +47,7 @@ vi.mock('../../lib/api/shipDays', () => ({
       id: '2',
       makro_order_no: 'PO-2',
       customer_name_en: 'PAYAM CAFE',
+      island: 'payam',
       status: 'packed',
       boat_id: null,
       paper_box_count: 1,
@@ -57,6 +59,7 @@ vi.mock('../../lib/api/shipDays', () => ({
       id: '3',
       makro_order_no: 'PO-3',
       customer_name_en: 'SUNSET',
+      island: 'payam',
       status: 'shipped',
       boat_id: '1',
       paper_box_count: 3,
@@ -155,6 +158,7 @@ test("lists only this day's short lines, each linking to its order", async () =>
       id: '1',
       makro_order_no: 'PO-1',
       customer_name_en: 'BLUE VIEW',
+      island: 'payam',
       status: 'imported',
       item_statuses: [
         { status: 'ok', product_name: 'rice', qty_ordered: 2, qty_shipped: 2, shortage_qty: 0 },
@@ -176,6 +180,7 @@ test('the "รวม" column sums paper + foam + piece counts', async () => {
       id: '1',
       makro_order_no: 'PO-1',
       customer_name_en: 'BLUE VIEW',
+      island: 'payam',
       status: 'packed',
       boat_id: null,
       paper_box_count: 2,
@@ -207,6 +212,7 @@ const groupOrders = () => [
     id: '1',
     makro_order_no: 'PO-1',
     customer_name_en: 'BLUE VIEW',
+    island: 'payam',
     status: 'packed',
     boat_id: null,
     paper_box_count: 2,
@@ -219,7 +225,8 @@ const groupOrders = () => [
   {
     id: '2',
     makro_order_no: 'PO-2',
-    customer_name_en: 'Blue  View', // same shop, Makro spacing/case differs
+    customer_name_en: 'Blue  View',
+    island: 'payam', // same shop, Makro spacing/case differs
     status: 'imported',
     boat_id: null,
     paper_box_count: 0,
@@ -232,6 +239,7 @@ const groupOrders = () => [
     id: '3',
     makro_order_no: 'PO-3',
     customer_name_en: 'SUNSET',
+    island: 'payam',
     status: 'shipped',
     boat_id: '1',
     paper_box_count: 3,
@@ -315,6 +323,7 @@ test('splits the table into "ยังไม่แพ็ค" (not-yet-packed) on
       id: '1',
       makro_order_no: 'PO-1',
       customer_name_en: 'ALREADY PACKED',
+      island: 'payam',
       status: 'packed',
       boat_id: null,
       paper_box_count: 1,
@@ -326,6 +335,7 @@ test('splits the table into "ยังไม่แพ็ค" (not-yet-packed) on
       id: '2',
       makro_order_no: 'PO-2',
       customer_name_en: 'NOT PACKED YET',
+      island: 'payam',
       status: 'imported',
       boat_id: null,
       paper_box_count: 0,
@@ -337,6 +347,7 @@ test('splits the table into "ยังไม่แพ็ค" (not-yet-packed) on
       id: '3',
       makro_order_no: 'PO-3',
       customer_name_en: 'ON THE PIER',
+      island: 'payam',
       status: 'at_pier',
       boat_id: '1',
       paper_box_count: 2,
@@ -513,4 +524,26 @@ test('the combined-pack link carries the shop name so only that shop\u2019s POs 
   renderPage()
   const link = await screen.findByRole('link', { name: 'แพ็ครวม' })
   expect(link.getAttribute('href')).toMatch(/\/pack\?name=BLUE%20VIEW$/)
+})
+
+test('island chips appear on a mixed day; an untagged order stays visible under every island', async () => {
+  vi.mocked(listOrdersForDay).mockResolvedValueOnce([
+    { id: '1', makro_order_no: 'PO-1', customer_name_en: 'PAYAM ONE', island: 'payam', status: 'imported', boat_id: null, paper_box_count: 0, foam_box_count: 0, piece_count: 0, outstanding_amount: 0, customer_phone: '01' },
+    { id: '2', makro_order_no: 'PO-2', customer_name_en: 'CHANG ONE', island: 'chang', status: 'imported', boat_id: null, paper_box_count: 0, foam_box_count: 0, piece_count: 0, outstanding_amount: 0, customer_phone: '02' },
+    { id: '3', makro_order_no: 'PO-3', customer_name_en: 'PIER ONLY', island: null, status: 'imported', boat_id: null, paper_box_count: 0, foam_box_count: 0, piece_count: 0, outstanding_amount: 0, customer_phone: '03' },
+  ])
+  renderPage()
+  expect(await screen.findByText('PIER ONLY')).toBeInTheDocument()
+  expect(screen.getByText('เลือกเกาะ')).toBeInTheDocument()
+  await userEvent.click(screen.getByRole('button', { name: 'เกาะช้าง' }))
+  expect(screen.getByText('CHANG ONE')).toBeInTheDocument()
+  expect(screen.getByText('PIER ONLY')).toBeInTheDocument()
+  expect(screen.queryByText('PAYAM ONE')).not.toBeInTheDocument()
+})
+
+test('a single-island day shows no island chips or badges', async () => {
+  renderPage()
+  await screen.findByText('BLUE VIEW')
+  expect(screen.queryByRole('group', { name: 'กรองตามเกาะ' })).not.toBeInTheDocument()
+  expect(screen.queryByText('เกาะพยาม')).not.toBeInTheDocument()
 })

@@ -16,6 +16,8 @@ import { EmptyState } from '../../components/ui/EmptyState'
 import { Notice, flash, type Flash } from '../../components/ui/Notice'
 import { AmountDue } from '../../components/ui/AmountDue'
 import { StatTile } from '../../components/ui/Stat'
+import { IslandBadge } from '../../components/ui/Island'
+import { isIsland } from '../../lib/islands'
 
 const R2 = import.meta.env.VITE_R2_PUBLIC_BASE_URL as string
 const READY = ['packed', 'at_pier']
@@ -102,7 +104,9 @@ export default function PierGroup({
     pierName.trim() !== '' &&
     !photoBusy &&
     attaching === 0 &&
-    !busy
+    !busy &&
+    // an untagged PO can't board until a manager picks its island
+    ready.every((o) => isIsland(o.island))
 
   async function chooseBoat(id: string) {
     setMsg(undefined)
@@ -201,6 +205,11 @@ export default function PierGroup({
       <h1 className="page-title">
         {customerName} · {ready.length} ออเดอร์
       </h1>
+      <div className="flex flex-wrap gap-1.5">
+        {Array.from(new Set(ready.map((o) => o.island ?? 'none'))).map((i) => (
+          <IslandBadge key={i} island={i} />
+        ))}
+      </div>
 
       {waiting.length > 0 && (
         <div className="alert alert-warn flex items-start gap-2">
@@ -305,6 +314,9 @@ export default function PierGroup({
           </button>
           {!pierName.trim() && (
             <p className="muted text-xs">ต้องกรอกชื่อคนลงเรือก่อนกดส่งขึ้นเรือแล้ว</p>
+          )}
+          {!ready.every((o) => isIsland(o.island)) && (
+            <p className="text-xs text-warn-ink">ยังไม่ระบุเกาะ — ให้หัวหน้าเลือกเกาะในหน้ารายละเอียดออเดอร์ก่อน จึงจะส่งขึ้นเรือได้</p>
           )}
           {(photoBusy || attaching > 0) && (
             <p className="muted text-xs">กำลังอัปโหลดรูป กรุณารอสักครู่ก่อนส่งขึ้นเรือ</p>

@@ -48,6 +48,7 @@ const baseResult = {
       makroOrderNo: 'P-1',
       customerName: 'PAYAM MART',
       subDistrict: 'เกาะพยาม',
+      island: 'payam',
       shippingAddress: 'x',
       expectedDate: '2026-09-11',
       makroOrderStatus: 'Completed',
@@ -59,7 +60,7 @@ const baseResult = {
   ],
   skippedNoItems: ['P-9'],
   skippedNotDirect: [],
-  skippedNotPayam: 1,
+  skippedNotIsland: 1,
   cancelledLinesDropped: 2,
   shippedAllZero: false,
 }
@@ -105,7 +106,7 @@ test('preview shows the payam count and the skip lines', async () => {
   await uploadBoth()
   await userEvent.click(await screen.findByRole('button', { name: /ดูตัวอย่าง/i }))
 
-  expect(await screen.findByText(/เจอออเดอร์เกาะพยาม 1 เจ้า/i)).toBeInTheDocument()
+  expect(await screen.findByText(/เจอออเดอร์ส่งเกาะ 1 เจ้า · เกาะพยาม 1/i)).toBeInTheDocument()
   expect(screen.getByText(/ข้าม 1 ออเดอร์ .*P-9/)).toBeInTheDocument()
   expect(screen.getByText(/ข้ามรายการที่ยกเลิก 2 รายการ/)).toBeInTheDocument()
   // preview row: #ของขาด = 1

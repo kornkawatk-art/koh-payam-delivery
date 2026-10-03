@@ -15,6 +15,7 @@ import { commitImport, listOrdersOnOtherDays, type OtherDayOrder } from '../../l
 import { UploadSimple, Warning } from '@phosphor-icons/react'
 import { PageHeader } from '../../components/ui/PageHeader'
 import { todayLocalISO } from '../../lib/format'
+import { ISLAND_LIST, ISLANDS } from '../../lib/islands'
 
 function loadMapping<T>(key: string, fallback: T): T {
   try {
@@ -243,8 +244,27 @@ export default function ImportOrders() {
       {result && (
         <div className="flex flex-col gap-4 border-t border-line pt-5">
           <p className="text-sm font-semibold text-ok-ink">
-            เจอออเดอร์เกาะพยาม {result.orders.length} เจ้า
+            เจอออเดอร์ส่งเกาะ {result.orders.length} เจ้า
+            {ISLAND_LIST.map((i) => {
+              const n = result.orders.filter((o) => o.island === i).length
+              return n > 0 ? ` · ${ISLANDS[i].th} ${n}` : ''
+            }).join('')}
           </p>
+
+          {result.orders.some((o) => !o.island) && (
+            <div className="alert alert-warn flex items-start gap-2">
+              <Warning size={18} weight="fill" className="mt-0.5 shrink-0" aria-hidden="true" />
+              <p>
+                {result.orders.filter((o) => !o.island).length} ออเดอร์ยังไม่ระบุเกาะ
+                (ที่อยู่มีแค่ท่าเรือเทศบาลปากน้ำ):{' '}
+                {result.orders
+                  .filter((o) => !o.island)
+                  .map((o) => o.makroOrderNo)
+                  .join(', ')}{' '}
+                — นำเข้าได้ตามปกติ แล้วให้หัวหน้าเลือกเกาะในหน้าออเดอร์ก่อนส่งขึ้นเรือ
+              </p>
+            </div>
+          )}
 
           {result.shippedAllZero && (
             <div className="alert alert-warn flex items-start gap-2">

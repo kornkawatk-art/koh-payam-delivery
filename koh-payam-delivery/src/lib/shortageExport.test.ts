@@ -69,3 +69,18 @@ test('Excel rows: one summary row per product, one detail row per order line sor
     ['2026-09-02', 'PO-A', 'Loose pork'],
   ])
 })
+
+test('the details sheet has an island column ("ยังไม่ระบุ" while unpicked)', () => {
+  const withIsland: ShortageReport = {
+    ...report,
+    groups: report.groups.map((g) => ({
+      ...g,
+      products: g.products.map((p) => ({
+        ...p,
+        details: p.details.map((d, i) => ({ ...d, island: i === 0 ? 'chang' : null })),
+      })),
+    })),
+  }
+  const { details } = buildExcelRows(withIsland)
+  expect(new Set(details.map((d) => d.เกาะ))).toEqual(new Set(['เกาะช้าง', 'ยังไม่ระบุ']))
+})

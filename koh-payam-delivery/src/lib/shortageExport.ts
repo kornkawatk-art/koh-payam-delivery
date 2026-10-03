@@ -1,5 +1,6 @@
 import type { ShortageDeptGroup, ShortageReport } from './api/shortageReport'
 import { formatDateTH } from './format'
+import { islandName } from './islands'
 
 /**
  * Quantity without a unit: weighed items are short by fractional kilos and
@@ -46,6 +47,7 @@ export function buildExcelRows(report: ShortageReport) {
         วันที่ส่ง: d.shipDate,
         เลขออเดอร์: d.makroOrderNo,
         ลูกค้า: d.customerNameEn,
+        เกาะ: islandName(d.island) ?? 'ยังไม่ระบุ',
         แผนก: g.label,
         รหัสสินค้า: p.itemId,
         สินค้า: p.productName,

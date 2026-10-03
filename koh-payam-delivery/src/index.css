@@ -459,6 +459,12 @@
   overflow-wrap: anywhere;
 }
 
+.sticker-island {
+  font-size: 3mm;
+  line-height: 1.1;
+  white-space: nowrap;
+}
+
 .sticker-meta {
   font-size: 3.6mm;
   line-height: 1.2;

@@ -5,6 +5,7 @@ import { readFileSync } from 'node:fs'
 import { parseMakroFile, type RawRow } from './parseMakroFile'
 import {
   buildImport,
+  classifyIsland,
   isNotMakroDirect,
   isPayam,
   parseExpectedDate,
@@ -120,7 +121,7 @@ test('buildImport keeps only payam orders that have line items', async () => {
 
   expect(r.orders.map((o) => o.makroOrderNo).sort()).toEqual(['P-001', 'P-002', 'P-003', 'P-006'])
   expect(r.skippedNoItems).toEqual(['P-005']) // payam ใน B แต่ไม่มีรายการใน A
-  expect(r.skippedNotPayam).toBe(1) // P-004
+  expect(r.skippedNotIsland).toBe(1) // P-004
   expect(r.cancelledLinesDropped).toBe(1) // P-002 line 100005
   expect(r.shippedAllZero).toBe(false)
 })
@@ -584,4 +585,65 @@ test('buildImport: a Koh Payam PO ending in B is skipped and reported, never imp
   expect(r.orders.map((o) => o.makroOrderNo)).toEqual(['111A'])
   expect(r.skippedNotDirect).toEqual(['222B'])
   expect(r.skippedNoItems).toEqual([])
+})
+
+// --- classifyIsland ----------------------------------------------------------
+
+test('classifyIsland: Payam keywords win, even next to the shared Paknam pier', () => {
+  expect(classifyIsland({ subDistrict: 'เกาะพยาม', shippingAddress: '' })).toBe('payam')
+  expect(
+    classifyIsland({ subDistrict: 'ปากน้ำ', shippingAddress: 'เกาะพยาม ส่งท่าเรือเทศบาลปากน้ำ' }),
+  ).toBe('payam')
+})
+
+test('classifyIsland: Koh Chang only by its name in the address (its sub-district is mostly mainland)', () => {
+  expect(classifyIsland({ subDistrict: 'ปากน้ำ', shippingAddress: '12 ม.1 เกาะช้าง เมืองระนอง' })).toBe('chang')
+  expect(classifyIsland({ subDistrict: 'Paknam', shippingAddress: 'Koh Chang, Ranong' })).toBe('chang')
+  expect(classifyIsland({ subDistrict: 'ปากน้ำ', shippingAddress: 'Ko Chang resort' })).toBe('chang')
+  expect(classifyIsland({ subDistrict: 'ปากน้ำ', shippingAddress: '9 ถนนสะพานปลา' })).toBeNull()
+})
+
+test('classifyIsland: an address naming only the Paknam municipal pier -> unknown (a manager picks)', () => {
+  expect(classifyIsland({ subDistrict: 'ปากน้ำ', shippingAddress: 'ส่งที่ท่าเรือเทศบาลปากน้ำ' })).toBe(
+    'unknown',
+  )
+  expect(
+    classifyIsland({ subDistrict: 'ปากน้ำ', shippingAddress: 'ท่าเรือ เทศบาลตำบลปากน้ำ ระนอง' }),
+  ).toBe('unknown')
+})
+
+test('buildImport tags each order with its island; a pier-only order is kept untagged', () => {
+  const O = DEFAULT_ORDER_MAPPING
+  const D = DEFAULT_DETAIL_MAPPING
+  const order = (no: string, sub: string, addr: string): RawRow => ({
+    [O.orderNo]: no,
+    [O.customer]: 'CUST ' + no,
+    [O.subDistrict]: sub,
+    [O.shippingAddress]: addr,
+  })
+  const line = (no: string): RawRow => ({
+    [D.orderNo]: no,
+    [D.product]: 'rice',
+    [D.orderedQty]: '1',
+    [D.shippedQty]: '1',
+    [D.shortageQty]: '0',
+    [D.cancelledQty]: '0',
+  })
+  const r = buildImport(
+    ['A', 'C', 'U', 'M'].map(line),
+    [
+      order('A', 'เกาะพยาม', 'x'),
+      order('C', 'ปากน้ำ', 'เกาะช้าง'),
+      order('U', 'ปากน้ำ', 'ท่าเรือเทศบาลปากน้ำ'),
+      order('M', 'บางริ้น', '9 ถนนเรืองราษฎร์'),
+    ],
+    D,
+    O,
+  )
+  expect(Object.fromEntries(r.orders.map((o) => [o.makroOrderNo, o.island]))).toEqual({
+    A: 'payam',
+    C: 'chang',
+    U: null,
+  })
+  expect(r.skippedNotIsland).toBe(1) // M: mainland
 })

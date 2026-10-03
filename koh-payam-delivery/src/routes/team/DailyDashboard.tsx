@@ -20,6 +20,13 @@ import QrOrderScanner from '../../components/QrOrderScanner'
 import { todayLocalISO } from '../../lib/format'
 import { groupByPhone, entryOrders, entryHasUnpacked, type DayEntry } from '../../lib/groupOrders'
 import { EmptyState } from '../../components/ui/EmptyState'
+import {
+  IslandBadge,
+  IslandFilter,
+  matchesIsland,
+  needsIslandFilter,
+  type IslandFilterValue,
+} from '../../components/ui/Island'
 
 export default function DailyDashboard() {
   const navigate = useNavigate()
@@ -27,6 +34,7 @@ export default function DailyDashboard() {
   const [rows, setRows] = useState<any[] | null>(null)
   const [failed, setFailed] = useState(false)
   const [q, setQ] = useState('')
+  const [island, setIsland] = useState<IslandFilterValue>('all')
   const [scanOpen, setScanOpen] = useState(false)
   // undefined = not loaded yet (don't flash the banner while unknown)
   const [linksSentAt, setLinksSentAt] = useState<string | null | undefined>(undefined)
@@ -113,18 +121,24 @@ export default function DailyDashboard() {
   // keeps any entry with a matching PO, so a group never loses members to it.
   const entries = useMemo(() => groupByPhone<any>(rows ?? []), [rows])
 
+  const showIslandFilter = useMemo(
+    () => needsIslandFilter((rows ?? []).map((o) => o.island)),
+    [rows],
+  )
+
   const filtered = useMemo(() => {
     const s = q.trim().toLowerCase()
-    return s
-      ? entries.filter((e) =>
+    return entries.filter(
+      (e) =>
+        entryOrders(e).some((o) => matchesIsland(o.island, island)) &&
+        (!s ||
           entryOrders(e).some(
             (o) =>
               o.customer_name_en.toLowerCase().includes(s) ||
               o.makro_order_no.toLowerCase().includes(s),
-          ),
-        )
-      : entries
-  }, [entries, q])
+          )),
+    )
+  }, [entries, q, island])
 
   // Not-yet-packed entries float to the top so the packing queue for the day
   // is obvious at a glance; everything past "packed" (packed/at_pier/shipped
@@ -281,6 +295,8 @@ export default function DailyDashboard() {
         />
       )}
 
+      {showIslandFilter && <IslandFilter value={island} onChange={setIsland} />}
+
       {filtered.length === 0 ? (
         <EmptyState
           icon={Package}
@@ -288,6 +304,8 @@ export default function DailyDashboard() {
           hint={
             q.trim()
               ? 'ไม่พบออเดอร์ที่ตรงกับคำค้น ลองค้นด้วยชื่อลูกค้าหรือเลขออเดอร์อื่น'
+              : island !== 'all'
+              ? 'ไม่มีออเดอร์ของเกาะนี้ในวันที่เลือก'
               : 'ยังไม่มีออเดอร์ของวันที่เลือก — เลือกวันอื่น หรือนำเข้าไฟล์ออเดอร์ของวันนี้'
           }
         />
@@ -314,7 +332,7 @@ export default function DailyDashboard() {
                 </tr>
               )}
               {notPacked.map((e) => (
-                <EntryRows key={entryKey(e)} entry={e} date={date} />
+                <EntryRows key={entryKey(e)} entry={e} date={date} showIsland={showIslandFilter} />
               ))}
               {packedOrAhead.length > 0 && (
                 <tr className="row-divider">
@@ -324,7 +342,7 @@ export default function DailyDashboard() {
                 </tr>
               )}
               {packedOrAhead.map((e) => (
-                <EntryRows key={entryKey(e)} entry={e} date={date} />
+                <EntryRows key={entryKey(e)} entry={e} date={date} showIsland={showIslandFilter} />
               ))}
             </tbody>
           </table>
@@ -387,17 +405,29 @@ function entryKey(e: DayEntry<any>) {
 const uniq = (xs: (string | null | undefined)[]) =>
   Array.from(new Set(xs.filter((x): x is string => !!x)))
 
-function EntryRows({ entry, date }: { entry: DayEntry<any>; date: string }) {
-  if (entry.kind === 'single') return <OrderRow order={entry.order} />
-  return <GroupRows group={entry} date={date} />
+// Island badges only on days that mix islands or have an untagged order --
+// on a single-island day they would just repeat on every row.
+function EntryRows({
+  entry,
+  date,
+  showIsland,
+}: {
+  entry: DayEntry<any>
+  date: string
+  showIsland: boolean
+}) {
+  if (entry.kind === 'single') return <OrderRow order={entry.order} showIsland={showIsland} />
+  return <GroupRows group={entry} date={date} showIsland={showIsland} />
 }
 
 function GroupRows({
   group,
   date,
+  showIsland,
 }: {
   group: Extract<DayEntry<any>, { kind: 'group' }>
   date: string
+  showIsland: boolean
 }) {
   const [open, setOpen] = useState(false)
   const os = group.orders
@@ -420,6 +450,10 @@ function GroupRows({
         </td>
         <td data-label="ลูกค้า">
           <span className="font-medium">{group.name}</span>
+          {showIsland &&
+            uniq(os.map((o) => o.island ?? 'none')).map((i) => (
+              <IslandBadge key={i} island={i} className="ml-1.5" />
+            ))}
           <Link
             className="btn btn-ok btn-sm ml-2"
             to={`/customer/${date}/${encodeURIComponent(group.phone)}/pack?name=${encodeURIComponent(group.name)}`}
@@ -445,7 +479,7 @@ function GroupRows({
         <td data-label="คนแพ็ค">{uniq(os.map((o) => o.packer_name)).join(', ') || '—'}</td>
         <td data-label="คนลงเรือ">{uniq(os.map((o) => o.pier_name)).join(', ') || '—'}</td>
       </tr>
-      {open && os.map((o) => <OrderRow key={o.id} order={o} indent />)}
+      {open && os.map((o) => <OrderRow key={o.id} order={o} indent showIsland={showIsland} />)}
     </>
   )
 }
@@ -464,7 +498,15 @@ function ShortBadge({ count }: { count: number }) {
   )
 }
 
-function OrderRow({ order: o, indent }: { order: any; indent?: boolean }) {
+function OrderRow({
+  order: o,
+  indent,
+  showIsland,
+}: {
+  order: any
+  indent?: boolean
+  showIsland: boolean
+}) {
   return (
     <tr className={indent ? 'row-child' : undefined}>
       <td className={`stack-lead whitespace-nowrap ${indent ? 'pl-8' : ''}`}>
@@ -472,7 +514,10 @@ function OrderRow({ order: o, indent }: { order: any; indent?: boolean }) {
           {o.makro_order_no}
         </Link>
       </td>
-      <td data-label="ลูกค้า">{o.customer_name_en}</td>
+      <td data-label="ลูกค้า">
+        {o.customer_name_en}
+        {showIsland && <IslandBadge island={o.island} className="ml-1.5" />}
+      </td>
       <td data-label="สถานะ">
         <StatusBadge status={o.status} />
         <ShortBadge count={shortCount(o)} />

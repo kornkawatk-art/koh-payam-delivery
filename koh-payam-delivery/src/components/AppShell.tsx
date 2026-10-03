@@ -35,7 +35,7 @@ export default function AppShell() {
           onClick={() => setOpen((v) => !v)}
         >
           <List size={20} weight="bold" aria-hidden="true" />
-          <span className="font-semibold">เกาะพยาม</span>
+          <span className="font-semibold">ระบบจัดส่งเกาะ</span>
         </button>
         <span className="truncate text-sm text-ink-soft">
           {profile?.name} · {role}
@@ -63,8 +63,8 @@ export default function AppShell() {
             KP
           </span>
           <div className="leading-tight">
-            <p className="text-sm font-semibold">เกาะพยาม</p>
-            <p className="text-xs text-ink-faint">ระบบจัดส่ง</p>
+            <p className="text-sm font-semibold">ระบบจัดส่งเกาะ</p>
+            <p className="text-xs text-ink-faint">พยาม · ช้าง</p>
           </div>
         </div>
 

@@ -24,12 +24,21 @@ import { BackLink } from '../../components/ui/BackLink'
 import { Notice, flash, type Flash } from '../../components/ui/Notice'
 import { AmountDue } from '../../components/ui/AmountDue'
 import { StatTile } from '../../components/ui/Stat'
+import {
+  IslandBadge,
+  IslandFilter,
+  matchesIsland,
+  needsIslandFilter,
+  type IslandFilterValue,
+} from '../../components/ui/Island'
+import { isIsland } from '../../lib/islands'
 
 type Boat = { id: string; name: string }
 type PierOrder = {
   id: string
   makro_order_no: string
   customer_name_en: string
+  island?: string | null
   status: string
   boat_id: string | null
   paper_box_count: number
@@ -54,6 +63,7 @@ export default function PierLoad() {
   const [date, setDate] = useState(todayLocalISO())
   const [boats, setBoats] = useState<Boat[]>([])
   const [all, setAll] = useState<PierOrder[]>([])
+  const [island, setIsland] = useState<IslandFilterValue>('all')
   const [selGroup, setSelGroup] = useState<{ phone: string; name: string } | null>(null)
   const [sel, setSel] = useState<PierOrder | null>(null)
   const [photoCount, setPhotoCount] = useState(0)
@@ -145,8 +155,11 @@ export default function PierLoad() {
       if (ready.length === 1) out.push({ kind: 'single', order: ready[0], waiting })
       else out.push({ kind: 'group', phone: e.phone, name: e.name, ready, waiting })
     }
-    return out
-  }, [all])
+    return out.filter((e) =>
+      (e.kind === 'single' ? [e.order] : e.ready).some((o) => matchesIsland(o.island, island)),
+    )
+  }, [all, island])
+  const showIslandFilter = useMemo(() => needsIslandFilter(all.map((o) => o.island)), [all])
 
   if (failed)
     return (
@@ -193,6 +206,7 @@ export default function PierLoad() {
             />
           }
         />
+        {showIslandFilter && <IslandFilter value={island} onChange={setIsland} />}
         {entries.length === 0 && (
           <EmptyState
             icon={Anchor}
@@ -219,6 +233,10 @@ export default function PierLoad() {
                   )}
                 </span>
                 <span className="flex items-center gap-2">
+                  {showIslandFilter &&
+                    Array.from(new Set(e.ready.map((o) => o.island ?? 'none'))).map((i) => (
+                      <IslandBadge key={i} island={i} />
+                    ))}
                   <span className="badge badge-brand">{e.ready.length} PO</span>
                   <span className="badge badge-neutral">
                     {e.ready.reduce((n, o) => n + o.paper_box_count + o.foam_box_count + o.piece_count, 0)} รวม
@@ -265,8 +283,11 @@ export default function PierLoad() {
                     </span>
                   )}
                 </span>
-                <span className="badge badge-neutral">
-                  {e.order.paper_box_count + e.order.foam_box_count + e.order.piece_count} รวม
+                <span className="flex items-center gap-2">
+                  {showIslandFilter && <IslandBadge island={e.order.island} />}
+                  <span className="badge badge-neutral">
+                    {e.order.paper_box_count + e.order.foam_box_count + e.order.piece_count} รวม
+                  </span>
                 </span>
               </button>
             ),
@@ -282,6 +303,7 @@ export default function PierLoad() {
       <h1 className="page-title">
         {sel.makro_order_no} · {sel.customer_name_en}
       </h1>
+      <IslandBadge island={sel.island} className="self-start" />
 
       {sel.outstanding_amount != null && sel.outstanding_amount > 0 && (
         <AmountDue
@@ -368,10 +390,18 @@ export default function PierLoad() {
       <button
         className="btn btn-primary min-h-[3.25rem] w-full text-lg"
         onClick={ship}
-        disabled={!sel.boat_id || photoCount < 1 || photoBusy || !pierName.trim() || shipping}
+        disabled={
+          !sel.boat_id ||
+          photoCount < 1 ||
+          photoBusy ||
+          !pierName.trim() ||
+          shipping ||
+          !isIsland(sel.island)
+        }
       >
         ส่งขึ้นเรือแล้ว
       </button>
+      {!isIsland(sel.island) && <p className="text-xs text-warn-ink">ยังไม่ระบุเกาะ — ให้หัวหน้าเลือกเกาะในหน้ารายละเอียดออเดอร์ก่อน จึงจะส่งขึ้นเรือได้</p>}
       {!pierName.trim() && (
         <p className="muted text-xs">ต้องกรอกชื่อคนลงเรือก่อนกดส่งขึ้นเรือแล้ว</p>
       )}
