@@ -27,6 +27,7 @@ import {
   needsIslandFilter,
   type IslandFilterValue,
 } from '../../components/ui/Island'
+import { PickupBadge } from '../../components/ui/PickupBadge'
 
 export default function DailyDashboard() {
   const navigate = useNavigate()
@@ -465,6 +466,7 @@ function GroupRows({
           <span className={`badge ${packed === os.length ? 'badge-ok' : 'badge-neutral'}`}>
             แพ็คแล้ว {packed}/{os.length}
           </span>
+          <PickupBadge show={os.some((o) => o.is_pickup)} className="ml-1.5" />
           <ShortBadge count={os.reduce((n, o) => n + shortCount(o), 0)} />
           {os.some((o) => o.outstanding_amount > 0) && (
             <span className="badge badge-warn ml-1.5">เก็บเงิน</span>
@@ -520,6 +522,7 @@ function OrderRow({
       </td>
       <td data-label="สถานะ">
         <StatusBadge status={o.status} />
+        <PickupBadge show={o.is_pickup} className="ml-1.5" />
         <ShortBadge count={shortCount(o)} />
         {o.outstanding_amount > 0 && <span className="badge badge-warn ml-1.5">เก็บเงิน</span>}
       </td>

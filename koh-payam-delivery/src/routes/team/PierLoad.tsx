@@ -32,6 +32,7 @@ import {
   type IslandFilterValue,
 } from '../../components/ui/Island'
 import { isIsland } from '../../lib/islands'
+import { PickupBadge } from '../../components/ui/PickupBadge'
 
 type Boat = { id: string; name: string }
 type PierOrder = {
@@ -39,6 +40,7 @@ type PierOrder = {
   makro_order_no: string
   customer_name_en: string
   island?: string | null
+  is_pickup?: boolean
   status: string
   boat_id: string | null
   paper_box_count: number
@@ -284,6 +286,7 @@ export default function PierLoad() {
                   )}
                 </span>
                 <span className="flex items-center gap-2">
+                  <PickupBadge show={e.order.is_pickup} />
                   {showIslandFilter && <IslandBadge island={e.order.island} />}
                   <span className="badge badge-neutral">
                     {e.order.paper_box_count + e.order.foam_box_count + e.order.piece_count} รวม

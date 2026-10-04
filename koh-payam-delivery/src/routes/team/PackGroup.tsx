@@ -20,6 +20,7 @@ import { groupedItemRows } from '../../components/ui/ItemGroupHeader'
 import { StickerPrintButton } from '../../components/StickerPrint'
 import { ShippingAddress } from '../../components/ui/ShippingAddress'
 import { MAX_COUNT, toCount } from '../../lib/stickers'
+import { PickupBadge } from '../../components/ui/PickupBadge'
 
 const R2 = import.meta.env.VITE_R2_PUBLIC_BASE_URL as string
 
@@ -218,6 +219,16 @@ export default function PackGroup() {
         back={{ to: '/', label: 'งานวันนี้' }}
         title={`แพ็ครวม · ${customerName} · ${orders.length} ออเดอร์`}
       />
+      {orders.some((o: any) => o.is_pickup) && (
+        <p className="alert alert-info flex flex-wrap items-center gap-2">
+          <PickupBadge show />
+          {orders
+            .filter((o: any) => o.is_pickup)
+            .map((o: any) => o.makro_order_no)
+            .join(', ')}{' '}
+          — ลูกค้ามารับเองที่สาขา ไม่ต้องส่งลงเรือ
+        </p>
+      )}
 
       <div className="alert alert-info">
         {primary ? (

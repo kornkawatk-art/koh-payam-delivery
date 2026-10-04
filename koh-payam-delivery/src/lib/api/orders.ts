@@ -93,6 +93,7 @@ export async function commitImport(
           outstanding_amount: o.outstandingAmount,
           customer_phone: o.customerPhone,
           island: o.island,
+          is_pickup: o.isPickup,
         })
         .select('id')
         .single()
@@ -116,6 +117,9 @@ export async function commitImport(
           payment_status: o.paymentStatus,
           outstanding_amount: o.outstandingAmount,
           customer_phone: o.customerPhone,
+          // Makro's own fact -- a re-import keeps it current (unlike island,
+          // which a manager may have picked by hand)
+          is_pickup: o.isPickup,
         })
         .eq('id', existingId)
       if (eU) throw new Error(`อัปเดตออเดอร์ ${o.makroOrderNo} ไม่สำเร็จ: ${eU.message}`)

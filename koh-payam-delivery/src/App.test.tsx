@@ -63,7 +63,11 @@ test('authed MFA-satisfied user with no profile row is redirected off a role-gat
   render(<App />)
 
   // Fails closed to "/" (DailyDashboard), never renders the restricted page, never hangs on the loader.
-  expect(await screen.findByPlaceholderText(/ค้นหาชื่อลูกค้า/)).toBeInTheDocument()
+  // DailyDashboard is a lazy route: its first import compiles on demand, which
+  // can outlast findBy's 1s default when the whole suite runs in parallel.
+  expect(
+    await screen.findByPlaceholderText(/ค้นหาชื่อลูกค้า/, {}, { timeout: 5000 }),
+  ).toBeInTheDocument()
   expect(screen.queryByText('ClaimsQueue')).not.toBeInTheDocument()
   expect(screen.queryByText('กำลังโหลด…')).not.toBeInTheDocument()
 })
