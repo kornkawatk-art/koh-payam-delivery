@@ -10,7 +10,13 @@ export type BackorderRow = {
   target_ship_date: string | null
   target_order_id: string | null
   status: 'pending' | 'fulfilled'
+  // 'ฟอง' for a broken-eggs resend (owed in eggs); null = the Makro unit
+  unit?: string | null
 }
+
+/** "x7" in Makro units, or "7 ฟอง" when the backorder is owed in another unit. */
+export const backorderQty = (b: { qty: number; unit?: string | null }) =>
+  b.unit ? `${b.qty} ${b.unit}` : `x${b.qty}`
 
 // A pending compensation backorder (queued by an approved "resend next day"
 // claim resolution) that hasn't been tied to a destination order yet — shown
@@ -25,6 +31,7 @@ export type UnmatchedBackorderRow = {
   customerName: string | undefined
   productName: string
   qty: number
+  unit?: string | null
   createdAt: string
 }
 
@@ -67,11 +74,12 @@ export async function syncShortageBackorders(orderId: string): Promise<void> {
 // Called by the claim resolution flow (Task 22): queue a compensating shipment
 // for an approved "resend next day" claim — one backorder row per item the
 // claim references (a missing_in_box claim can reference several products;
-// damaged always has exactly one; box_lost has none).
+// damaged always has exactly one; box_lost has none). A broken_eggs claim
+// counts eggs, so its resend is owed in eggs (unit 'ฟอง'), not Makro units.
 export async function createResendBackorder(claimId: string): Promise<void> {
   const { data: c } = await supabase
     .from('claims')
-    .select('order_id, claim_items(qty,order_items(product_name))')
+    .select('order_id, type, claim_items(qty,order_items(product_name))')
     .eq('id', claimId)
     .single()
   if (!c) throw new Error('ไม่พบเคลม')
@@ -90,6 +98,7 @@ export async function createResendBackorder(claimId: string): Promise<void> {
     reason: 'claim_resend',
     product_name: it.order_items?.product_name ?? 'ไม่ระบุสินค้า',
     qty: it.qty,
+    unit: (c as any).type === 'broken_eggs' ? 'ฟอง' : null,
     status: 'pending',
     target_ship_date: null,
     claim_id: claimId,
@@ -154,7 +163,7 @@ export async function listUnmatchedBackorders(): Promise<UnmatchedBackorderRow[]
   const { data, error } = await supabase
     .from('backorders')
     .select(
-      'id,product_name,qty,created_at,orders!backorders_source_order_id_fkey(customer_name_en)',
+      'id,product_name,qty,unit,created_at,orders!backorders_source_order_id_fkey(customer_name_en)',
     )
     .eq('reason', 'claim_resend')
     .is('target_order_id', null)
@@ -165,6 +174,7 @@ export async function listUnmatchedBackorders(): Promise<UnmatchedBackorderRow[]
     customerName: b.orders?.customer_name_en,
     productName: b.product_name,
     qty: b.qty,
+    unit: b.unit ?? null,
     createdAt: b.created_at,
   }))
 }
@@ -173,7 +183,7 @@ export async function listBackordersForDay(shipDate: string): Promise<BackorderR
   const { data, error } = await supabase
     .from('backorders')
     .select(
-      'id,source_order_id,reason,product_name,qty,target_ship_date,target_order_id,status',
+      'id,source_order_id,reason,product_name,qty,unit,target_ship_date,target_order_id,status',
     )
     .eq('target_ship_date', shipDate)
     .eq('status', 'pending')
@@ -187,7 +197,7 @@ export async function listPendingBackordersForOrder(orderId: string): Promise<Ba
   const { data, error } = await supabase
     .from('backorders')
     .select(
-      'id,source_order_id,reason,product_name,qty,target_ship_date,target_order_id,status',
+      'id,source_order_id,reason,product_name,qty,unit,target_ship_date,target_order_id,status',
     )
     .eq('target_order_id', orderId)
     .eq('status', 'pending')
@@ -202,7 +212,7 @@ export async function listRelatedBackordersForOrder(orderId: string): Promise<Ba
   const { data, error } = await supabase
     .from('backorders')
     .select(
-      'id,source_order_id,reason,product_name,qty,target_ship_date,target_order_id,status',
+      'id,source_order_id,reason,product_name,qty,unit,target_ship_date,target_order_id,status',
     )
     .or(`source_order_id.eq.${orderId},target_order_id.eq.${orderId}`)
   if (error) throw new Error('โหลดรายการค้างส่งไม่สำเร็จ: ' + error.message)

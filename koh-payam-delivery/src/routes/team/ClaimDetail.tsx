@@ -5,6 +5,8 @@ import { supabase } from '../../lib/supabase'
 import { PageSkeleton } from '../../components/ui/Skeleton'
 import { PageHeader } from '../../components/ui/PageHeader'
 import { PhotoGallery } from '../../components/ui/PhotoGallery'
+import { claimTypeTH } from '../../lib/claimTypes'
+import { maxBrokenEggs } from '../../../supabase/functions/_shared/eggs'
 
 const R2 = import.meta.env.VITE_R2_PUBLIC_BASE_URL as string
 
@@ -94,8 +96,13 @@ export default function ClaimDetail() {
 
   const claimItems = (c.claim_items ?? []) as {
     qty: number
-    order_items: { product_name: string; makro_item_id?: string | null } | null
+    order_items: {
+      product_name: string
+      makro_item_id?: string | null
+      qty_shipped?: number
+    } | null
   }[]
+  const isEggs = c.type === 'broken_eggs'
 
   return (
     <div className="flex flex-col gap-5">
@@ -105,7 +112,7 @@ export default function ClaimDetail() {
       />
 
       <div className="card flex flex-col gap-2 text-sm">
-        <p>ประเภท: {c.type}</p>
+        <p>ประเภท: {claimTypeTH(c.type)}</p>
         {claimItems.length > 0 && (
           <ul className="list-inside list-disc">
             {claimItems.map((ci, i) => (
@@ -113,7 +120,21 @@ export default function ClaimDetail() {
                 {ci.order_items?.makro_item_id && (
                   <span className="tnum text-ink-soft">{ci.order_items.makro_item_id} · </span>
                 )}
-                {ci.order_items?.product_name ?? 'ไม่ระบุสินค้า'} × {ci.qty}
+                {ci.order_items?.product_name ?? 'ไม่ระบุสินค้า'}
+                {isEggs ? (
+                  <>
+                    {' '}
+                    — แตก <strong>{ci.qty} ฟอง</strong>
+                    {ci.order_items && ci.order_items.qty_shipped != null && (
+                      <span className="text-ink-soft">
+                        {' '}
+                        จาก {maxBrokenEggs(ci.order_items.product_name, ci.order_items.qty_shipped)} ฟอง
+                      </span>
+                    )}
+                  </>
+                ) : (
+                  <> × {ci.qty}</>
+                )}
               </li>
             ))}
           </ul>
@@ -212,6 +233,7 @@ export default function ClaimDetail() {
                 disabled={claimItems.length === 0}
               />
               ส่งชดเชยวันถัดไป
+              {isEggs && <span className="muted text-xs">(ส่งเป็นฟองตามจำนวนที่แตก)</span>}
             </label>
             {claimItems.length === 0 && (
               <p className="muted text-xs">

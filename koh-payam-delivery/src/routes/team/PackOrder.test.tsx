@@ -52,7 +52,8 @@ vi.mock('../../lib/api/customerAliases', async (importOriginal) => ({
   getShortName: vi.fn().mockResolvedValue('JJ'),
   saveShortName: vi.fn().mockResolvedValue(undefined),
 }))
-vi.mock('../../lib/api/backorders', () => ({
+vi.mock('../../lib/api/backorders', async (importOriginal) => ({
+  backorderQty: (await importOriginal<typeof import('../../lib/api/backorders')>()).backorderQty,
   listPendingBackordersForOrder: (...a: unknown[]) => listPendingBackordersForOrder(...a),
   markBackorderFulfilled: (...a: unknown[]) => markBackorderFulfilled(...a),
 }))

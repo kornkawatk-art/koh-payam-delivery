@@ -347,6 +347,7 @@ export default function CustomerOrderView() {
                         {i > 0 ? ', ' : ''}
                         {it.itemId ? `${it.itemId} · ` : ''}
                         {it.productName} × {it.qty}
+                        {c.type === 'broken_eggs' && ` ${t(lang, 'claim_form_eggs_unit')}`}
                       </span>
                     ))}
                   </span>

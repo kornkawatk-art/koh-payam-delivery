@@ -1,4 +1,5 @@
 import {
+  backorderQty,
   syncShortageBackorders,
   linkBackordersToDay,
   listUnmatchedBackorders,
@@ -326,6 +327,7 @@ test('listUnmatchedBackorders selects only claim_resend, unmatched rows, ordered
       customerName: 'SUNSET',
       productName: 'fish sauce',
       qty: 1,
+      unit: null,
       createdAt: '2026-09-05T00:00:00.000Z',
     },
   ])
@@ -385,6 +387,7 @@ test('createResendBackorder inserts one backorder row per claim item', async () 
       reason: 'claim_resend',
       product_name: 'rice',
       qty: 2,
+      unit: null,
       status: 'pending',
       target_ship_date: null,
       claim_id: 'c1',
@@ -394,6 +397,7 @@ test('createResendBackorder inserts one backorder row per claim item', async () 
       reason: 'claim_resend',
       product_name: 'fish sauce',
       qty: 1,
+      unit: null,
       status: 'pending',
       target_ship_date: null,
       claim_id: 'c1',
@@ -480,4 +484,21 @@ test('markBackorderFulfilled warns (but does not throw) when the backorder claim
   expect(logAction).not.toHaveBeenCalled()
   expect(warnSpy).toHaveBeenCalledWith('claim_id lookup failed', backorderRowError)
   warnSpy.mockRestore()
+})
+
+test('a broken-eggs resend is owed in eggs', async () => {
+  claimRow = {
+    order_id: 'ord1',
+    type: 'broken_eggs',
+    claim_items: [{ qty: 7, order_items: { product_name: 'ไข่ไก่ 30 ฟอง x 5' } }],
+  }
+  await createResendBackorder('c9')
+  const ins = calls.find((c) => c[0] === 'insert')
+  expect(ins[2]).toEqual([expect.objectContaining({ product_name: 'ไข่ไก่ 30 ฟอง x 5', qty: 7, unit: 'ฟอง' })])
+})
+
+test('backorderQty: Makro units as "xN", other units spelled out', () => {
+  expect(backorderQty({ qty: 3 })).toBe('x3')
+  expect(backorderQty({ qty: 3, unit: null })).toBe('x3')
+  expect(backorderQty({ qty: 7, unit: 'ฟอง' })).toBe('7 ฟอง')
 })

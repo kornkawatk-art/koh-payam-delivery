@@ -2,6 +2,14 @@ import { render, screen } from '@testing-library/react'
 import App from './App'
 import { supabase } from './lib/supabase'
 
+// The routing tests only need to know WHICH page rendered. The real
+// DailyDashboard is a lazy route whose first import compiles a large module
+// graph -- over 5s on a loaded machine running the whole suite -- so stand it
+// in with a marker that keeps its search box (what the assertions look for).
+vi.mock('./routes/team/DailyDashboard', () => ({
+  default: () => <input placeholder="ค้นหาชื่อลูกค้า / เลขออเดอร์" />,
+}))
+
 vi.mock('./lib/supabase', () => {
   const single = vi.fn().mockResolvedValue({ data: null, error: null })
   return {
@@ -63,11 +71,7 @@ test('authed MFA-satisfied user with no profile row is redirected off a role-gat
   render(<App />)
 
   // Fails closed to "/" (DailyDashboard), never renders the restricted page, never hangs on the loader.
-  // DailyDashboard is a lazy route: its first import compiles on demand, which
-  // can outlast findBy's 1s default when the whole suite runs in parallel.
-  expect(
-    await screen.findByPlaceholderText(/ค้นหาชื่อลูกค้า/, {}, { timeout: 5000 }),
-  ).toBeInTheDocument()
+  expect(await screen.findByPlaceholderText(/ค้นหาชื่อลูกค้า/)).toBeInTheDocument()
   expect(screen.queryByText('ClaimsQueue')).not.toBeInTheDocument()
   expect(screen.queryByText('กำลังโหลด…')).not.toBeInTheDocument()
 })

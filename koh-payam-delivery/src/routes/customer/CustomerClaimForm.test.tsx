@@ -322,3 +322,40 @@ test('the item checklist shows the makro item code before the product name (and 
   expect(screen.getByRole('checkbox', { name: '100001 · Rice 5kg' })).toBeInTheDocument()
   expect(screen.getByRole('checkbox', { name: 'Fish sauce' })).toBeInTheDocument()
 })
+
+const eggOrder = [
+  { productName: 'Rice 5kg', shippedQty: 10 },
+  { productName: 'เอโร่ ไข่ไก่ เบอร์ 2 ไม่มีฝา 30 ฟอง x 5', shippedQty: 1 },
+  { productName: 'เอโร่ ไข่ไก่ เบอร์ 1 มีฝา 30 ฟอง', shippedQty: 2 },
+]
+
+test('broken eggs: lists only egg lines, counts eggs (capped at the eggs shipped), needs a photo', async () => {
+  const onDone = vi.fn()
+  render(<CustomerClaimForm token="tok_abc" items={eggOrder} lang="th" onDone={onDone} />)
+
+  await userEvent.click(screen.getByRole('radio', { name: 'ไข่แตก' }))
+  expect(screen.getByText('ไข่รายการไหนแตก แตกกี่ฟอง')).toBeInTheDocument()
+  expect(screen.queryByRole('checkbox', { name: 'Rice 5kg' })).not.toBeInTheDocument()
+
+  await userEvent.click(screen.getByRole('checkbox', { name: /30 ฟอง x 5/ }))
+  expect(screen.getByText(/สูงสุด 150 ฟอง/)).toBeInTheDocument()
+  const qty = screen.getByLabelText(/จำนวน.*30 ฟอง x 5/)
+  fireEvent.change(qty, { target: { value: '999' } })
+  expect(qty).toHaveValue(150) // a bundle of 5 trays holds 150 eggs
+
+  // no photo yet -> can't submit, and says why
+  expect(screen.getByRole('button', { name: 'ส่งเรื่อง' })).toBeDisabled()
+  expect(screen.getByText('กรุณาแนบรูปไข่ที่แตกอย่างน้อย 1 รูป')).toBeInTheDocument()
+
+  fireEvent.change(qty, { target: { value: '7' } })
+  await userEvent.click(screen.getByRole('button', { name: 'mock-upload' }))
+  await userEvent.click(screen.getByRole('button', { name: 'ส่งเรื่อง' }))
+  await waitFor(() => expect(onDone).toHaveBeenCalled())
+  expect(lastBody()).toMatchObject({ type: 'broken_eggs', items: [{ orderItemIndex: 1, qty: 7 }] })
+})
+
+test('broken eggs is unavailable on an order with no eggs', () => {
+  render(<CustomerClaimForm token="tok_abc" items={items} lang="en" onDone={vi.fn()} />)
+  expect(screen.getByRole('radio', { name: /Broken eggs/ })).toBeDisabled()
+  expect(screen.getByText('(This order has no eggs.)')).toBeInTheDocument()
+})

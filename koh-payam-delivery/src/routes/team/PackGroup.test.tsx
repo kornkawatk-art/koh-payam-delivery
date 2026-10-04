@@ -46,7 +46,8 @@ vi.mock('../../components/PhotoCapture', () => ({
     </>
   ),
 }))
-vi.mock('../../lib/api/backorders', () => ({
+vi.mock('../../lib/api/backorders', async (importOriginal) => ({
+  backorderQty: (await importOriginal<typeof import('../../lib/api/backorders')>()).backorderQty,
   listPendingBackordersForOrder: (...a: unknown[]) => listPendingBackordersForOrder(...a),
   markBackorderFulfilled: (...a: unknown[]) => markBackorderFulfilled(...a),
 }))

@@ -245,3 +245,23 @@ test('renders a Thai error instead of a permanent spinner when the claim fails t
   renderPage()
   expect(await screen.findByText('โหลดเคลมไม่สำเร็จ')).toBeInTheDocument()
 })
+
+test('a broken-eggs claim reads in eggs: "แตก N ฟอง จาก M ฟอง", with a Thai type name', async () => {
+  getClaim.mockReset().mockResolvedValue({
+    ...claim,
+    type: 'broken_eggs',
+    claim_items: [
+      { qty: 7, order_items: { product_name: 'เอโร่ ไข่ไก่ เบอร์ 2 30 ฟอง x 5', qty_shipped: 1 } },
+    ],
+  })
+  renderPage()
+  expect(await screen.findByText('ประเภท: ไข่แตก')).toBeInTheDocument()
+  expect(screen.getByText('7 ฟอง')).toBeInTheDocument()
+  expect(screen.getByText(/จาก 150 ฟอง/)).toBeInTheDocument()
+  expect(screen.getByText(/ส่งเป็นฟองตามจำนวนที่แตก/)).toBeInTheDocument()
+})
+
+test('other claim types show their Thai name instead of the raw code', async () => {
+  renderPage()
+  expect(await screen.findByText('ประเภท: สินค้าเสียหาย')).toBeInTheDocument()
+})
