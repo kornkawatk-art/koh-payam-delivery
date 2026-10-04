@@ -6,6 +6,8 @@ import { NAV, canAccess } from '../lib/roles'
 import { NAV_ACCENT_CLASSES } from '../lib/navAccentStyles'
 import { useAppUpdate } from '../lib/useAppUpdate'
 import { PageSkeleton } from './ui/Skeleton'
+import { useNavCounts } from '../lib/useNavCounts'
+import { URGENT_NAV_PATHS } from '../lib/api/navCounts'
 
 export default function AppShell() {
   const { profile, signOut } = useAuth()
@@ -14,6 +16,10 @@ export default function AppShell() {
   const [open, setOpen] = useState(false)
   const { pathname } = useLocation()
   const updateAvailable = useAppUpdate()
+  const counts = useNavCounts(role, pathname)
+  // Only decisions waiting on a manager light the mobile menu dot -- the
+  // routine pack/pier counts are non-zero most of the day.
+  const urgent = URGENT_NAV_PATHS.reduce((n, p) => n + (counts[p] ?? 0), 0)
 
   // Close the mobile drawer on navigation and on Escape.
   useEffect(() => setOpen(false), [pathname])
@@ -30,11 +36,19 @@ export default function AppShell() {
       <header className="sticky top-0 z-30 flex items-center justify-between border-b border-line bg-surface/95 px-4 py-2.5 backdrop-blur lg:hidden">
         <button
           className="btn btn-ghost btn-sm -ml-2"
-          aria-label="เมนู"
+          aria-label={urgent > 0 ? `เมนู (มีงานรอตัดสิน ${urgent})` : 'เมนู'}
           aria-expanded={open}
           onClick={() => setOpen((v) => !v)}
         >
-          <List size={20} weight="bold" aria-hidden="true" />
+          <span className="relative">
+            <List size={20} weight="bold" aria-hidden="true" />
+            {urgent > 0 && (
+              <span
+                className="absolute -right-1 -top-1 h-2.5 w-2.5 rounded-full bg-danger ring-2 ring-surface"
+                aria-hidden="true"
+              />
+            )}
+          </span>
           <span className="font-semibold">ระบบจัดส่งเกาะ</span>
         </button>
         <span className="truncate text-sm text-ink-soft">
@@ -101,6 +115,19 @@ export default function AppShell() {
                           />
                         </span>
                         {n.label}
+                        {!!counts[n.path] && (
+                          <span
+                            className={
+                              'ml-auto min-w-[1.375rem] rounded-full px-1.5 py-0.5 text-center text-xs font-semibold tnum ' +
+                              (URGENT_NAV_PATHS.includes(n.path)
+                                ? 'bg-danger text-white'
+                                : 'bg-line text-ink-soft')
+                            }
+                            aria-label={`ค้าง ${counts[n.path]}`}
+                          >
+                            {counts[n.path]}
+                          </span>
+                        )}
                       </>
                     )}
                   </NavLink>
