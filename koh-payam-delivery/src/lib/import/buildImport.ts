@@ -26,6 +26,7 @@ export type OrderMapping = {
   paymentStatus: string
   outstandingAmount: string
   customerPhone: string
+  orderType: string
 }
 
 export const DEFAULT_DETAIL_MAPPING: DetailMapping = {
@@ -51,6 +52,7 @@ export const DEFAULT_ORDER_MAPPING: OrderMapping = {
   paymentStatus: 'Payment Status',
   outstandingAmount: 'Outstanding Amount',
   customerPhone: 'Customer Phone',
+  orderType: 'Order Type',
 }
 
 export const FIELD_LABELS_DETAIL: Record<keyof DetailMapping, string> = {
@@ -76,6 +78,7 @@ export const FIELD_LABELS_ORDER: Record<keyof OrderMapping, string> = {
   paymentStatus: 'สถานะการชำระเงิน',
   outstandingAmount: 'ยอดค้างชำระ',
   customerPhone: 'เบอร์โทรลูกค้า',
+  orderType: 'ประเภทออเดอร์ (ส่ง/รับเอง)',
 }
 
 // คอลัมน์ที่ต้องมีเสมอ (ที่เหลือมี fallback ในโค้ด จึงไม่บังคับ)
@@ -99,6 +102,7 @@ const ORDER_SOFT: (keyof OrderMapping)[] = [
   'paymentStatus',
   'outstandingAmount',
   'customerPhone',
+  'orderType',
 ]
 // Dept exists in the real Makro OrderDetailExport but must never block import
 // if a future/older file variant lacks it -- an unclassified line just
@@ -135,6 +139,8 @@ export type ParsedOrder = {
   customerPhone: string | null
   // null = the address only names the shared Paknam pier; a manager picks.
   island: Island | null
+  // Makro Order Type "Pick up at store": the customer collects at the branch.
+  isPickup: boolean
   items: ParsedItem[]
 }
 
@@ -278,6 +284,7 @@ export function buildImport(
     const paymentMethod = om.paymentMethod ? (r[om.paymentMethod] ?? '').trim() : ''
     const paymentStatus = om.paymentStatus ? (r[om.paymentStatus] ?? '').trim() : ''
     const customerPhone = om.customerPhone ? (r[om.customerPhone] ?? '').trim() : ''
+    const orderType = om.orderType ? (r[om.orderType] ?? '').trim() : ''
     payamOrders.set(orderNo, {
       makroOrderNo: orderNo,
       customerName: (r[om.customer] ?? '').trim(),
@@ -290,6 +297,7 @@ export function buildImport(
       outstandingAmount: om.outstandingAmount ? toNum(r[om.outstandingAmount]) : 0,
       customerPhone: customerPhone || null,
       island: island === 'unknown' ? null : island,
+      isPickup: /pick\s*-?\s*up/i.test(orderType),
       items: [],
     })
   }

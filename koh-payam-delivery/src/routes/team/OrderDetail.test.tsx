@@ -319,3 +319,10 @@ test('an untagged order warns; a packer sees who must pick, with no picker', asy
   expect(screen.getAllByText('ยังไม่ระบุเกาะ').length).toBeGreaterThan(0)
   expect(screen.queryByRole('combobox', { name: 'เกาะที่ส่ง' })).not.toBeInTheDocument()
 })
+
+test('a pick-up-at-store order says so at the top', async () => {
+  getOrder.mockResolvedValue({ ...order, is_pickup: true })
+  renderPage()
+  expect(await screen.findByText('รับเองที่สาขา')).toBeInTheDocument()
+  expect(screen.getByText(/ไม่ต้องส่งลงเรือ/)).toBeInTheDocument()
+})

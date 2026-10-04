@@ -251,6 +251,17 @@ export default function ImportOrders() {
             }).join('')}
           </p>
 
+          {result.orders.some((o) => o.isPickup) && (
+            <p className="muted">
+              ในนี้มี {result.orders.filter((o) => o.isPickup).length} ออเดอร์ที่ลูกค้ามารับเองที่สาขา
+              (Pick up at store) — นำเข้าตามปกติ และมีป้าย "รับเองที่สาขา" ให้เห็น:{' '}
+              {result.orders
+                .filter((o) => o.isPickup)
+                .map((o) => o.makroOrderNo)
+                .join(', ')}
+            </p>
+          )}
+
           {result.orders.some((o) => !o.island) && (
             <div className="alert alert-warn flex items-start gap-2">
               <Warning size={18} weight="fill" className="mt-0.5 shrink-0" aria-hidden="true" />

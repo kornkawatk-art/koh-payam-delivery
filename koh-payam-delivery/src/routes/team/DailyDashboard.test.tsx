@@ -547,3 +547,14 @@ test('a single-island day shows no island chips or badges', async () => {
   expect(screen.queryByRole('group', { name: 'กรองตามเกาะ' })).not.toBeInTheDocument()
   expect(screen.queryByText('เกาะพยาม')).not.toBeInTheDocument()
 })
+
+test('a pick-up-at-store order carries a "รับเองที่สาขา" badge', async () => {
+  vi.mocked(listOrdersForDay).mockResolvedValueOnce([
+    { id: '1', makro_order_no: 'PO-1', customer_name_en: 'STORE PICKUP', island: 'payam', is_pickup: true, status: 'imported', boat_id: null, paper_box_count: 0, foam_box_count: 0, piece_count: 0, outstanding_amount: 0, customer_phone: '01' },
+    { id: '2', makro_order_no: 'PO-2', customer_name_en: 'BY BOAT', island: 'payam', is_pickup: false, status: 'imported', boat_id: null, paper_box_count: 0, foam_box_count: 0, piece_count: 0, outstanding_amount: 0, customer_phone: '02' },
+  ])
+  renderPage()
+  const row = (await screen.findByText('STORE PICKUP')).closest('tr') as HTMLElement
+  expect(within(row).getByText('รับเองที่สาขา')).toBeInTheDocument()
+  expect(within(screen.getByText('BY BOAT').closest('tr') as HTMLElement).queryByText('รับเองที่สาขา')).not.toBeInTheDocument()
+})

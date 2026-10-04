@@ -19,6 +19,7 @@ import { AmountDue } from '../../components/ui/AmountDue'
 import { groupedItemRows } from '../../components/ui/ItemGroupHeader'
 import { StickerPrintButton } from '../../components/StickerPrint'
 import { ShippingAddress } from '../../components/ui/ShippingAddress'
+import { PickupBadge } from '../../components/ui/PickupBadge'
 
 export default function OrderDetail() {
   const { id } = useParams()
@@ -115,8 +116,15 @@ export default function OrderDetail() {
             {order.makro_order_no} · {order.customer_name_en}
           </h1>
           <StatusBadge status={order.status} />
+          <PickupBadge show={order.is_pickup} />
         </div>
       </header>
+
+      {order.is_pickup && (
+        <p className="alert alert-info">
+          ออเดอร์นี้ลูกค้า<strong>มารับเองที่สาขา</strong> (Pick up at store) — ไม่ต้องส่งลงเรือ
+        </p>
+      )}
 
       {order.outstanding_amount != null && order.outstanding_amount > 0 && (
         <AmountDue

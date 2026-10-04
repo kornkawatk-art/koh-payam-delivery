@@ -17,6 +17,7 @@ import { groupedItemRows } from '../../components/ui/ItemGroupHeader'
 import { StickerPrintButton } from '../../components/StickerPrint'
 import { ShippingAddress } from '../../components/ui/ShippingAddress'
 import { MAX_COUNT, toCount } from '../../lib/stickers'
+import { PickupBadge } from '../../components/ui/PickupBadge'
 
 const R2 = import.meta.env.VITE_R2_PUBLIC_BASE_URL as string
 
@@ -147,6 +148,12 @@ export default function PackOrder() {
         back={{ to: `/order/${id}`, label: 'รายละเอียดออเดอร์' }}
         title={`แพ็ค · ${order.makro_order_no} · ${order.customer_name_en}`}
       />
+      {order.is_pickup && (
+        <p className="alert alert-info flex flex-wrap items-center gap-2">
+          <PickupBadge show />
+          ลูกค้ามารับเองที่สาขา — ไม่ต้องส่งลงเรือ
+        </p>
+      )}
 
       <ShippingAddress addresses={[order.shipping_address]} />
 

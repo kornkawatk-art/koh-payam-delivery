@@ -647,3 +647,34 @@ test('buildImport tags each order with its island; a pier-only order is kept unt
   })
   expect(r.skippedNotIsland).toBe(1) // M: mainland
 })
+
+test('buildImport keeps "Pick up at store" orders but flags them', () => {
+  const O = DEFAULT_ORDER_MAPPING
+  const D = DEFAULT_DETAIL_MAPPING
+  const order = (no: string, type?: string): RawRow => ({
+    [O.orderNo]: no,
+    [O.customer]: 'CUST',
+    [O.subDistrict]: 'เกาะพยาม',
+    [O.shippingAddress]: 'x',
+    ...(type === undefined ? {} : { [O.orderType]: type }),
+  })
+  const line = (no: string): RawRow => ({
+    [D.orderNo]: no,
+    [D.product]: 'rice',
+    [D.orderedQty]: '1',
+    [D.shippedQty]: '1',
+    [D.shortageQty]: '0',
+    [D.cancelledQty]: '0',
+  })
+  const r = buildImport(
+    ['S', 'P', 'N'].map(line),
+    [order('S', 'Standard delivery'), order('P', 'Pick up at store'), order('N')],
+    D,
+    O,
+  )
+  expect(Object.fromEntries(r.orders.map((o) => [o.makroOrderNo, o.isPickup]))).toEqual({
+    S: false,
+    P: true,
+    N: false, // a file without the column imports as delivery, as before
+  })
+})
