@@ -8,12 +8,17 @@
 // qty_shipped — defense-in-depth against a client that bypasses the UI cap.
 // The claim + its items are created atomically by the `create_claim` RPC.
 //
+// broken_eggs ("ไข่แตก") counts eggs, not Makro units: every item must be a
+// product sold by the egg (its name says "N ฟอง"), its qty is clamped to the
+// eggs that shipped (see _shared/eggs.ts), and at least one photo is required.
+//
 // config.toml sets verify_jwt = false: the customer submits this from an emailed
 // link with no Supabase session. Auth here mirrors photo-upload-url's claim
 // branch — the order `link_token` plus the 48h claim window (order must be
 // `shipped`, `shipped_at` set, and now - shipped_at <= 48h), else 403.
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { cors } from '../_shared/cors.ts'
+import { eggsPerUnit, maxBrokenEggs } from '../_shared/eggs.ts'
 
 const JSON_HEADERS = { ...cors, 'Content-Type': 'application/json' }
 const CLAIM_WINDOW_MS = 48 * 60 * 60 * 1000
@@ -23,6 +28,7 @@ const ITEMS_COUNT_OK: Record<string, (n: number) => boolean> = {
   box_lost: (n) => n === 0,
   damaged: (n) => n >= 1,
   missing_in_box: (n) => n >= 1,
+  broken_eggs: (n) => n >= 1,
 }
 
 Deno.serve(async (req) => {
@@ -35,7 +41,7 @@ Deno.serve(async (req) => {
     const p = await req.json()
     if (!p?.token) return new Response('token required', { status: 400, headers: cors })
 
-    if (!['missing_in_box', 'damaged', 'box_lost'].includes(p.type)) {
+    if (!(p.type in ITEMS_COUNT_OK)) {
       return new Response(JSON.stringify({ error: 'invalid type' }), { status: 400, headers: cors })
     }
 
@@ -59,6 +65,10 @@ Deno.serve(async (req) => {
           headers: cors,
         })
       }
+    }
+
+    if (p.type === 'broken_eggs' && photoKeys.length === 0) {
+      return new Response(JSON.stringify({ error: 'photo required' }), { status: 400, headers: cors })
     }
 
     const description = String(p.description ?? '').slice(0, 2000)
@@ -87,22 +97,36 @@ Deno.serve(async (req) => {
     // single-item form used to: index into this order's items ordered by
     // line_no. Fetched once and reused for every entry in `items`. qty_shipped
     // is fetched alongside so each entry's qty can be clamped below.
-    let orderItemsList: { id: string; qty_shipped: number }[] | null = null
+    let orderItemsList: { id: string; qty_shipped: number; product_name: string }[] | null = null
     if (rawItems.length) {
       const { data: items } = await admin
         .from('order_items')
-        .select('id,line_no,qty_shipped')
+        .select('id,line_no,qty_shipped,product_name')
         .eq('order_id', o.id)
         .order('line_no')
       orderItemsList = items ?? []
     }
 
-    const itemsJson = rawItems.map((it: Record<string, unknown>) => {
+    const resolved = rawItems.map((it: Record<string, unknown>) => {
       const idx = it?.orderItemIndex
-      const resolvedItem = Number.isInteger(idx) ? orderItemsList?.[idx as number] : null
+      return Number.isInteger(idx) ? orderItemsList?.[idx as number] ?? null : null
+    })
+    if (
+      p.type === 'broken_eggs' &&
+      resolved.some((r) => !r || eggsPerUnit(r.product_name) === null)
+    ) {
+      return new Response(JSON.stringify({ error: 'not an egg item' }), { status: 400, headers: cors })
+    }
+
+    const itemsJson = rawItems.map((it: Record<string, unknown>, i: number) => {
+      const resolvedItem = resolved[i]
       const orderItemId = resolvedItem?.id ?? null
       const submittedQty = Math.max(1, Math.floor(Number(it?.qty) || 1))
-      const qty = Math.min(submittedQty, resolvedItem?.qty_shipped || 1)
+      const cap =
+        p.type === 'broken_eggs'
+          ? maxBrokenEggs(resolvedItem!.product_name, resolvedItem!.qty_shipped)
+          : resolvedItem?.qty_shipped
+      const qty = Math.min(submittedQty, cap || 1)
       return { order_item_id: orderItemId, qty }
     })
 

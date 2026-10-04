@@ -5,6 +5,7 @@ import { getOrder, regenTokenLink, deleteOrder, setOrderIsland } from '../../lib
 import { ISLAND_LIST, ISLANDS, isIsland, islandName, type Island } from '../../lib/islands'
 import {
   listRelatedBackordersForOrder,
+  backorderQty,
   type BackorderRow,
 } from '../../lib/api/backorders'
 import { StatusBadge } from '../../components/ui/StatusBadge'
@@ -199,7 +200,7 @@ export default function OrderDetail() {
           <ul className="mt-1.5 list-disc pl-5">
             {owedHere.map((b) => (
               <li key={b.id}>
-                {b.product_name} x{b.qty}
+                {b.product_name} {backorderQty(b)}
               </li>
             ))}
           </ul>
@@ -333,7 +334,7 @@ export default function OrderDetail() {
           <ul className="mt-1 flex flex-col gap-1 text-ink-soft">
             {backorders.map((b) => (
               <li key={b.id}>
-                {b.product_name} x{b.qty} ·{' '}
+                {b.product_name} {backorderQty(b)} ·{' '}
                 {b.reason === 'claim_resend' ? 'ส่งชดเชยเคลม' : 'ของขาด'} ·{' '}
                 {b.status === 'fulfilled' ? 'ส่งแล้ว' : 'รอส่ง'}
                 {b.source_order_id === id ? ' (ขาดจากออเดอร์นี้)' : ''}

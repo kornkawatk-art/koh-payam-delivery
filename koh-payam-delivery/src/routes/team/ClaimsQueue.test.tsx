@@ -11,7 +11,8 @@ vi.mock('../../lib/api/claims', () => ({
 }))
 
 const listUnmatchedBackorders = vi.fn()
-vi.mock('../../lib/api/backorders', () => ({
+vi.mock('../../lib/api/backorders', async (importOriginal) => ({
+  backorderQty: (await importOriginal<typeof import('../../lib/api/backorders')>()).backorderQty,
   listUnmatchedBackorders: (...a: unknown[]) => listUnmatchedBackorders(...a),
 }))
 

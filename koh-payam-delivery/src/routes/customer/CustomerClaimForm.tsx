@@ -1,11 +1,12 @@
 import { useState } from 'react'
 import { t, type Lang } from './i18n'
 import PhotoCapture from '../../components/PhotoCapture'
+import { maxBrokenEggs } from '../../../supabase/functions/_shared/eggs'
 
 const FN = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/submit-claim`
 const ANON = import.meta.env.VITE_SUPABASE_ANON_KEY as string
 
-const CLAIM_TYPES = ['missing_in_box', 'damaged', 'box_lost'] as const
+const CLAIM_TYPES = ['missing_in_box', 'damaged', 'broken_eggs', 'box_lost'] as const
 type ClaimType = (typeof CLAIM_TYPES)[number]
 
 type Props = {
@@ -40,6 +41,9 @@ function selectOnFocus(e: React.FocusEvent<HTMLInputElement>) {
  *    checkbox per item, each with its own qty once checked, capped at that
  *    item's shippedQty (an item that shipped 0 units isn't offered at all —
  *    that's the existing shortage/backorder flow, a different concept).
+ *  - broken_eggs lists only products sold by the egg ("N ฟอง" in the name)
+ *    and counts EGGS, capped at the eggs that shipped; a photo is required.
+ *    submit-claim re-checks all three.
  */
 export default function CustomerClaimForm({ token, items, lang, onDone }: Props) {
   const [type, setType] = useState<ClaimType>('missing_in_box')
@@ -50,12 +54,18 @@ export default function CustomerClaimForm({ token, items, lang, onDone }: Props)
   const [photoBusy, setPhotoBusy] = useState(false)
   const [err, setErr] = useState(false)
 
+  const isEggs = type === 'broken_eggs'
   const checkedCount = Object.keys(checkedItems).length
-  const canSubmit = type === 'box_lost' || checkedCount > 0
-  const showItemChecklist = type === 'missing_in_box' || type === 'damaged'
-  const claimableItems = items
-    .map((it, index) => ({ ...it, index }))
-    .filter((it) => it.shippedQty > 0)
+  const needsPhoto = isEggs && keys.length === 0
+  const canSubmit = (type === 'box_lost' || checkedCount > 0) && !needsPhoto
+  const showItemChecklist = type !== 'box_lost'
+  // `max` is the per-line cap: units shipped, or for eggs the eggs shipped.
+  const eggItems = items
+    .map((it, index) => ({ ...it, index, max: maxBrokenEggs(it.productName, it.shippedQty) }))
+    .filter((it) => it.max > 0)
+  const claimableItems = isEggs
+    ? eggItems
+    : items.map((it, index) => ({ ...it, index, max: it.shippedQty })).filter((it) => it.max > 0)
 
   function changeType(ct: ClaimType) {
     setType(ct)
@@ -123,9 +133,13 @@ export default function CustomerClaimForm({ token, items, lang, onDone }: Props)
               name="claim_type"
               value={ct}
               checked={type === ct}
+              disabled={ct === 'broken_eggs' && eggItems.length === 0}
               onChange={() => changeType(ct)}
             />
             {t(lang, `claim_type_${ct}`)}
+            {ct === 'broken_eggs' && eggItems.length === 0 && (
+              <span className="muted text-xs">({t(lang, 'claim_form_no_eggs')})</span>
+            )}
           </label>
         ))}
       </fieldset>
@@ -133,9 +147,16 @@ export default function CustomerClaimForm({ token, items, lang, onDone }: Props)
       {showItemChecklist && (
         <fieldset className="flex flex-col gap-2">
           <legend className="section-title">
-            {t(lang, type === 'damaged' ? 'claim_form_damaged_items' : 'claim_form_missing_items')}
+            {t(
+              lang,
+              isEggs
+                ? 'claim_form_egg_items'
+                : type === 'damaged'
+                  ? 'claim_form_damaged_items'
+                  : 'claim_form_missing_items',
+            )}
           </legend>
-          {claimableItems.map(({ productName, itemId, shippedQty, index }) => {
+          {claimableItems.map(({ productName, itemId, max, index }) => {
             const checked = index in checkedItems
             return (
               <div key={`${productName}-${index}`} className="flex items-center gap-3 text-sm">
@@ -151,25 +172,30 @@ export default function CustomerClaimForm({ token, items, lang, onDone }: Props)
                   </span>
                 </label>
                 {checked && (
-                  <input
-                    type="number"
-                    min={1}
-                    max={shippedQty}
-                    inputMode="numeric"
-                    aria-label={`${t(lang, 'claim_form_qty')}: ${productName}`}
-                    value={checkedItems[index]}
-                    onChange={(e) =>
-                      setItemQty(
-                        index,
-                        Math.min(
-                          shippedQty,
-                          Math.max(1, Math.floor(Number(e.target.value)) || 1),
-                        ),
-                      )
-                    }
-                    onFocus={selectOnFocus}
-                    className="w-20"
-                  />
+                  <span className="flex items-center gap-1.5">
+                    <input
+                      type="number"
+                      min={1}
+                      max={max}
+                      inputMode="numeric"
+                      aria-label={`${t(lang, 'claim_form_qty')}: ${productName}`}
+                      value={checkedItems[index]}
+                      onChange={(e) =>
+                        setItemQty(
+                          index,
+                          Math.min(max, Math.max(1, Math.floor(Number(e.target.value)) || 1)),
+                        )
+                      }
+                      onFocus={selectOnFocus}
+                      className="w-20"
+                    />
+                    {isEggs && (
+                      <span className="whitespace-nowrap text-xs text-ink-soft">
+                        {t(lang, 'claim_form_eggs_unit')} ·{' '}
+                        {t(lang, 'claim_form_eggs_max', { n: max })}
+                      </span>
+                    )}
+                  </span>
                 )}
               </div>
             )
@@ -197,6 +223,10 @@ export default function CustomerClaimForm({ token, items, lang, onDone }: Props)
           onRemoved={(k) => setKeys((ks) => ks.filter((kk) => kk !== k))}
         />
       </div>
+
+      {needsPhoto && (
+        <p className="text-xs text-warn-ink">{t(lang, 'claim_form_photo_required')}</p>
+      )}
 
       {err && <p className="alert alert-danger">{t(lang, 'claim_form_error')}</p>}
 

@@ -6,6 +6,7 @@ import { attachEvidencePhoto, removeEvidencePhoto } from '../../lib/api/photos'
 import {
   listPendingBackordersForOrder,
   markBackorderFulfilled,
+  backorderQty,
   type BackorderRow,
 } from '../../lib/api/backorders'
 import PhotoCapture from '../../components/PhotoCapture'
@@ -164,7 +165,7 @@ export default function PackOrder() {
             {backorders.map((b) => (
               <li key={b.id} className="flex items-center gap-3">
                 <span>
-                  {b.product_name} x{b.qty}
+                  {b.product_name} {backorderQty(b)}
                 </span>
                 <button
                   className="btn btn-secondary btn-sm"

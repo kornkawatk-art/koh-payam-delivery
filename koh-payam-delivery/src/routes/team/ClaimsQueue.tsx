@@ -1,12 +1,17 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { listClaims, countOutstandingClaims, type ClaimRow } from '../../lib/api/claims'
-import { listUnmatchedBackorders, type UnmatchedBackorderRow } from '../../lib/api/backorders'
+import {
+  backorderQty,
+  listUnmatchedBackorders,
+  type UnmatchedBackorderRow,
+} from '../../lib/api/backorders'
 import { Flag, CheckCircle } from '@phosphor-icons/react'
 import { SkeletonRows } from '../../components/ui/Skeleton'
 import { PageHeader } from '../../components/ui/PageHeader'
 import { formatDateTimeTH } from '../../lib/format'
 import { EmptyState } from '../../components/ui/EmptyState'
+import { claimTypeTH } from '../../lib/claimTypes'
 
 type Filter = 'all' | 'open' | 'approved' | 'rejected'
 
@@ -154,7 +159,7 @@ export default function ClaimsQueue() {
                       </Link>
                     </td>
                     <td data-label="ลูกค้า">{c.customer_name_en}</td>
-                    <td data-label="ประเภท">{c.type}</td>
+                    <td data-label="ประเภท">{claimTypeTH(c.type)}</td>
                     <td data-label="จำนวนรายการ" className="tnum">
                       {c.itemCount} รายการ
                     </td>
@@ -200,7 +205,7 @@ export default function ClaimsQueue() {
                     <tr key={b.id} className={stale ? 'bg-red-50' : undefined}>
                       <td className="stack-lead">{b.customerName}</td>
                       <td data-label="สินค้า">
-                        {b.productName} x{b.qty}
+                        {b.productName} {backorderQty(b)}
                       </td>
                       <td data-label="ค้างมาแล้ว" className="tnum">
                         {daysWaiting} วัน

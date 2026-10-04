@@ -16,7 +16,8 @@ vi.mock('../../lib/api/orders', () => ({
   deleteOrder: (...a: unknown[]) => deleteOrder(...a),
   setOrderIsland: (...a: unknown[]) => setOrderIsland(...a),
 }))
-vi.mock('../../lib/api/backorders', () => ({
+vi.mock('../../lib/api/backorders', async (importOriginal) => ({
+  backorderQty: (await importOriginal<typeof import('../../lib/api/backorders')>()).backorderQty,
   listRelatedBackordersForOrder: (...a: unknown[]) => listRelatedBackordersForOrder(...a),
 }))
 vi.mock('../../lib/auth', () => ({
