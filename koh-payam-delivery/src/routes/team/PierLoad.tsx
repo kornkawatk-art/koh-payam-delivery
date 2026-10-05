@@ -364,14 +364,13 @@ export default function PierLoad() {
       </label>
 
       <section>
-        <p className="section-title mb-2">รูปหลักฐาน (สูงสุด 5)</p>
+        <p className="section-title mb-2">รูปหลักฐาน (อย่างน้อย 1 รูป)</p>
         {initialPhotos === null ? (
           <Spinner />
         ) : (
         <PhotoCapture
           scope="evidence"
           orderId={sel.id}
-          max={5}
           initialPhotos={initialPhotos}
           onBusyChange={setPhotoBusy}
           onUploaded={async (key) => {
