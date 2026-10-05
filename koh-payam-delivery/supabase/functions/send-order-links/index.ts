@@ -1,4 +1,10 @@
-// POST { shipDate: string } -> { ok: true, sent: number, failed: number, skipped: boolean }
+// POST { shipDate: string }
+//   -> { ok: true, sent: number, failed: number, skipped: boolean, unreached: UnreachedCustomer[] }
+//
+// `unreached` (unreached.ts) lists the day's customers who did NOT get a LINE
+// message -- no phone, not registered, or the push failed -- so the team can
+// copy those links by hand. Also returned when the day was already sent
+// (skipped), so pressing the button again still shows who is missing.
 //
 // Called by BoatSetup.tsx (via src/lib/api/shipDays.ts's sendOrderLinks) right
 // after a team member saves that day's boat list, from an authenticated team
@@ -58,6 +64,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { cors } from '../_shared/cors.ts'
 import { normalizePhone } from '../_shared/phone.ts'
 import { dedupOrdersByPhone } from './dedup.ts'
+import { unreachedCustomers } from './unreached.ts'
 import { bangkokToday, missingLineSecrets } from './guards.ts'
 
 const JSON_HEADERS = { ...cors, 'Content-Type': 'application/json' }
@@ -65,10 +72,13 @@ const LINE_PUSH_URL = 'https://api.line.me/v2/bot/message/push'
 
 type OrderForLink = {
   id: string
+  makro_order_no: string
   customer_name_en: string
   customer_phone: string | null
   link_token: string
+  is_pickup: boolean | null
 }
+const ORDER_COLS = 'id,makro_order_no,customer_name_en,customer_phone,link_token,is_pickup'
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: cors })
@@ -140,9 +150,31 @@ Deno.serve(async (req) => {
       })
     }
     if (shipDay.links_sent_at) {
-      return new Response(JSON.stringify({ ok: true, sent: 0, failed: 0, skipped: true }), {
-        headers: JSON_HEADERS,
-      })
+      // Nothing is sent again, but still report who the earlier send could
+      // not reach (best effort -- a lookup failure just reports nobody).
+      let unreached: ReturnType<typeof unreachedCustomers> = []
+      const { data: dayOrders } = await admin
+        .from('orders')
+        .select(ORDER_COLS)
+        .eq('ship_date', shipDate)
+      const day = (dayOrders ?? []) as OrderForLink[]
+      if (day.length) {
+        const phones = Array.from(
+          new Set(day.map((o) => normalizePhone(o.customer_phone ?? '')).filter(Boolean)),
+        )
+        const { data: contacts, error: cErr } = phones.length
+          ? await admin.from('line_contacts').select('phone').in('phone', phones)
+          : { data: [], error: null }
+        if (!cErr)
+          unreached = unreachedCustomers(
+            day,
+            new Set((contacts ?? []).map((c: { phone: string }) => c.phone)),
+          )
+      }
+      return new Response(
+        JSON.stringify({ ok: true, sent: 0, failed: 0, skipped: true, unreached }),
+        { headers: JSON_HEADERS },
+      )
     }
 
     // Step 1b: fail fast on unprovisioned secrets, BEFORE any order is loaded
@@ -165,7 +197,7 @@ Deno.serve(async (req) => {
     // Step 2: load every order shipping that day.
     const { data: orders, error: ordersErr } = await admin
       .from('orders')
-      .select('id,customer_name_en,customer_phone,link_token')
+      .select(ORDER_COLS)
       .eq('ship_date', shipDate)
     if (ordersErr) {
       console.error('send-order-links load orders', ordersErr)
@@ -180,6 +212,8 @@ Deno.serve(async (req) => {
 
     let sent = 0
     let failed = 0
+    const registered = new Set<string>()
+    const failedPhones = new Set<string>()
 
     if (deduped.length) {
       // line_contacts.phone is written normalized by register-line-contact, so
@@ -210,6 +244,7 @@ Deno.serve(async (req) => {
           c.line_user_id,
         ]),
       )
+      for (const p of contactByPhone.keys()) registered.add(p)
 
       // Steps 4+5: push per recipient, independently — one bad send must
       // never abort the batch.
@@ -231,6 +266,7 @@ Deno.serve(async (req) => {
           sent += 1
         } catch (e) {
           failed += 1
+          failedPhones.add(normalizePhone(o.customer_phone ?? ''))
           // Log enough to investigate (order id, phone) — never the response
           // body or the channel token, which could carry anything sensitive.
           console.error('send-order-links push failed', {
@@ -249,7 +285,8 @@ Deno.serve(async (req) => {
       .update({ links_sent_at: new Date().toISOString() })
       .eq('id', shipDay.id)
 
-    return new Response(JSON.stringify({ ok: true, sent, failed, skipped: false }), {
+    const unreached = unreachedCustomers((orders ?? []) as OrderForLink[], registered, failedPhones)
+    return new Response(JSON.stringify({ ok: true, sent, failed, skipped: false, unreached }), {
       headers: JSON_HEADERS,
     })
   } catch (e) {

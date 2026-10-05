@@ -71,7 +71,7 @@ vi.mock('../../lib/api/shipDays', () => ({
   // Non-null by default so the new "ยังไม่ได้ส่งลิงก์ไลน์" banner stays out of
   // every pre-existing test's way; tests that care override it explicitly.
   getShipDayLinksSentAt: vi.fn().mockResolvedValue('2026-01-01T00:00:00.000Z'),
-  sendOrderLinks: vi.fn().mockResolvedValue({ sent: 0, failed: 0, skipped: false }),
+  sendOrderLinks: vi.fn().mockResolvedValue({ sent: 0, failed: 0, skipped: false, unreached: [] }),
 }))
 
 const listBackordersForDay = vi.fn().mockResolvedValue([])
@@ -429,7 +429,7 @@ test('prompts to send LINE links when they have not been sent yet for today, and
   await screen.findByText('BLUE VIEW')
   expect(await screen.findByText('ยังไม่ได้ส่งลิงก์ไลน์ให้ลูกค้าวันนี้')).toBeInTheDocument()
 
-  vi.mocked(sendOrderLinks).mockResolvedValueOnce({ sent: 3, failed: 0, skipped: false })
+  vi.mocked(sendOrderLinks).mockResolvedValueOnce({ sent: 3, failed: 0, skipped: false, unreached: [] })
   await userEvent.click(screen.getByRole('button', { name: 'ส่งลิงก์ไลน์เลย' }))
 
   expect(sendOrderLinks).toHaveBeenCalledWith(todayLocalISO())
@@ -557,4 +557,40 @@ test('a pick-up-at-store order carries a "รับเองที่สาข�
   const row = (await screen.findByText('STORE PICKUP')).closest('tr') as HTMLElement
   expect(within(row).getByText('รับเองที่สาขา')).toBeInTheDocument()
   expect(within(screen.getByText('BY BOAT').closest('tr') as HTMLElement).queryByText('รับเองที่สาขา')).not.toBeInTheDocument()
+})
+
+test('after sending, a popup lists the customers LINE did not reach, linking to their orders', async () => {
+  vi.mocked(getShipDayLinksSentAt).mockResolvedValueOnce(null)
+  renderPage()
+  await screen.findByText('BLUE VIEW')
+  vi.mocked(sendOrderLinks).mockResolvedValueOnce({
+    sent: 2,
+    failed: 0,
+    skipped: false,
+    unreached: [
+      { customerName: 'PAYAM CAFE', phone: '0822222222', reason: 'not_registered', orders: [{ id: '2', makroOrderNo: 'PO-2' }] },
+      { customerName: 'NO PHONE SHOP', phone: null, reason: 'no_phone', orders: [{ id: '9', makroOrderNo: 'PO-9' }] },
+    ],
+  })
+  await userEvent.click(screen.getByRole('button', { name: 'ส่งลิงก์ไลน์เลย' }))
+
+  const dialog = await screen.findByRole('dialog', { name: 'ลูกค้าที่ยังไม่ได้รับลิงก์ทางไลน์' })
+  expect(within(dialog).getByText('ยังไม่ได้รับลิงก์ทางไลน์ 2 ราย')).toBeInTheDocument()
+  expect(within(dialog).getByText(/ยังไม่ได้ลงทะเบียน LINE/)).toBeInTheDocument()
+  expect(within(dialog).getByText(/ไม่มีเบอร์โทรในออเดอร์/)).toBeInTheDocument()
+  expect(within(dialog).getByRole('link', { name: 'PO-2' })).toHaveAttribute('href', '/order/2')
+  expect(screen.getByText('ส่งลิงก์ไลน์ 2 ฉบับ · ยังไม่ได้รับ 2 ราย')).toBeInTheDocument()
+
+  await userEvent.click(within(dialog).getByRole('button', { name: 'รับทราบ' }))
+  expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+})
+
+test('no popup when everyone was reached', async () => {
+  vi.mocked(getShipDayLinksSentAt).mockResolvedValueOnce(null)
+  renderPage()
+  await screen.findByText('BLUE VIEW')
+  vi.mocked(sendOrderLinks).mockResolvedValueOnce({ sent: 3, failed: 0, skipped: false, unreached: [] })
+  await userEvent.click(screen.getByRole('button', { name: 'ส่งลิงก์ไลน์เลย' }))
+  await screen.findByText('ส่งลิงก์ไลน์ 3 ฉบับ')
+  expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
 })

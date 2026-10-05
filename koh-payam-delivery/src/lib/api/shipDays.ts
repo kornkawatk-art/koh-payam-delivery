@@ -53,9 +53,18 @@ export async function getShipDayLinksSentAt(shipDate: string): Promise<string | 
  * fallback path in send-order-links itself (verify_jwt stays at its
  * default `true`), so a missing session simply fails as unauthorized.
  */
-export async function sendOrderLinks(
-  shipDate: string,
-): Promise<{ sent: number; failed: number; skipped: boolean }> {
+export type { UnreachedCustomer } from '../../../supabase/functions/send-order-links/unreached'
+import type { UnreachedCustomer } from '../../../supabase/functions/send-order-links/unreached'
+
+export type SendLinksResult = {
+  sent: number
+  failed: number
+  skipped: boolean
+  // customers the send could not reach (copy their links by hand)
+  unreached: UnreachedCustomer[]
+}
+
+export async function sendOrderLinks(shipDate: string): Promise<SendLinksResult> {
   const res = await fetchWithTeamSession(`${FN_BASE}/send-order-links`, {
     method: 'POST',
     headers: {
@@ -66,7 +75,13 @@ export async function sendOrderLinks(
   })
   if (!res.ok) throw new Error('ส่งลิงก์ไลน์ไม่สำเร็จ (' + res.status + ')')
   const body = await res.json()
-  return { sent: body.sent, failed: body.failed, skipped: body.skipped }
+  return {
+    sent: body.sent,
+    failed: body.failed,
+    skipped: body.skipped,
+    // older deployments of the function don't send it
+    unreached: Array.isArray(body.unreached) ? body.unreached : [],
+  }
 }
 
 // `item_statuses` (just each line's ok/short status) lets the daily dashboard

@@ -1,6 +1,11 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { listOrdersForDay, getShipDayLinksSentAt, sendOrderLinks } from '../../lib/api/shipDays'
+import {
+  listOrdersForDay,
+  getShipDayLinksSentAt,
+  sendOrderLinks,
+  type UnreachedCustomer,
+} from '../../lib/api/shipDays'
 import { supabase } from '../../lib/supabase'
 import {
   House,
@@ -28,6 +33,7 @@ import {
   type IslandFilterValue,
 } from '../../components/ui/Island'
 import { PickupBadge } from '../../components/ui/PickupBadge'
+import { LinkSendReport } from '../../components/LinkSendReport'
 
 export default function DailyDashboard() {
   const navigate = useNavigate()
@@ -41,6 +47,7 @@ export default function DailyDashboard() {
   const [linksSentAt, setLinksSentAt] = useState<string | null | undefined>(undefined)
   const [linkSendBusy, setLinkSendBusy] = useState(false)
   const [linkSendMsg, setLinkSendMsg] = useState<string>()
+  const [unreached, setUnreached] = useState<UnreachedCustomer[]>([])
 
   const load = useCallback(async () => {
     // A date picker being cleared/edited passes through '' -- don't query
@@ -82,8 +89,12 @@ export default function DailyDashboard() {
     setLinkSendBusy(true)
     setLinkSendMsg(undefined)
     try {
-      const { sent, skipped } = await sendOrderLinks(date)
-      setLinkSendMsg(skipped ? 'ส่งลิงก์ไลน์ไปแล้วก่อนหน้านี้' : `ส่งลิงก์ไลน์ ${sent} ฉบับ`)
+      const r = await sendOrderLinks(date)
+      setLinkSendMsg(
+        (r.skipped ? 'ส่งลิงก์ไลน์ไปแล้วก่อนหน้านี้' : `ส่งลิงก์ไลน์ ${r.sent} ฉบับ`) +
+          (r.unreached.length ? ` · ยังไม่ได้รับ ${r.unreached.length} ราย` : ''),
+      )
+      setUnreached(r.unreached)
       setLinksSentAt(new Date().toISOString())
     } catch (e) {
       setLinkSendMsg((e as Error).message)
@@ -179,6 +190,9 @@ export default function DailyDashboard() {
 
   return (
     <div className="flex flex-col gap-5">
+      {unreached.length > 0 && (
+        <LinkSendReport unreached={unreached} onClose={() => setUnreached([])} />
+      )}
       <PageHeader
         title="งานวันนี้"
         icon={House}

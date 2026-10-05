@@ -6,7 +6,7 @@ import { todayLocalISO } from '../../lib/format'
 
 const getOrCreateShipDay = vi.fn()
 const setBoats = vi.fn().mockResolvedValue(undefined)
-const sendOrderLinks = vi.fn().mockResolvedValue({ sent: 0, failed: 0, skipped: false })
+const sendOrderLinks = vi.fn().mockResolvedValue({ sent: 0, failed: 0, skipped: false, unreached: [] })
 
 vi.mock('../../lib/api/shipDays', () => ({
   getOrCreateShipDay: (...a: unknown[]) => getOrCreateShipDay(...a),
@@ -38,7 +38,7 @@ beforeEach(() => {
     ],
   })
   setBoats.mockClear()
-  sendOrderLinks.mockReset().mockResolvedValue({ sent: 0, failed: 0, skipped: false })
+  sendOrderLinks.mockReset().mockResolvedValue({ sent: 0, failed: 0, skipped: false, unreached: [] })
   countResult.current = { count: 0, error: null }
 })
 
@@ -122,7 +122,7 @@ test('save() shows a Thai error message when persisting fails', async () => {
 })
 
 test('saving boats successfully also sends LINE links for the same date and folds the count into the success message', async () => {
-  sendOrderLinks.mockResolvedValueOnce({ sent: 5, failed: 1, skipped: false })
+  sendOrderLinks.mockResolvedValueOnce({ sent: 5, failed: 1, skipped: false, unreached: [] })
   renderPage()
   await screen.findByDisplayValue('เรือเช้า')
 
@@ -159,4 +159,20 @@ test('fails closed when the count query errors — boat stays, warning shown', a
     await screen.findByText('ตรวจสอบออเดอร์ที่ผูกกับเรือไม่สำเร็จ ลองใหม่อีกครั้ง'),
   ).toBeInTheDocument()
   expect(screen.getByDisplayValue('เรือเช้า')).toBeInTheDocument()
+})
+
+test('saving boats then shows who LINE did not reach', async () => {
+  sendOrderLinks.mockResolvedValueOnce({
+    sent: 4,
+    failed: 1,
+    skipped: false,
+    unreached: [{ customerName: 'BLOCKED', phone: '0833333333', reason: 'push_failed', orders: [{ id: 'o5', makroOrderNo: 'PO-5' }] }],
+  })
+  renderPage()
+  await screen.findByDisplayValue('เรือเช้า')
+  await userEvent.click(screen.getByRole('button', { name: 'บันทึก' }))
+  const dialog = await screen.findByRole('dialog', { name: 'ลูกค้าที่ยังไม่ได้รับลิงก์ทางไลน์' })
+  expect(dialog).toHaveTextContent('BLOCKED')
+  expect(dialog).toHaveTextContent('ส่งไม่สำเร็จ (อาจบล็อก LINE ร้าน)')
+  expect(screen.getByText('บันทึกรายการเรือแล้ว · ส่งลิงก์ไลน์ 4 ฉบับ · ยังไม่ได้รับ 1 ราย')).toBeInTheDocument()
 })

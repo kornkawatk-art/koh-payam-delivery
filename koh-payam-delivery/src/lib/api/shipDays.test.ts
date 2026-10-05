@@ -49,7 +49,8 @@ test('sendOrderLinks POSTs to the edge function with the session bearer token an
   expect(init.method).toBe('POST')
   expect(init.headers.Authorization).toBe('Bearer tok-123')
   expect(JSON.parse(init.body)).toEqual({ shipDate: '2026-10-01' })
-  expect(result).toEqual({ sent: 3, failed: 1, skipped: false })
+  // an older deployment of the function sends no list -> an empty one
+  expect(result).toEqual({ sent: 3, failed: 1, skipped: false, unreached: [] })
 })
 
 test('sendOrderLinks throws a Thai error carrying the status code on a non-ok response', async () => {
