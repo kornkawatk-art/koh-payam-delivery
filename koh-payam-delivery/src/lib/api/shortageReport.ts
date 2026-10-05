@@ -5,6 +5,7 @@ import {
   deptGroupOf,
   type DeptGroupCode,
 } from '../departments'
+import { fetchAll } from './fetchAll'
 
 export type ShortageDetailRow = {
   orderId: string
@@ -86,16 +87,25 @@ export async function getShortageReport(
   fromDate: string,
   toDate: string,
 ): Promise<ShortageReport> {
-  const { data, error } = await supabase
-    .from('order_items')
-    .select(
-      'product_name, makro_item_id, dept, qty_ordered, qty_shipped, shortage_qty, order_id, orders!inner(makro_order_no, customer_name_en, ship_date, island)',
+  // Paged: a long range can hold more than the 1000 rows one request returns.
+  let rows: RawShortageRow[]
+  try {
+    rows = await fetchAll<RawShortageRow>(
+      (from, to) =>
+        supabase
+          .from('order_items')
+          .select(
+            'product_name, makro_item_id, dept, qty_ordered, qty_shipped, shortage_qty, order_id, orders!inner(makro_order_no, customer_name_en, ship_date, island)',
+          )
+          .eq('status', 'short')
+          .gte('orders.ship_date', fromDate)
+          .lte('orders.ship_date', toDate)
+          .order('id')
+          .range(from, to) as unknown as PromiseLike<{ data: RawShortageRow[] | null; error: unknown }>,
     )
-    .eq('status', 'short')
-    .gte('orders.ship_date', fromDate)
-    .lte('orders.ship_date', toDate)
-  if (error) throw new Error('โหลดรายงานของขาดไม่สำเร็จ: ' + error.message)
-  const rows = (data ?? []) as unknown as RawShortageRow[]
+  } catch (e) {
+    throw new Error('โหลดรายงานของขาดไม่สำเร็จ: ' + (e as { message?: string }).message)
+  }
 
   const byProduct = new Map<string, ProductAcc>()
   const affectedOrders = new Set<string>()

@@ -37,6 +37,15 @@ function makeBuilder() {
       filtered = filtered.filter((r) => get(r, col) <= val)
       return builder
     },
+    order: (col: string) => {
+      calls.push(['order', col])
+      return builder
+    },
+    range: (from: number, to: number) => {
+      calls.push(['range', from, to])
+      filtered = filtered.slice(from, to + 1)
+      return builder
+    },
     then: (resolve: any, reject: any) =>
       Promise.resolve(
         queryError ? { data: null, error: queryError } : { data: filtered, error: null },

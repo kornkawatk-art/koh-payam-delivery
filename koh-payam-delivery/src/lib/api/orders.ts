@@ -8,6 +8,7 @@ import type { ParsedOrder } from '../import/buildImport'
 import { itemRow, planItemSync, type ExistingItem } from '../import/itemSync'
 import { canTransition, type OrderStatus } from '../status'
 import { normCustomerName } from '../groupOrders'
+import { daysAgoISO, fetchAll } from './fetchAll'
 
 export type OtherDayOrder = { makro_order_no: string; ship_date: string; status: string }
 
@@ -304,17 +305,32 @@ export async function setOrderPierName(orderId: string, pierName: string): Promi
 // pier names already used on other orders, read straight off `orders` rather
 // than a separate roster table.
 export async function listDistinctPierNames(): Promise<string[]> {
-  const { data, error } = await supabase
-    .from('orders')
-    .select('pier_name')
-    .not('pier_name', 'is', null)
-  if (error) return []
+  // Recent orders only: names of people still on the team, and a read that
+  // stays small however much history piles up.
+  const since = daysAgoISO(NAME_SUGGESTION_DAYS)
+  let data: { pier_name: string | null }[]
+  try {
+    data = await fetchAll((from, to) =>
+      supabase
+        .from('orders')
+        .select('pier_name')
+        .not('pier_name', 'is', null)
+        .gte('ship_date', since)
+        .order('id')
+        .range(from, to),
+    )
+  } catch {
+    return []
+  }
   const names = new Set<string>()
-  for (const row of (data ?? []) as { pier_name: string | null }[]) {
+  for (const row of data) {
     if (row.pier_name) names.add(row.pier_name)
   }
   return Array.from(names).sort()
 }
+
+/** How far back the packer / pier name suggestions look. */
+export const NAME_SUGGESTION_DAYS = 180
 
 export async function regenTokenLink(orderId: string): Promise<string> {
   const token = makeLinkToken()

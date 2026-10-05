@@ -24,31 +24,20 @@ const state = {
 }
 
 vi.mock('../supabase', () => {
+  // One chainable, awaitable stand-in for every query shape these functions
+  // build (list: filter -> order -> range; count: in; single: eq -> single).
   const selectBuilder = () => {
     const b: any = {}
-    b.order = (col: string, opts: any) => {
-      state.orderArgs.push([col, opts])
-      const p: any = Promise.resolve({ data: state.listData, error: state.error })
-      p.eq = (c2: string, v2: any) => {
-        state.eqArgs.push([c2, v2])
-        return Promise.resolve({ data: state.listData, error: state.error })
-      }
-      p.in = (c2: string, v2: any) => {
-        state.inArgs.push([c2, v2])
-        return Promise.resolve({ data: state.listData, error: state.error })
-      }
-      return p
-    }
-    b.eq = (col: string, val: any) => {
-      state.eqArgs.push([col, val])
-      return {
-        single: () => Promise.resolve({ data: state.singleData, error: state.error }),
-      }
-    }
-    b.in = (col: string, val: any) => {
-      state.inArgs.push([col, val])
-      return Promise.resolve({ data: state.listData, count: state.countValue, error: state.error })
-    }
+    b.order = (col: string, opts: any) => (state.orderArgs.push([col, opts]), b)
+    b.eq = (col: string, val: any) => (state.eqArgs.push([col, val]), b)
+    b.in = (col: string, val: any) => (state.inArgs.push([col, val]), b)
+    b.range = () => b
+    b.single = () => Promise.resolve({ data: state.singleData, error: state.error })
+    b.then = (res: any, rej: any) =>
+      Promise.resolve({ data: state.listData, count: state.countValue, error: state.error }).then(
+        res,
+        rej,
+      )
     return b
   }
   return {

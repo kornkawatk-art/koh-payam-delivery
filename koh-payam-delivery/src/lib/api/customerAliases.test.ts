@@ -11,6 +11,20 @@ import {
 
 beforeEach(() => from.mockReset())
 
+// Paged reads (select -> order -> range): each table serves its rows in the
+// slice that range() asks for, like PostgREST.
+function mockTables(tables: Record<string, any[]>) {
+  from.mockImplementation((t: string) => {
+    const b: any = {
+      select: () => b,
+      order: () => b,
+      range: (lo: number, hi: number) =>
+        Promise.resolve({ data: (tables[t] ?? []).slice(lo, hi + 1), error: null }),
+    }
+    return b
+  })
+}
+
 test('customerKey: phone digits + normalized name, so one owner\u2019s shops each get their own key', () => {
   expect(customerKey({ customer_phone: '082-628 9533', customer_name_en: 'JJ Payam' })).toBe(
     'phone:0826289533|name:JJ PAYAM',
@@ -57,22 +71,15 @@ test('saveShortName upserts the trimmed name under the customer key; blank is re
 })
 
 test('listCustomerAliases: one row per customer (latest order wins), newest first, with saved names', async () => {
-  from.mockImplementation((t: string) => ({
-    select: () =>
-      Promise.resolve(
-        t === 'orders'
-          ? {
-              data: [
-                { customer_name_en: 'JJ Payam', customer_phone: '0826289533', ship_date: '2026-09-01' },
-                { customer_name_en: 'jj  payam', customer_phone: '082-628-9533', ship_date: '2026-09-20' },
-                { customer_name_en: 'Ziggy', customer_phone: '0826289533', ship_date: '2026-09-05' },
-                { customer_name_en: 'Sunset', customer_phone: null, ship_date: '2026-09-10' },
-              ],
-              error: null,
-            }
-          : { data: [{ customer_key: 'phone:0826289533|name:JJ PAYAM', short_name: 'JJ' }], error: null },
-      ),
-  }))
+  mockTables({
+    orders: [
+      { customer_name_en: 'JJ Payam', customer_phone: '0826289533', ship_date: '2026-09-01' },
+      { customer_name_en: 'jj  payam', customer_phone: '082-628-9533', ship_date: '2026-09-20' },
+      { customer_name_en: 'Ziggy', customer_phone: '0826289533', ship_date: '2026-09-05' },
+      { customer_name_en: 'Sunset', customer_phone: null, ship_date: '2026-09-10' },
+    ],
+    customer_aliases: [{ customer_key: 'phone:0826289533|name:JJ PAYAM', short_name: 'JJ' }],
+  })
   const rows = await listCustomerAliases()
   // one row per shop: JJ's two spellings merge; the same owner's Ziggy is its own row
   expect(rows).toEqual([
@@ -80,4 +87,18 @@ test('listCustomerAliases: one row per customer (latest order wins), newest firs
     { key: 'name:SUNSET', name: 'Sunset', phone: null, shortName: null, lastShipDate: '2026-09-10' },
     { key: 'phone:0826289533|name:ZIGGY', name: 'Ziggy', phone: '0826289533', shortName: null, lastShipDate: '2026-09-05' },
   ])
+})
+
+test('listCustomerAliases reads past the 1000-row cap -- a customer on page 2 is not lost', async () => {
+  const many = Array.from({ length: 1000 }, () => ({
+    customer_name_en: 'Regular',
+    customer_phone: '0811111111',
+    ship_date: '2026-09-01',
+  }))
+  mockTables({
+    orders: [...many, { customer_name_en: 'Late Newcomer', customer_phone: '0822222222', ship_date: '2026-10-01' }],
+    customer_aliases: [],
+  })
+  const rows = await listCustomerAliases()
+  expect(rows.map((r) => r.name)).toEqual(['Late Newcomer', 'Regular'])
 })

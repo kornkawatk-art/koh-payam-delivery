@@ -1,6 +1,7 @@
 import { supabase } from '../supabase'
 import { createResendBackorder } from './backorders'
 import { logAction } from './audit'
+import { fetchAll } from './fetchAll'
 
 export type ClaimRow = {
   id: string
@@ -17,17 +18,23 @@ export type ClaimRow = {
 export async function listClaims(
   filter: { status?: string | string[] } = {},
 ): Promise<ClaimRow[]> {
-  let q = supabase
-    .from('claims')
-    .select(
-      'id,order_id,type,status,deadline_at,created_at, orders(makro_order_no,customer_name_en), claim_items(id)',
-    )
-    .order('deadline_at', { ascending: true })
-  if (Array.isArray(filter.status)) q = q.in('status', filter.status)
-  else if (filter.status) q = q.eq('status', filter.status)
-  const { data, error } = await q
-  if (error) throw new Error('โหลดคิวเคลมไม่สำเร็จ: ' + error.message)
-  return (data ?? []).map((c: any) => ({
+  // Paged: the "all" tab grows with every claim ever made.
+  let data: any[]
+  try {
+    data = await fetchAll<any>((from, to) => {
+      let q = supabase
+        .from('claims')
+        .select(
+          'id,order_id,type,status,deadline_at,created_at, orders(makro_order_no,customer_name_en), claim_items(id)',
+        )
+      if (Array.isArray(filter.status)) q = q.in('status', filter.status)
+      else if (filter.status) q = q.eq('status', filter.status)
+      return q.order('deadline_at', { ascending: true }).order('id').range(from, to)
+    })
+  } catch (e) {
+    throw new Error('โหลดคิวเคลมไม่สำเร็จ: ' + (e as { message?: string }).message)
+  }
+  return data.map((c: any) => ({
     id: c.id,
     order_id: c.order_id,
     type: c.type,
