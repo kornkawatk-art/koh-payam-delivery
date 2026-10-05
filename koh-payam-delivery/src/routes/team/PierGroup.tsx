@@ -293,11 +293,10 @@ export default function PierGroup({
           </label>
 
           <section>
-            <p className="section-title mb-2">รูปหลักฐาน (สูงสุด 5 — แนบให้ทุกออเดอร์ในกลุ่ม)</p>
+            <p className="section-title mb-2">รูปหลักฐาน (อย่างน้อย 1 รูป — แนบให้ทุกออเดอร์ในกลุ่ม)</p>
             <PhotoCapture
               scope="evidence"
               orderId={ready[0].id}
-              max={5}
               initialPhotos={allKeys.map((key) => ({ key, url: `${R2}/${key}` }))}
               onBusyChange={setPhotoBusy}
               onUploaded={addPhoto}
