@@ -1,6 +1,8 @@
 import { supabase } from '../supabase'
 import { syncShortageBackorders } from './backorders'
 import { logAction } from './audit'
+import { daysAgoISO, fetchAll } from './fetchAll'
+import { NAME_SUGGESTION_DAYS } from './orders'
 
 export type PackInput = {
   orderId: string
@@ -124,13 +126,24 @@ export async function savePackGroup(input: PackGroupInput): Promise<void> {
 // packer names already used on other orders, read straight off `orders`
 // rather than a separate roster table.
 export async function listDistinctPackerNames(): Promise<string[]> {
-  const { data, error } = await supabase
-    .from('orders')
-    .select('packer_name')
-    .not('packer_name', 'is', null)
-  if (error) return []
+  // Recent orders only (see listDistinctPierNames).
+  const since = daysAgoISO(NAME_SUGGESTION_DAYS)
+  let data: { packer_name: string | null }[]
+  try {
+    data = await fetchAll((from, to) =>
+      supabase
+        .from('orders')
+        .select('packer_name')
+        .not('packer_name', 'is', null)
+        .gte('ship_date', since)
+        .order('id')
+        .range(from, to),
+    )
+  } catch {
+    return []
+  }
   const names = new Set<string>()
-  for (const row of (data ?? []) as { packer_name: string | null }[]) {
+  for (const row of data) {
     if (row.packer_name) names.add(row.packer_name)
   }
   return Array.from(names).sort()

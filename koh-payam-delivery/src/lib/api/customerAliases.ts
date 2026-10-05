@@ -1,5 +1,6 @@
 import { supabase } from '../supabase'
 import { normCustomerName } from '../groupOrders'
+import { fetchAll } from './fetchAll'
 
 /**
  * Short names for box stickers ("JJ Payam" -> "JJ"), one per customer.
@@ -57,18 +58,33 @@ export type CustomerAliasRow = {
  * name (null = not set yet) -- for the manager's list page.
  */
 export async function listCustomerAliases(): Promise<CustomerAliasRow[]> {
+  // Every order ever -- paged, since one request stops at 1000 rows.
   const [orders, aliases] = await Promise.all([
-    supabase.from('orders').select('customer_name_en,customer_phone,ship_date'),
-    supabase.from('customer_aliases').select('customer_key,short_name'),
+    fetchAll<any>((from, to) =>
+      supabase
+        .from('orders')
+        .select('customer_name_en,customer_phone,ship_date')
+        .order('id')
+        .range(from, to),
+    ).catch((e) => {
+      throw new Error('โหลดรายชื่อลูกค้าไม่สำเร็จ: ' + (e as { message?: string }).message)
+    }),
+    fetchAll<any>((from, to) =>
+      supabase
+        .from('customer_aliases')
+        .select('customer_key,short_name')
+        .order('customer_key')
+        .range(from, to),
+    ).catch((e) => {
+      throw new Error('โหลดชื่อย่อไม่สำเร็จ: ' + (e as { message?: string }).message)
+    }),
   ])
-  if (orders.error) throw new Error('โหลดรายชื่อลูกค้าไม่สำเร็จ: ' + orders.error.message)
-  if (aliases.error) throw new Error('โหลดชื่อย่อไม่สำเร็จ: ' + aliases.error.message)
 
   const shortByKey = new Map(
-    (aliases.data ?? []).map((a: any) => [a.customer_key as string, a.short_name as string]),
+    aliases.map((a: any) => [a.customer_key as string, a.short_name as string]),
   )
   const byKey = new Map<string, CustomerAliasRow>()
-  for (const o of (orders.data ?? []) as any[]) {
+  for (const o of orders) {
     const key = customerKey(o)
     const seen = byKey.get(key)
     // Keep the most recent order's name/phone as the display values.
