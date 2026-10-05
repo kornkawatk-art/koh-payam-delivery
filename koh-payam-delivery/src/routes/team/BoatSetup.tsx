@@ -1,11 +1,17 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { getOrCreateShipDay, sendOrderLinks, setBoats } from '../../lib/api/shipDays'
+import {
+  getOrCreateShipDay,
+  sendOrderLinks,
+  setBoats,
+  type UnreachedCustomer,
+} from '../../lib/api/shipDays'
 import { supabase } from '../../lib/supabase'
 import { Anchor } from '@phosphor-icons/react'
 import { PageHeader } from '../../components/ui/PageHeader'
 import { todayLocalISO } from '../../lib/format'
 import { EmptyState } from '../../components/ui/EmptyState'
 import { Notice, flash, type Flash } from '../../components/ui/Notice'
+import { LinkSendReport } from '../../components/LinkSendReport'
 
 type Boat = { id: string; name: string }
 
@@ -55,6 +61,7 @@ export default function BoatSetup() {
   // Saving also sends the customers' LINE links: a second tap mid-save must
   // not start a second send.
   const [saving, setSaving] = useState(false)
+  const [unreached, setUnreached] = useState<UnreachedCustomer[]>([])
   const saveInFlight = useRef(false)
 
   async function save() {
@@ -71,8 +78,10 @@ export default function BoatSetup() {
       let text = 'บันทึกรายการเรือแล้ว'
       let linksFailed = false
       try {
-        const { sent, skipped } = await sendOrderLinks(date)
-        if (!skipped) text += ` · ส่งลิงก์ไลน์ ${sent} ฉบับ`
+        const r = await sendOrderLinks(date)
+        if (!r.skipped) text += ` · ส่งลิงก์ไลน์ ${r.sent} ฉบับ`
+        if (r.unreached.length) text += ` · ยังไม่ได้รับ ${r.unreached.length} ราย`
+        setUnreached(r.unreached)
       } catch (e) {
         text += ' แต่ส่งลิงก์ไลน์ไม่สำเร็จ: ' + (e as Error).message
         linksFailed = true
@@ -98,6 +107,9 @@ export default function BoatSetup() {
 
   return (
     <div className="flex flex-col gap-5">
+      {unreached.length > 0 && (
+        <LinkSendReport unreached={unreached} onClose={() => setUnreached([])} />
+      )}
       <PageHeader
         title="ตั้งค่าเรือประจำวัน"
         icon={Anchor}
