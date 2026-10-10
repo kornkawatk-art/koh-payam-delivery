@@ -8,6 +8,7 @@ import {
   ClockCounterClockwise,
   ChartBar,
   Tag,
+  Package,
   type Icon,
 } from '@phosphor-icons/react'
 
@@ -45,6 +46,7 @@ export const NAV: { path: string; label: string; roles: Role[]; icon: Icon; acce
       accent: 'amber',
     },
     { path: '/pier', label: 'ที่ท่าเรือ', roles: ['pier', 'manager'], icon: MapPin, accent: 'teal' },
+    { path: '/foam', label: 'ลังโฟม', roles: ['pier', 'manager'], icon: Package, accent: 'amber' },
     { path: '/claims', label: 'คิวเคลม', roles: ['manager'], icon: Flag, accent: 'rose' },
     {
       path: '/line-contacts',
