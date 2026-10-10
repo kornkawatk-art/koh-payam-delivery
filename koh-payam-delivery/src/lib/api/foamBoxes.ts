@@ -29,6 +29,7 @@ type MoveRow = {
   kind: 'return' | 'set'
   qty: number
   note: string | null
+  created_by?: string | null
   created_at: string
 }
 type OrderRow = {
@@ -40,14 +41,27 @@ type OrderRow = {
   foam_box_count: number | null
 }
 const ORDER_COLS = 'makro_order_no,customer_name_en,customer_phone,status,shipped_at,foam_box_count'
-const MOVE_COLS = 'customer_key,kind,qty,note,created_at'
+const MOVE_COLS = 'customer_key,kind,qty,note,created_by,created_at'
 
-const moveEvent = (m: MoveRow): FoamEvent => ({
-  at: m.created_at,
-  kind: m.kind,
-  qty: m.qty,
-  ...(m.note ? { label: m.note } : {}),
-})
+const moveEvent = (m: MoveRow, names?: Map<string, string>): FoamEvent => {
+  const by = m.created_by ? names?.get(m.created_by) : undefined
+  return {
+    at: m.created_at,
+    kind: m.kind,
+    qty: m.qty,
+    ...(m.note ? { label: m.note } : {}),
+    ...(by ? { by } : {}),
+  }
+}
+
+/** Display names of whoever recorded these moves (best effort: none on failure). */
+async function creatorNames(moves: MoveRow[]): Promise<Map<string, string>> {
+  const ids = Array.from(new Set(moves.map((m) => m.created_by).filter((x): x is string => !!x)))
+  if (!ids.length) return new Map()
+  const { data, error } = await supabase.from('profiles').select('id,name').in('id', ids)
+  if (error) return new Map()
+  return new Map(((data ?? []) as { id: string; name: string }[]).map((p) => [p.id, p.name]))
+}
 
 /** When "sent" starts counting; null = tracking not enabled (or unreadable). */
 export async function getFoamTrackingStart(): Promise<string | null> {
@@ -94,10 +108,14 @@ export async function listFoamCustomers(): Promise<FoamCustomer[] | null> {
     byKey.set(key, c)
   }
   for (const m of moves) byKey.get(m.customer_key)?.moves.push(m)
+  const names = await creatorNames(moves)
 
   const out: FoamCustomer[] = []
   for (const [key, c] of byKey) {
-    const events = sortFoamEvents([...sentEvents(c.orders, start), ...c.moves.map(moveEvent)])
+    const events = sortFoamEvents([
+      ...sentEvents(c.orders, start),
+      ...c.moves.map((m) => moveEvent(m, names)),
+    ])
     const { balance, lastSentAt } = foamBalance(events)
     out.push({ key, name: c.name, phone: c.phone, balance, lastSentAt, events })
   }
@@ -115,9 +133,9 @@ export async function getCustomerFoamBalance(ref: CustomerRef): Promise<number> 
       .select(ORDER_COLS)
       .eq('status', 'shipped')
       .gte('shipped_at', start)
-    q = ref.customer_phone
-      ? q.eq('customer_phone', ref.customer_phone)
-      : q.eq('customer_name_en', ref.customer_name_en ?? '')
+    // Digits, not the raw phone: the same customer's POs can carry the phone
+    // formatted differently. No phone -> the phoneless orders, narrowed by key below.
+    q = q.eq('customer_phone_digits', (ref.customer_phone ?? '').replace(/\D/g, ''))
     const [{ data: orders, error: oErr }, { data: moves, error: mErr }] = await Promise.all([
       q,
       supabase.from('foam_box_moves').select(MOVE_COLS).eq('customer_key', key),
@@ -126,7 +144,7 @@ export async function getCustomerFoamBalance(ref: CustomerRef): Promise<number> 
     const mine = ((orders ?? []) as OrderRow[]).filter((o) => customerKey(o) === key)
     return foamBalance([
       ...sentEvents(mine, start),
-      ...((moves ?? []) as MoveRow[]).map(moveEvent),
+      ...((moves ?? []) as MoveRow[]).map((m) => moveEvent(m)),
     ]).balance
   } catch {
     return 0

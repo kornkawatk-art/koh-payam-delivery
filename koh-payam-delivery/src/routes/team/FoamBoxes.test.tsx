@@ -1,6 +1,7 @@
 import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import FoamBoxes from './FoamBoxes'
+import { formatDateTimeTH } from '../../lib/format'
 
 const listFoamCustomers = vi.fn()
 const recordFoamReturn = vi.fn().mockResolvedValue(undefined)
@@ -83,4 +84,14 @@ test('not enabled yet (migration not run) -> a Thai notice, no crash', async () 
   listFoamCustomers.mockResolvedValue(null)
   render(<FoamBoxes />)
   expect(await screen.findByText(/ยังไม่ได้เปิดใช้ระบบติดตามลังโฟม/)).toBeInTheDocument()
+})
+
+test('history shows who and the exact time (local, not the UTC date)', async () => {
+  const at = '2026-10-10T23:30:00+00:00' // 06:30 the next morning in Bangkok
+  listFoamCustomers.mockResolvedValue([
+    { ...jj, events: [...jj.events, { at, kind: 'return', qty: 1, by: 'สมชาย' }] },
+  ])
+  render(<FoamBoxes />)
+  await userEvent.click(await screen.findByRole('button', { name: /JJ Payam/ }))
+  expect(screen.getByText(`${formatDateTimeTH(at)} · รับคืน 1 ใบ · โดย สมชาย`)).toBeInTheDocument()
 })

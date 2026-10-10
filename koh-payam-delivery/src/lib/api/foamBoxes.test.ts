@@ -27,6 +27,7 @@ vi.mock('../supabase', () => ({
         select: () => b,
         eq: (c: string, v: any) => (filters.push((r) => r[c] === v), b),
         gte: (c: string, v: any) => (filters.push((r) => r[c] >= v), b),
+        in: (c: string, vs: any[]) => (filters.push((r) => vs.includes(r[c])), b),
         order: () => b,
         range: (lo: number, hi: number) => {
           const r = result()
@@ -48,16 +49,20 @@ vi.mock('../supabase', () => ({
 }))
 
 const START = '2026-10-10T00:00:00+00:00'
-const order = (o: Partial<any>) => ({
-  id: 'o',
-  makro_order_no: 'PO',
-  customer_name_en: 'JJ Payam',
-  customer_phone: '0826289533',
-  status: 'shipped',
-  shipped_at: '2026-10-11T00:00:00+00:00',
-  foam_box_count: 2,
-  ...o,
-})
+// customer_phone_digits mirrors the generated column 0031 adds to orders.
+const order = (o: Partial<any>) => {
+  const row = {
+    id: 'o',
+    makro_order_no: 'PO',
+    customer_name_en: 'JJ Payam',
+    customer_phone: '0826289533' as string | null,
+    status: 'shipped',
+    shipped_at: '2026-10-11T00:00:00+00:00',
+    foam_box_count: 2,
+    ...o,
+  }
+  return { ...row, customer_phone_digits: (row.customer_phone ?? '').replace(/\D/g, '') }
+}
 
 beforeEach(() => {
   for (const k of Object.keys(db)) delete db[k]
@@ -126,4 +131,23 @@ test('quantities must be whole and in range before anything is written', async (
   await expect(recordFoamReturn({ key: 'k', name: 'n' }, 0)).rejects.toThrow()
   await expect(setFoamBalance({ key: 'k', name: 'n' }, -1)).rejects.toThrow()
   expect(inserts).toEqual([])
+})
+
+test("getCustomerFoamBalance finds the customer's orders whatever the phone formatting", async () => {
+  db.orders = [
+    order({ customer_phone: '082-628-9533', foam_box_count: 3 }),
+    order({ customer_phone: '0826289533', foam_box_count: 2 }),
+  ]
+  db.foam_box_moves = []
+  expect(await getCustomerFoamBalance({ customer_phone: '0826289533', customer_name_en: 'JJ Payam' })).toBe(5)
+})
+
+test('history moves say who recorded them', async () => {
+  db.orders = [order({ foam_box_count: 3 })]
+  db.profiles = [{ id: 'u1', name: 'สมชาย' }]
+  db.foam_box_moves = [
+    { customer_key: 'phone:0826289533|name:JJ PAYAM', kind: 'return', qty: 1, note: null, created_by: 'u1', created_at: '2026-10-12T00:00:00+00:00' },
+  ]
+  const [jj] = (await listFoamCustomers())!
+  expect(jj.events.find((e) => e.kind === 'return')?.by).toBe('สมชาย')
 })

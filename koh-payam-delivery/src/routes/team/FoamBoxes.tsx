@@ -5,7 +5,7 @@ import { PageSkeleton } from '../../components/ui/Skeleton'
 import { EmptyState } from '../../components/ui/EmptyState'
 import { Notice, flash, type Flash } from '../../components/ui/Notice'
 import { useAuth } from '../../lib/auth'
-import { formatDateTH } from '../../lib/format'
+import { formatDateTH, formatDateTimeTH } from '../../lib/format'
 import {
   listFoamCustomers,
   recordFoamReturn,
@@ -155,7 +155,7 @@ function FoamRow({
           <span className="font-medium">{c.name}</span>
           <span className="text-xs text-ink-soft">
             {c.phone ?? 'ไม่มีเบอร์'}
-            {c.lastSentAt ? ` · ส่งลังล่าสุด ${formatDateTH(c.lastSentAt.slice(0, 10))}` : ''}
+            {c.lastSentAt ? ` · ส่งลังล่าสุด ${formatDateTH(c.lastSentAt)}` : ''}
           </span>
         </button>
         <span className={`badge ${c.balance > 0 ? 'badge-warn' : 'badge-neutral'} tnum`}>
@@ -212,8 +212,7 @@ function FoamRow({
           {c.events.length === 0 && <li>ยังไม่มีประวัติ</li>}
           {[...c.events].reverse().map((e, i) => (
             <li key={i}>
-              {formatDateTH(e.at.slice(0, 10))} · {KIND_TH[e.kind]} {e.qty} ใบ
-              {e.label ? ` · ${e.label}` : ''}
+              {`${formatDateTimeTH(e.at)} · ${KIND_TH[e.kind]} ${e.qty} ใบ${e.label ? ` · ${e.label}` : ''}${e.by ? ` · โดย ${e.by}` : ''}`}
             </li>
           ))}
         </ul>

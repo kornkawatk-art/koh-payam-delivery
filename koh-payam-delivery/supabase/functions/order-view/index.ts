@@ -134,9 +134,8 @@ Deno.serve(async (req) => {
         .select('customer_name_en,customer_phone,status,shipped_at,foam_box_count')
         .eq('status', 'shipped')
         .gte('shipped_at', start)
-      q = o.customer_phone
-        ? q.eq('customer_phone', o.customer_phone)
-        : q.eq('customer_name_en', o.customer_name_en)
+      // digits, not the raw phone -- one customer's POs can format it differently
+      q = q.eq('customer_phone_digits', String(o.customer_phone ?? '').replace(/\D/g, ''))
       const [{ data: mine }, { data: moves }] = await Promise.all([
         q,
         admin.from('foam_box_moves').select('kind,qty,created_at').eq('customer_key', key),

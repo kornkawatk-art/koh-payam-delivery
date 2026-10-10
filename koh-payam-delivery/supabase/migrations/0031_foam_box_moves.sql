@@ -3,6 +3,16 @@
 -- types is stored here -- returns and set-balance; boxes SENT come from
 -- shipped orders' foam_box_count since app_settings.foam_tracking_start.
 
+-- orders.customer_phone is stored exactly as Makro exported it ("082-628-9533"
+-- on one PO, "0826289533" on the next). Per-customer lookups (pier line,
+-- customer page) match on the digits so those POs are one customer, the same
+-- way customerKey groups them.
+alter table public.orders
+  add column if not exists customer_phone_digits text
+  generated always as (regexp_replace(coalesce(customer_phone, ''), '\D', '', 'g')) stored;
+create index if not exists orders_customer_phone_digits_idx
+  on public.orders (customer_phone_digits);
+
 create table if not exists public.app_settings (
   id boolean primary key default true check (id),
   foam_tracking_start timestamptz not null

@@ -6,7 +6,13 @@
 // balance never goes below 0 (an over-return is old boxes, not credit); a set
 // makes the balance exactly that number (opening balance or correction).
 
-export type FoamEvent = { at: string; kind: 'sent' | 'return' | 'set'; qty: number; label?: string }
+export type FoamEvent = {
+  at: string
+  kind: 'sent' | 'return' | 'set'
+  qty: number
+  label?: string // PO number for a ship, the note for a return/set
+  by?: string // who recorded a return/set
+}
 
 export type FoamOrder = {
   status: string
