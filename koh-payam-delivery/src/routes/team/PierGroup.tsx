@@ -18,6 +18,7 @@ import { AmountDue } from '../../components/ui/AmountDue'
 import { StatTile } from '../../components/ui/Stat'
 import { IslandBadge } from '../../components/ui/Island'
 import { isIsland } from '../../lib/islands'
+import { FoamOwedNote } from '../../components/FoamOwedNote'
 
 const R2 = import.meta.env.VITE_R2_PUBLIC_BASE_URL as string
 const READY = ['packed', 'at_pier']
@@ -210,6 +211,7 @@ export default function PierGroup({
           <IslandBadge key={i} island={i} />
         ))}
       </div>
+      {ready[0] && <FoamOwedNote customer={ready[0]} />}
 
       {waiting.length > 0 && (
         <div className="alert alert-warn flex items-start gap-2">

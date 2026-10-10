@@ -21,6 +21,7 @@ vi.mock('../../lib/api/photos', () => ({
   attachEvidencePhoto: (...a: unknown[]) => attachEvidencePhoto(...a),
   removeEvidencePhoto: (...a: unknown[]) => removeEvidencePhoto(...a),
 }))
+vi.mock('../../components/FoamOwedNote', () => ({ FoamOwedNote: () => null }))
 vi.mock('../../components/PhotoCapture', () => ({
   default: ({
     orderId,
