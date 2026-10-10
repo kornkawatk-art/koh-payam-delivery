@@ -44,6 +44,8 @@ type OrderView = {
   foamBoxCount: number
   pieceCount: number
   outstandingAmount: number | null
+  // foam boxes this customer still holds (0 / absent = none or unknown)
+  foamBoxesOutstanding?: number
   items: Item[]
   shortages: { productName: string; orderedQty: number; shippedQty: number }[]
   evidencePhotos: string[]
@@ -205,6 +207,11 @@ export default function CustomerOrderView() {
       <OrderStatusTimeline status={data.status} lang={lang} />
 
       <section className="flex flex-col gap-3" aria-label={t(lang, 'boxes')}>
+        {(data.foamBoxesOutstanding ?? 0) > 0 && (
+          <p className="alert alert-warn">
+            {t(lang, 'foam_owed', { n: data.foamBoxesOutstanding! })}
+          </p>
+        )}
         {data.outstandingAmount != null && data.outstandingAmount > 0 && (
           <AmountDue
             tone="brand"

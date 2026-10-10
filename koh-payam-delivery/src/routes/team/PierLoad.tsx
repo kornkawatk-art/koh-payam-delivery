@@ -33,6 +33,7 @@ import {
 } from '../../components/ui/Island'
 import { isIsland } from '../../lib/islands'
 import { PickupBadge } from '../../components/ui/PickupBadge'
+import { FoamOwedNote } from '../../components/FoamOwedNote'
 
 type Boat = { id: string; name: string }
 type PierOrder = {
@@ -307,6 +308,7 @@ export default function PierLoad() {
         {sel.makro_order_no} · {sel.customer_name_en}
       </h1>
       <IslandBadge island={sel.island} className="self-start" />
+      <FoamOwedNote customer={sel} />
 
       {sel.outstanding_amount != null && sel.outstanding_amount > 0 && (
         <AmountDue

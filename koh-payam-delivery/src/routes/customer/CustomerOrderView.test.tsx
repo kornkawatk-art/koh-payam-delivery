@@ -287,3 +287,17 @@ test('an order whose island is not picked yet gets a neutral header', async () =
   await screen.findByText(/PO-1001/)
   expect(screen.getByText('Order tracking')).toBeInTheDocument()
 })
+
+test('a customer holding foam boxes is asked to return them (TH/EN); nothing at 0', async () => {
+  fetchMock.mockResolvedValue(ok({ ...payload, foamBoxesOutstanding: 3 }))
+  const { unmount } = renderAt()
+  expect(
+    await screen.findByText('You have 3 of our foam boxes — please return them with the boat'),
+  ).toBeInTheDocument()
+  unmount()
+
+  fetchMock.mockResolvedValue(ok({ ...payload, foamBoxesOutstanding: 0 }))
+  renderAt()
+  await screen.findByText(/PO-1001/)
+  expect(screen.queryByText(/foam boxes/)).not.toBeInTheDocument()
+})

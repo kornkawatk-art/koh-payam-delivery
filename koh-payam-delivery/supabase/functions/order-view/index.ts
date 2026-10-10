@@ -9,6 +9,8 @@
 // data, refund_amount, or audit rows.
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { cors } from '../_shared/cors.ts'
+import { customerKey } from '../_shared/customerKey.ts'
+import { foamBalance, sentEvents, type FoamEvent } from '../_shared/foamBalance.ts'
 
 const JSON_HEADERS = { ...cors, 'Content-Type': 'application/json' }
 const CLAIM_WINDOW_MS = 48 * 60 * 60 * 1000
@@ -116,6 +118,49 @@ Deno.serve(async (req) => {
     .sort((a, b) => Number(a.line_no) - Number(b.line_no))
   const claims = (o.claims ?? []) as Array<Record<string, unknown>>
 
+  // Foam boxes this customer still holds (feature/foam-boxes). Best effort:
+  // before migration 0031 the tables don't exist and this stays 0.
+  let foamBoxesOutstanding = 0
+  try {
+    const { data: settings } = await admin
+      .from('app_settings')
+      .select('foam_tracking_start')
+      .maybeSingle()
+    const start = (settings as { foam_tracking_start?: string } | null)?.foam_tracking_start
+    if (start) {
+      const key = customerKey(o)
+      let q = admin
+        .from('orders')
+        .select('customer_name_en,customer_phone,status,shipped_at,foam_box_count')
+        .eq('status', 'shipped')
+        .gte('shipped_at', start)
+      // digits, not the raw phone -- one customer's POs can format it differently
+      q = q.eq('customer_phone_digits', String(o.customer_phone ?? '').replace(/\D/g, ''))
+      const [{ data: mine }, { data: moves }] = await Promise.all([
+        q,
+        admin.from('foam_box_moves').select('kind,qty,created_at').eq('customer_key', key),
+      ])
+      const ships = (
+        (mine ?? []) as Array<{
+          customer_name_en: string
+          customer_phone: string | null
+          status: string
+          shipped_at: string | null
+          foam_box_count: number | null
+        }>
+      ).filter((r) => customerKey(r) === key)
+      const events: FoamEvent[] = [
+        ...sentEvents(ships, start),
+        ...((moves ?? []) as Array<{ kind: 'return' | 'set'; qty: number; created_at: string }>).map(
+          (m) => ({ at: m.created_at, kind: m.kind, qty: m.qty }),
+        ),
+      ]
+      foamBoxesOutstanding = foamBalance(events).balance
+    }
+  } catch (e) {
+    console.error('order-view foam balance', e)
+  }
+
   const body = {
     orderNo: o.makro_order_no,
     customerNameEn: o.customer_name_en,
@@ -130,6 +175,7 @@ Deno.serve(async (req) => {
     pieceCount: o.piece_count,
     // Amount only — payment_method/payment_status stay internal (Q3a/Q8).
     outstandingAmount: o.outstanding_amount > 0 ? Number(o.outstanding_amount) : null,
+    foamBoxesOutstanding,
     items: items.map((i) => ({
       productName: i.product_name,
       itemId: i.makro_item_id ?? null,

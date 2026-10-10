@@ -91,6 +91,12 @@ function buildMessage(
     case 'island_set':
       return `ตั้งเกาะของออเดอร์ ${orderNo(r.entity_id)} เป็น${islandName(meta.island) ?? meta.island}${by}`
 
+    case 'foam_return':
+      return `รับคืนลังโฟม ${meta.qty} ใบ จาก ${meta.name}${by}`
+
+    case 'foam_set':
+      return `ตั้งยอดลังโฟมของ ${meta.name} เป็น ${meta.qty} ใบ${by}`
+
     case 'regen_link':
       return `สร้างลิงก์ลูกค้าใหม่ให้ออเดอร์ ${orderNo(r.entity_id)}${by}`
 

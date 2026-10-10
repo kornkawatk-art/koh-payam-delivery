@@ -15,6 +15,7 @@ const DailyDashboard = lazyPage(() => import('./routes/team/DailyDashboard'))
 const ImportOrders = lazyPage(() => import('./routes/team/ImportOrders'))
 const BoatSetup = lazyPage(() => import('./routes/team/BoatSetup'))
 const PierLoad = lazyPage(() => import('./routes/team/PierLoad'))
+const FoamBoxes = lazyPage(() => import('./routes/team/FoamBoxes'))
 const ClaimsQueue = lazyPage(() => import('./routes/team/ClaimsQueue'))
 const ClaimDetail = lazyPage(() => import('./routes/team/ClaimDetail'))
 const LineContacts = lazyPage(() => import('./routes/team/LineContacts'))
@@ -94,6 +95,14 @@ export default function App() {
               element={
                 <RequireRole path="/pier">
                   <PierLoad />
+                </RequireRole>
+              }
+            />
+            <Route
+              path="/foam"
+              element={
+                <RequireRole path="/foam">
+                  <FoamBoxes />
                 </RequireRole>
               }
             />
