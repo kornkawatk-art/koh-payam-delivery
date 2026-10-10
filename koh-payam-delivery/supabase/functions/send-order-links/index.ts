@@ -65,6 +65,8 @@ import { cors } from '../_shared/cors.ts'
 import { normalizePhone } from '../_shared/phone.ts'
 import { dedupOrdersByPhone } from './dedup.ts'
 import { unreachedCustomers } from './unreached.ts'
+import { foamOwedByCustomer, linkMessage } from './foamOwed.ts'
+import { customerKey } from '../_shared/customerKey.ts'
 import { bangkokToday, missingLineSecrets } from './guards.ts'
 
 const JSON_HEADERS = { ...cors, 'Content-Type': 'application/json' }
@@ -246,6 +248,39 @@ Deno.serve(async (req) => {
       )
       for (const p of contactByPhone.keys()) registered.add(p)
 
+      // Foam boxes each customer still holds, appended to their message
+      // (feature/foam-reminders). Best effort: any failure here just sends
+      // the plain link -- it must never stop the links going out.
+      let foamOwed = new Map<string, number>()
+      try {
+        const { data: settings } = await admin
+          .from('app_settings')
+          .select('foam_tracking_start')
+          .maybeSingle()
+        const start = (settings as { foam_tracking_start?: string } | null)?.foam_tracking_start
+        if (start) {
+          const digits = Array.from(
+            new Set(deduped.map((o) => (o.customer_phone ?? '').replace(/\D/g, '')).filter(Boolean)),
+          )
+          const keys = deduped.map((o) => customerKey(o))
+          const [{ data: shipped, error: sErr }, { data: moves, error: mErr }] = await Promise.all([
+            admin
+              .from('orders')
+              .select('customer_phone,customer_name_en,status,shipped_at,foam_box_count')
+              .eq('status', 'shipped')
+              .gte('shipped_at', start)
+              .in('customer_phone_digits', digits),
+            admin
+              .from('foam_box_moves')
+              .select('customer_key,kind,qty,created_at')
+              .in('customer_key', keys),
+          ])
+          if (!sErr && !mErr) foamOwed = foamOwedByCustomer(shipped ?? [], moves ?? [], start)
+        }
+      } catch (e) {
+        console.error('send-order-links foam balances', e)
+      }
+
       // Steps 4+5: push per recipient, independently — one bad send must
       // never abort the batch.
       for (const o of deduped) {
@@ -253,7 +288,7 @@ Deno.serve(async (req) => {
         if (!lineUserId) continue // not registered yet -- "คัดลอก" stays the fallback
 
         try {
-          const text = `ออเดอร์ของคุณพร้อมส่งแล้ว ติดตามได้ที่: ${site}/o/${o.link_token}`
+          const text = linkMessage(site, o.link_token, foamOwed.get(customerKey(o)) ?? 0)
           const res = await fetch(LINE_PUSH_URL, {
             method: 'POST',
             headers: {

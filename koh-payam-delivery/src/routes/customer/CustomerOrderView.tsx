@@ -208,7 +208,7 @@ export default function CustomerOrderView() {
 
       <section className="flex flex-col gap-3" aria-label={t(lang, 'boxes')}>
         {(data.foamBoxesOutstanding ?? 0) > 0 && (
-          <p className="alert alert-warn">
+          <p className="rounded-lg bg-danger px-3 py-2.5 text-sm font-semibold text-white">
             {t(lang, 'foam_owed', { n: data.foamBoxesOutstanding! })}
           </p>
         )}
