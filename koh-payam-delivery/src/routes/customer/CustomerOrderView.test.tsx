@@ -292,7 +292,7 @@ test('a customer holding foam boxes is asked to return them (TH/EN); nothing at 
   fetchMock.mockResolvedValue(ok({ ...payload, foamBoxesOutstanding: 3 }))
   const { unmount } = renderAt()
   expect(
-    await screen.findByText('You have 3 of our foam boxes — please return them with the boat'),
+    await screen.findByText('You have 3 Makro foam boxes — please return them with the boat'),
   ).toBeInTheDocument()
   unmount()
 
@@ -300,4 +300,17 @@ test('a customer holding foam boxes is asked to return them (TH/EN); nothing at 
   renderAt()
   await screen.findByText(/PO-1001/)
   expect(screen.queryByText(/foam boxes/)).not.toBeInTheDocument()
+})
+
+test('the foam box reminder names Makro in Thai too', async () => {
+  try {
+    localStorage.setItem('cust_lang', 'th')
+  } catch {
+    /* ignore */
+  }
+  fetchMock.mockResolvedValue(ok({ ...payload, foamBoxesOutstanding: 2 }))
+  renderAt()
+  const box = await screen.findByText('คุณมีลังโฟมของแม็คโครค้างอยู่ 2 ใบ กรุณาคืนกับเรือ')
+  // red background, white text -- meant to stand out on the page
+  expect(box).toHaveClass('bg-danger', 'text-white')
 })
