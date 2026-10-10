@@ -10,6 +10,7 @@ import { AmountDue } from '../../components/ui/AmountDue'
 import { groupedItemRows } from '../../components/ui/ItemGroupHeader'
 import { formatDate, formatDateTime } from '../../lib/format'
 import { islandName } from '../../lib/islands'
+import { AppLogo } from '../../components/AppLogo'
 
 const FN = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/order-view`
 const ANON = import.meta.env.VITE_SUPABASE_ANON_KEY as string
@@ -131,9 +132,7 @@ export default function CustomerOrderView() {
       <div className="mx-auto flex w-full max-w-xl flex-col gap-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-ink to-brand-ink text-xs font-semibold text-white">
-              KP
-            </span>
+            <AppLogo size={32} className="rounded-lg" />
             <span className="text-sm font-semibold text-ink">
               {islandName(data?.island, lang) ?? (lang === 'th' ? 'ติดตามออเดอร์' : 'Order tracking')}
             </span>

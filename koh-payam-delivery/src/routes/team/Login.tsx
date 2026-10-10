@@ -1,6 +1,8 @@
 import { FormEvent, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../lib/auth'
+import { AppLogo } from '../../components/AppLogo'
+import { APP_VERSION } from '../../lib/appVersion'
 
 export default function Login() {
   const { signIn } = useAuth()
@@ -28,9 +30,7 @@ export default function Login() {
       />
       <div className="relative w-full max-w-sm">
         <div className="mb-6 flex flex-col items-center gap-2 text-center">
-          <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-gradient-to-br from-ink to-brand-ink text-base font-semibold text-white shadow-pop">
-            KP
-          </span>
+          <AppLogo size={44} className="rounded-xl shadow-pop" />
           <h1 className="page-title">เข้าสู่ระบบทีมงาน</h1>
           <p className="muted">ระบบจัดส่งสินค้าเกาะ</p>
         </div>
@@ -61,6 +61,7 @@ export default function Login() {
             {busy ? 'กำลังเข้าสู่ระบบ…' : 'เข้าสู่ระบบ'}
           </button>
         </form>
+        <p className="mt-4 text-center text-[11px] text-ink-faint tnum">เวอร์ชัน {APP_VERSION}</p>
       </div>
     </div>
   )

@@ -84,3 +84,10 @@ test('the mobile menu button gets a dot only for decisions waiting (claims / LIN
   renderShell()
   expect(screen.getByRole('button', { name: 'เมนู (มีงานรอตัดสิน 3)' })).toBeInTheDocument()
 })
+
+test('the menu shows the new logo (not "KP") and the app version', () => {
+  renderShell()
+  expect(screen.getAllByRole('img', { name: 'ระบบจัดส่งเกาะ' }).length).toBeGreaterThan(0)
+  expect(screen.queryByText('KP')).not.toBeInTheDocument()
+  expect(screen.getByText('เวอร์ชัน dev')).toBeInTheDocument()
+})
