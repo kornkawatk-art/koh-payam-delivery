@@ -672,3 +672,22 @@ test('a failed orders lookup chunk is logged and swallowed -- the page still ren
     warnSpy.mockRestore()
   }
 })
+
+test('actions: foam_return and foam_set read in Thai with the customer and count', async () => {
+  profilesData = [PROFILE]
+  const row = (id: number, action: string, qty: number) => ({
+    id,
+    user_id: 'u1',
+    action,
+    entity_type: 'customer',
+    entity_id: 'phone:0826289533|name:JJ PAYAM',
+    meta: { name: 'JJ Payam', qty },
+    created_at: '2026-10-10T00:00:00.000Z',
+  })
+  auditRows = [row(30, 'foam_return', 3), row(31, 'foam_set', 5)]
+  const rows = await listAuditLogs()
+  expect(rows.map((r) => r.message)).toEqual([
+    'รับคืนลังโฟม 3 ใบ จาก JJ Payam โดย สมชาย',
+    'ตั้งยอดลังโฟมของ JJ Payam เป็น 5 ใบ โดย สมชาย',
+  ])
+})
