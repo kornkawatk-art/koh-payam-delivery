@@ -8,6 +8,8 @@ import {
   setOrderBoats,
   setOrderPierName,
   updateOrderStatus,
+  markPickedUp,
+  reopenOrder,
 } from './orders'
 
 const state = {
@@ -557,4 +559,59 @@ test('listOrdersOnOtherDays returns the rows, short-circuits on an empty list, a
   expect(await listOrdersOnOtherDays([], '2026-10-01')).toEqual([])
   state.elsewhereError = { message: 'boom' }
   await expect(listOrdersOnOtherDays(['PO-1'], '2026-10-01')).rejects.toThrow('ตรวจออเดอร์ที่เคยนำเข้าแล้วไม่สำเร็จ: boom')
+})
+
+const pickup = (status: string) => ({ ...parsedOrders[0], isPickup: true, makroOrderStatus: status })
+const orderUpdates = () => state.updated.filter((u) => u.table === 'orders').map((u) => u.patch)
+
+test('commitImport: a new store pickup Makro marks "Picked up" arrives already closed', async () => {
+  await commitImport('2026-10-01', [pickup('Picked up')] as any)
+  const row = state.inserted.find((i) => i.table === 'orders')!.rows
+  expect(row.status).toBe('picked_up')
+  expect(row.picked_up_at).toEqual(expect.any(String))
+})
+
+test('commitImport: a new pickup not yet collected, or a boat order, imports as usual', async () => {
+  await commitImport('2026-10-01', [pickup('Ready for pickup'), { ...parsedOrders[0], makroOrderNo: 'PO-2', makroOrderStatus: 'Picked up' }] as any)
+  const rows = state.inserted.filter((i) => i.table === 'orders').map((i) => i.rows)
+  expect(rows.map((r) => r.status)).toEqual(['imported', 'imported'])
+})
+
+test('commitImport: re-importing an open pickup that Makro now marks "Picked up" closes it', async () => {
+  state.existing = [{ id: 'e1', makro_order_no: 'PO-1', status: 'imported' }]
+  await commitImport('2026-10-01', [pickup('Picked up')] as any)
+  expect(orderUpdates()[0]).toMatchObject({ status: 'picked_up', picked_up_at: expect.any(String) })
+})
+
+test('commitImport: a re-import never moves a shipped order back to picked_up', async () => {
+  state.existing = [{ id: 'e1', makro_order_no: 'PO-1', status: 'shipped' }]
+  await commitImport('2026-10-01', [pickup('Picked up')] as any)
+  expect(orderUpdates()[0].status).toBeUndefined()
+})
+
+test('commitImport: POs Makro returned / canceled get their Makro status recorded (for the warning badge)', async () => {
+  await commitImport('2026-10-01', [], [{ makroOrderNo: 'PO-9', status: 'Returned' }])
+  expect(orderUpdates()).toContainEqual({ makro_order_status: 'Returned' })
+})
+
+test('markPickedUp closes an open store pickup and audits it', async () => {
+  state.current = { status: 'packed', is_pickup: true }
+  await markPickedUp('o1')
+  expect(orderUpdates()[0]).toEqual({ status: 'picked_up', picked_up_at: expect.any(String) })
+  expect(logAction).toHaveBeenCalledWith('picked_up', 'order', 'o1', { from: 'packed' })
+})
+
+test('markPickedUp refuses a boat order or one that already shipped', async () => {
+  state.current = { status: 'imported', is_pickup: false }
+  await expect(markPickedUp('o1')).rejects.toThrow('ไม่ใช่ออเดอร์รับเองที่สาขา')
+  state.current = { status: 'shipped', is_pickup: true }
+  await expect(markPickedUp('o1')).rejects.toThrow()
+  expect(orderUpdates()).toEqual([])
+})
+
+test('reopenOrder puts a picked-up order back to imported', async () => {
+  state.current = { status: 'picked_up', is_pickup: true }
+  await reopenOrder('o1')
+  expect(orderUpdates()[0]).toEqual({ status: 'imported', picked_up_at: null })
+  expect(logAction).toHaveBeenCalledWith('order_reopened', 'order', 'o1', undefined)
 })

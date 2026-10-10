@@ -34,6 +34,8 @@ import {
 import { isIsland } from '../../lib/islands'
 import { PickupBadge } from '../../components/ui/PickupBadge'
 import { FoamOwedNote } from '../../components/FoamOwedNote'
+import { MakroVoidBadge } from '../../components/ui/MakroVoidBadge'
+import { makroVoid } from '../../lib/makroStatus'
 
 type Boat = { id: string; name: string }
 type PierOrder = {
@@ -42,6 +44,7 @@ type PierOrder = {
   customer_name_en: string
   island?: string | null
   is_pickup?: boolean
+  makro_order_status?: string | null
   status: string
   boat_id: string | null
   paper_box_count: number
@@ -288,6 +291,7 @@ export default function PierLoad() {
                 </span>
                 <span className="flex items-center gap-2">
                   <PickupBadge show={e.order.is_pickup} />
+                  <MakroVoidBadge status={e.order.makro_order_status} />
                   {showIslandFilter && <IslandBadge island={e.order.island} />}
                   <span className="badge badge-neutral">
                     {e.order.paper_box_count + e.order.foam_box_count + e.order.piece_count} รวม
@@ -400,11 +404,18 @@ export default function PierLoad() {
           photoBusy ||
           !pierName.trim() ||
           shipping ||
-          !isIsland(sel.island)
+          !isIsland(sel.island) ||
+          !!makroVoid(sel.makro_order_status)
         }
       >
         ส่งขึ้นเรือแล้ว
       </button>
+      {makroVoid(sel.makro_order_status) && (
+        <p className="text-xs text-danger-ink">
+          {makroVoid(sel.makro_order_status) === 'returned' ? 'แม็คโครคืนสินค้า' : 'แม็คโครยกเลิก'}
+          ออเดอร์นี้แล้ว — ห้ามส่งขึ้นเรือ
+        </p>
+      )}
       {!isIsland(sel.island) && <p className="text-xs text-warn-ink">ยังไม่ระบุเกาะ — ให้หัวหน้าเลือกเกาะในหน้ารายละเอียดออเดอร์ก่อน จึงจะส่งขึ้นเรือได้</p>}
       {!pierName.trim() && (
         <p className="muted text-xs">ต้องกรอกชื่อคนลงเรือก่อนกดส่งขึ้นเรือแล้ว</p>

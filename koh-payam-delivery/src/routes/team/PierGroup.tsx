@@ -19,6 +19,7 @@ import { StatTile } from '../../components/ui/Stat'
 import { IslandBadge } from '../../components/ui/Island'
 import { isIsland } from '../../lib/islands'
 import { FoamOwedNote } from '../../components/FoamOwedNote'
+import { makroVoid } from '../../lib/makroStatus'
 
 const R2 = import.meta.env.VITE_R2_PUBLIC_BASE_URL as string
 const READY = ['packed', 'at_pier']
@@ -107,7 +108,9 @@ export default function PierGroup({
     attaching === 0 &&
     !busy &&
     // an untagged PO can't board until a manager picks its island
-    ready.every((o) => isIsland(o.island))
+    ready.every((o) => isIsland(o.island)) &&
+    // nor one Makro returned / canceled
+    !ready.some((o) => makroVoid(o.makro_order_status))
 
   async function chooseBoat(id: string) {
     setMsg(undefined)
@@ -315,6 +318,16 @@ export default function PierGroup({
           </button>
           {!pierName.trim() && (
             <p className="muted text-xs">ต้องกรอกชื่อคนลงเรือก่อนกดส่งขึ้นเรือแล้ว</p>
+          )}
+          {ready.some((o) => makroVoid(o.makro_order_status)) && (
+            <p className="text-xs text-danger-ink">
+              แม็คโครคืนสินค้า/ยกเลิก{' '}
+              {ready
+                .filter((o) => makroVoid(o.makro_order_status))
+                .map((o) => o.makro_order_no)
+                .join(', ')}{' '}
+              — ห้ามส่งขึ้นเรือ (ให้หัวหน้าลบออเดอร์นั้นก่อน)
+            </p>
           )}
           {!ready.every((o) => isIsland(o.island)) && (
             <p className="text-xs text-warn-ink">ยังไม่ระบุเกาะ — ให้หัวหน้าเลือกเกาะในหน้ารายละเอียดออเดอร์ก่อน จึงจะส่งขึ้นเรือได้</p>

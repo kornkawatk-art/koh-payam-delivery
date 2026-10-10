@@ -22,6 +22,7 @@ const STATUS_LABEL: Record<string, string> = {
   packed: 'แพ็คเสร็จ',
   at_pier: 'ถึงท่าเรือ',
   shipped: 'ส่งแล้ว',
+  picked_up: 'ลูกค้ารับแล้ว',
 }
 
 type OrderLookup = { makro_order_no: string; ship_day_id: string | null }
@@ -87,6 +88,12 @@ function buildMessage(
 
     case 'pier_name_set':
       return `บันทึกชื่อคนลงเรือ "${meta.pierName}" ให้ออเดอร์ ${orderNo(r.entity_id)}${by}`
+
+    case 'picked_up':
+      return `ปิดออเดอร์ ${orderNo(r.entity_id)} — ลูกค้ามารับที่สาขาแล้ว${by}`
+
+    case 'order_reopened':
+      return `เปิดออเดอร์ ${orderNo(r.entity_id)} อีกครั้ง (กลับเป็น "นำเข้าแล้ว")${by}`
 
     case 'island_set':
       return `ตั้งเกาะของออเดอร์ ${orderNo(r.entity_id)} เป็น${islandName(meta.island) ?? meta.island}${by}`

@@ -1,10 +1,11 @@
-import { Tray, Package, MapPin, CheckCircle, type Icon } from '@phosphor-icons/react'
+import { Tray, Package, MapPin, CheckCircle, Storefront, type Icon } from '@phosphor-icons/react'
 
 const LABEL: Record<string, string> = {
   imported: 'นำเข้าแล้ว',
   packed: 'แพ็คแล้ว',
   at_pier: 'ถึงท่าเรือ',
   shipped: 'ส่งแล้ว',
+  picked_up: 'ลูกค้ารับแล้ว',
 }
 
 const TONE: Record<string, string> = {
@@ -13,6 +14,8 @@ const TONE: Record<string, string> = {
   at_pier: 'badge-brand',
   // Solid fill: same green family as "packed" but visibly the finished state.
   shipped: 'badge-ok-solid',
+  // finished too: a store pickup the customer collected
+  picked_up: 'badge-ok-solid',
 }
 
 // currentColor inherits each badge's own text tone above -- no extra color
@@ -22,6 +25,7 @@ const STATUS_ICON: Record<string, Icon> = {
   packed: Package,
   at_pier: MapPin,
   shipped: CheckCircle,
+  picked_up: Storefront,
 }
 
 export function StatusBadge({ status }: { status: string }) {

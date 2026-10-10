@@ -691,3 +691,23 @@ test('actions: foam_return and foam_set read in Thai with the customer and count
     'ตั้งยอดลังโฟมของ JJ Payam เป็น 5 ใบ โดย สมชาย',
   ])
 })
+
+test('actions: picked_up and order_reopened', async () => {
+  profilesData = [PROFILE]
+  ordersData = [{ id: 'o1', makro_order_no: 'PO-7', ship_day_id: null }]
+  const row = (id: number, action: string) => ({
+    id,
+    user_id: 'u1',
+    action,
+    entity_type: 'order',
+    entity_id: 'o1',
+    meta: action === 'picked_up' ? { from: 'imported' } : null,
+    created_at: '2026-10-10T00:00:00.000Z',
+  })
+  auditRows = [row(40, 'picked_up'), row(41, 'order_reopened')]
+  const rows = await listAuditLogs()
+  expect(rows.map((r) => r.message)).toEqual([
+    'ปิดออเดอร์ PO-7 — ลูกค้ามารับที่สาขาแล้ว โดย สมชาย',
+    'เปิดออเดอร์ PO-7 อีกครั้ง (กลับเป็น "นำเข้าแล้ว") โดย สมชาย',
+  ])
+})

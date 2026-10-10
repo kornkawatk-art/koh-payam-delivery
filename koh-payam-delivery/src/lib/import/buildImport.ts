@@ -1,5 +1,6 @@
 import type { RawRow } from './parseMakroFile'
 import type { Island } from '../islands'
+import { makroVoid } from '../makroStatus'
 
 // --- Mapping shapes -------------------------------------------------------------
 
@@ -149,6 +150,9 @@ export type BuildResult = {
   skippedNoItems: string[] // ออเดอร์เกาะใน B แต่ไม่มีใน A
   skippedNotDirect: string[] // เลข PO ลงท้าย B = ไม่ได้ส่งจากแม็คโครโดยตรง
   skippedNotIsland: number // นับ order ที่ไม่ใช่ส่งเกาะ
+  // ออเดอร์เกาะที่แม็คโครคืนสินค้า/ยกเลิก -- ไม่นำเข้า แต่ส่งต่อให้ commitImport
+  // ติดป้ายบน PO เดิมที่เคยนำเข้าไว้แล้ว
+  skippedVoid: { makroOrderNo: string; status: string }[]
   cancelledLinesDropped: number
   shippedAllZero: boolean // true ถ้าทุกบรรทัด shippedQty==0 -> UI เตือน
 }
@@ -270,6 +274,7 @@ export function buildImport(
   // 1. index order rows by orderNo, keep only island orders
   const payamOrders = new Map<string, ParsedOrder>()
   let skippedNotIsland = 0
+  const skippedVoid: { makroOrderNo: string; status: string }[] = []
   for (const r of orderRows) {
     const orderNo = (r[om.orderNo] ?? '').trim()
     if (!orderNo) continue
@@ -281,6 +286,10 @@ export function buildImport(
       continue
     }
     const makroOrderStatus = om.orderStatus ? (r[om.orderStatus] ?? '').trim() : ''
+    if (makroVoid(makroOrderStatus)) {
+      skippedVoid.push({ makroOrderNo: orderNo, status: makroOrderStatus })
+      continue
+    }
     const paymentMethod = om.paymentMethod ? (r[om.paymentMethod] ?? '').trim() : ''
     const paymentStatus = om.paymentStatus ? (r[om.paymentStatus] ?? '').trim() : ''
     const customerPhone = om.customerPhone ? (r[om.customerPhone] ?? '').trim() : ''
@@ -388,6 +397,7 @@ export function buildImport(
     skippedNoItems,
     skippedNotDirect,
     skippedNotIsland,
+    skippedVoid,
     cancelledLinesDropped,
     shippedAllZero,
   }
