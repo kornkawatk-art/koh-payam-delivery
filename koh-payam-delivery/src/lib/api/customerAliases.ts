@@ -1,5 +1,5 @@
 import { supabase } from '../supabase'
-import { normCustomerName } from '../groupOrders'
+import { customerKey } from '../../../supabase/functions/_shared/customerKey'
 import { fetchAll } from './fetchAll'
 
 /**
@@ -12,11 +12,7 @@ import { fetchAll } from './fetchAll'
  */
 export type CustomerRef = { customer_phone?: string | null; customer_name_en?: string | null }
 
-export function customerKey(o: CustomerRef): string {
-  const digits = (o.customer_phone ?? '').replace(/\D/g, '')
-  const name = normCustomerName(o.customer_name_en)
-  return digits ? `phone:${digits}|name:${name}` : `name:${name}`
-}
+export { customerKey }
 
 /** A first guess when no short name is saved yet: the name's first word. */
 export function suggestShortName(fullName: string | null | undefined): string {

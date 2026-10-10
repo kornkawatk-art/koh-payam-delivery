@@ -1,3 +1,4 @@
+import { normCustomerName } from '../../supabase/functions/_shared/customerKey'
 type Groupable = {
   id: string
   makro_order_no: string
@@ -14,8 +15,7 @@ export type DayEntry<T extends Groupable> =
  * with two spaces == "สุวิทย์ เพชร์รัตน์"). Must match the SQL normalization in
  * 0025_customer_per_shop.sql.
  */
-export const normCustomerName = (name: string | null | undefined) =>
-  (name ?? '').trim().replace(/\s+/g, ' ').toUpperCase()
+export { normCustomerName } from '../../supabase/functions/_shared/customerKey'
 
 /**
  * Collapse one day's orders into per-customer entries. A customer is a phone
