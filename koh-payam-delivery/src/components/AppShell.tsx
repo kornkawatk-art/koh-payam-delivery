@@ -8,6 +8,8 @@ import { useAppUpdate } from '../lib/useAppUpdate'
 import { PageSkeleton } from './ui/Skeleton'
 import { useNavCounts } from '../lib/useNavCounts'
 import { URGENT_NAV_PATHS } from '../lib/api/navCounts'
+import { AppLogo } from './AppLogo'
+import { APP_VERSION } from '../lib/appVersion'
 
 export default function AppShell() {
   const { profile, signOut } = useAuth()
@@ -73,9 +75,7 @@ export default function AppShell() {
         }
       >
         <div className="flex items-center gap-2.5 border-b border-line px-4 py-4">
-          <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-gradient-to-br from-ink to-brand-ink text-sm font-semibold text-white shadow-card">
-            KP
-          </span>
+          <AppLogo size={36} className="shrink-0 rounded-lg shadow-card" />
           <div className="leading-tight">
             <p className="text-sm font-semibold">ระบบจัดส่งเกาะ</p>
             <p className="text-xs text-ink-faint">พยาม · ช้าง</p>
@@ -145,6 +145,7 @@ export default function AppShell() {
             <SignOut size={16} weight="bold" aria-hidden="true" />
             ออกจากระบบ
           </button>
+          <p className="px-1 pt-2 text-center text-[11px] text-ink-faint tnum">เวอร์ชัน {APP_VERSION}</p>
         </div>
       </aside>
 
