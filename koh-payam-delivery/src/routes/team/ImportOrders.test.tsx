@@ -61,6 +61,7 @@ const baseResult = {
   skippedNoItems: ['P-9'],
   skippedNotDirect: [],
   skippedNotIsland: 1,
+  skippedVoid: [],
   cancelledLinesDropped: 2,
   shippedAllZero: false,
 }
@@ -126,7 +127,7 @@ test('import calls commitImport(shipDate, orders) and reports created/synced', a
   await userEvent.click(await screen.findByRole('button', { name: /ดูตัวอย่าง/i }))
   await userEvent.click(await screen.findByRole('button', { name: /นำเข้า 1 ออเดอร์/i }))
 
-  expect(commitImport).toHaveBeenCalledWith('2026-09-11', baseResult.orders)
+  expect(commitImport).toHaveBeenCalledWith('2026-09-11', baseResult.orders, [])
   expect(await screen.findByText(/นำเข้า 3 ใหม่ · sync 2/i)).toBeInTheDocument()
 })
 
@@ -176,4 +177,14 @@ test('preview lists the POs skipped for ending in B (not delivered by Makro dire
   expect(
     await screen.findByText(/ข้าม 1 ออเดอร์ \(ลงท้าย B — ไม่ได้ส่งจากแม็คโครโดยตรง\): 8542380461B/),
   ).toBeInTheDocument()
+})
+
+test('Makro returned / canceled POs are listed as skipped and passed on so existing ones get flagged', async () => {
+  const voided = [{ makroOrderNo: 'P-8', status: 'Returned' }, { makroOrderNo: 'P-9', status: 'Canceled' }]
+  buildImportMock.mockReturnValue({ ...baseResult, skippedVoid: voided })
+  await uploadBoth()
+  await userEvent.click(await screen.findByRole('button', { name: /ดูตัวอย่าง/i }))
+  expect(await screen.findByText(/ข้าม 2 ออเดอร์ \(แม็คโครคืน\/ยกเลิก\): P-8, P-9/)).toBeInTheDocument()
+  await userEvent.click(screen.getByRole('button', { name: /นำเข้า 1 ออเดอร์/i }))
+  expect(commitImport).toHaveBeenCalledWith('2026-09-11', baseResult.orders, voided)
 })

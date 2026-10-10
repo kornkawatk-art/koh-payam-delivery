@@ -678,3 +678,34 @@ test('buildImport keeps "Pick up at store" orders but flags them', () => {
     N: false, // a file without the column imports as delivery, as before
   })
 })
+
+test('buildImport skips Makro returned / canceled orders but lists them (so existing POs can be flagged)', () => {
+  const O = DEFAULT_ORDER_MAPPING
+  const D = DEFAULT_DETAIL_MAPPING
+  const order = (no: string, status: string): RawRow => ({
+    [O.orderNo]: no,
+    [O.customer]: 'CUST',
+    [O.subDistrict]: 'เกาะพยาม',
+    [O.shippingAddress]: 'x',
+    [O.orderStatus]: status,
+  })
+  const line = (no: string): RawRow => ({
+    [D.orderNo]: no,
+    [D.product]: 'rice',
+    [D.orderedQty]: '1',
+    [D.shippedQty]: '1',
+    [D.shortageQty]: '0',
+    [D.cancelledQty]: '0',
+  })
+  const r = buildImport(
+    ['OK', 'RET', 'CAN'].map(line),
+    [order('OK', 'Delivered'), order('RET', 'Returned'), order('CAN', 'Canceled')],
+    D,
+    O,
+  )
+  expect(r.orders.map((o) => o.makroOrderNo)).toEqual(['OK'])
+  expect(r.skippedVoid).toEqual([
+    { makroOrderNo: 'RET', status: 'Returned' },
+    { makroOrderNo: 'CAN', status: 'Canceled' },
+  ])
+})

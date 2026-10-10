@@ -1,7 +1,14 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link, useParams, useNavigate } from 'react-router-dom'
 import { Anchor, MapPin, Package, Warning } from '@phosphor-icons/react'
-import { getOrder, regenTokenLink, deleteOrder, setOrderIsland } from '../../lib/api/orders'
+import {
+  getOrder,
+  regenTokenLink,
+  deleteOrder,
+  setOrderIsland,
+  markPickedUp,
+  reopenOrder,
+} from '../../lib/api/orders'
 import { ISLAND_LIST, ISLANDS, isIsland, islandName, type Island } from '../../lib/islands'
 import {
   listRelatedBackordersForOrder,
@@ -21,6 +28,8 @@ import { groupedItemRows } from '../../components/ui/ItemGroupHeader'
 import { StickerPrintButton } from '../../components/StickerPrint'
 import { ShippingAddress } from '../../components/ui/ShippingAddress'
 import { PickupBadge } from '../../components/ui/PickupBadge'
+import { MakroVoidBadge } from '../../components/ui/MakroVoidBadge'
+import { makroVoid } from '../../lib/makroStatus'
 
 export default function OrderDetail() {
   const { id } = useParams()
@@ -32,6 +41,7 @@ export default function OrderDetail() {
   const [msg, setMsg] = useState<Flash>()
   const [busy, setBusy] = useState(false)
   const [deleteOpen, setDeleteOpen] = useState(false)
+  const [closeOpen, setCloseOpen] = useState(false)
   const [confirmText, setConfirmText] = useState('')
 
   const load = useCallback(() => {
@@ -90,6 +100,21 @@ export default function OrderDetail() {
     }
   }
 
+  async function run(action: () => Promise<void>, ok: string) {
+    setBusy(true)
+    setMsg(undefined)
+    try {
+      await action()
+      setCloseOpen(false)
+      load()
+      setMsg(flash.ok(ok))
+    } catch (e) {
+      setMsg(flash.error((e as Error).message))
+    } finally {
+      setBusy(false)
+    }
+  }
+
   async function doDelete() {
     setBusy(true)
     setMsg(undefined)
@@ -118,13 +143,62 @@ export default function OrderDetail() {
           </h1>
           <StatusBadge status={order.status} />
           <PickupBadge show={order.is_pickup} />
+          <MakroVoidBadge status={order.makro_order_status} />
         </div>
       </header>
 
-      {order.is_pickup && (
-        <p className="alert alert-info">
-          ออเดอร์นี้ลูกค้า<strong>มารับเองที่สาขา</strong> (Pick up at store) — ไม่ต้องส่งลงเรือ
+      {makroVoid(order.makro_order_status) && (
+        <p className="alert alert-danger">
+          {makroVoid(order.makro_order_status) === 'returned'
+            ? 'แม็คโครคืนสินค้าออเดอร์นี้แล้ว'
+            : 'แม็คโครยกเลิกออเดอร์นี้แล้ว'}{' '}
+          — ห้ามส่งขึ้นเรือ{profile?.role === 'manager' ? ' (ลบออเดอร์ได้ที่ท้ายหน้า)' : ''}
         </p>
+      )}
+
+      {order.is_pickup && (
+        <div className="alert alert-info flex flex-col gap-2">
+          <p>
+            ออเดอร์นี้ลูกค้า<strong>มารับเองที่สาขา</strong> (Pick up at store) — ไม่ต้องส่งลงเรือ
+          </p>
+          {['imported', 'packed'].includes(order.status) &&
+            (!closeOpen ? (
+              <button
+                type="button"
+                className="btn btn-ok btn-sm self-start"
+                disabled={busy}
+                onClick={() => setCloseOpen(true)}
+              >
+                ลูกค้ารับแล้ว
+              </button>
+            ) : (
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-sm">ยืนยันว่าลูกค้ามารับออเดอร์นี้ไปแล้ว?</span>
+                <button
+                  type="button"
+                  className="btn btn-ok btn-sm"
+                  aria-label="ยืนยัน ลูกค้ารับแล้ว"
+                  disabled={busy}
+                  onClick={() => void run(() => markPickedUp(id!), 'ปิดออเดอร์แล้ว — ลูกค้ารับแล้ว')}
+                >
+                  ยืนยัน
+                </button>
+                <button type="button" className="btn btn-ghost btn-sm" onClick={() => setCloseOpen(false)}>
+                  ยกเลิก
+                </button>
+              </div>
+            ))}
+          {order.status === 'picked_up' && profile?.role === 'manager' && (
+            <button
+              type="button"
+              className="btn btn-secondary btn-sm self-start"
+              disabled={busy}
+              onClick={() => void run(() => reopenOrder(id!), 'เปิดออเดอร์อีกครั้งแล้ว')}
+            >
+              เปิดออเดอร์อีกครั้ง
+            </button>
+          )}
+        </div>
       )}
 
       {order.outstanding_amount != null && order.outstanding_amount > 0 && (

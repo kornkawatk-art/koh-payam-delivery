@@ -34,6 +34,7 @@ import {
 } from '../../components/ui/Island'
 import { PickupBadge } from '../../components/ui/PickupBadge'
 import { LinkSendReport } from '../../components/LinkSendReport'
+import { MakroVoidBadge } from '../../components/ui/MakroVoidBadge'
 
 export default function DailyDashboard() {
   const navigate = useNavigate()
@@ -122,7 +123,8 @@ export default function DailyDashboard() {
     const r = rows ?? []
     return {
       total: r.length,
-      packed: r.filter((o) => ['packed', 'at_pier', 'shipped'].includes(o.status)).length,
+      // a collected store pickup is done too
+      packed: r.filter((o) => ['packed', 'at_pier', 'shipped', 'picked_up'].includes(o.status)).length,
       atPier: r.filter((o) => ['at_pier', 'shipped'].includes(o.status)).length,
       shipped: r.filter((o) => o.status === 'shipped').length,
     }
@@ -481,6 +483,9 @@ function GroupRows({
             แพ็คแล้ว {packed}/{os.length}
           </span>
           <PickupBadge show={os.some((o) => o.is_pickup)} className="ml-1.5" />
+          {os.map((o) => (
+            <MakroVoidBadge key={o.id} status={o.makro_order_status} className="ml-1.5" />
+          ))}
           <ShortBadge count={os.reduce((n, o) => n + shortCount(o), 0)} />
           {os.some((o) => o.outstanding_amount > 0) && (
             <span className="badge badge-warn ml-1.5">เก็บเงิน</span>
@@ -537,6 +542,7 @@ function OrderRow({
       <td data-label="สถานะ">
         <StatusBadge status={o.status} />
         <PickupBadge show={o.is_pickup} className="ml-1.5" />
+        <MakroVoidBadge status={o.makro_order_status} className="ml-1.5" />
         <ShortBadge count={shortCount(o)} />
         {o.outstanding_amount > 0 && <span className="badge badge-warn ml-1.5">เก็บเงิน</span>}
       </td>

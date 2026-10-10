@@ -144,7 +144,7 @@ export default function ImportOrders() {
     setError(undefined)
     setImportMsg(undefined)
     try {
-      const r = await commitImport(shipDate, result.orders)
+      const r = await commitImport(shipDate, result.orders, result.skippedVoid ?? [])
       setImportMsg(
         `นำเข้า ${r.created} ใหม่ · sync ${r.synced}` +
           (r.skipped.length > 0 ? ` · ข้าม ${r.skipped.length} ที่เคยนำเข้าแล้ว` : ''),
@@ -285,6 +285,13 @@ export default function ImportOrders() {
                 export ใหม่หลังจัดของเสร็จแล้ว sync
               </p>
             </div>
+          )}
+
+          {(result.skippedVoid ?? []).length > 0 && (
+            <p className="muted">
+              ข้าม {result.skippedVoid.length} ออเดอร์ (แม็คโครคืน/ยกเลิก):{' '}
+              {result.skippedVoid.map((v) => v.makroOrderNo).join(', ')}
+            </p>
           )}
 
           {result.skippedNotDirect.length > 0 && (

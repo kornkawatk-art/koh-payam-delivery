@@ -8,6 +8,8 @@ const regenTokenLink = vi.fn().mockResolvedValue('o_new')
 const deleteOrder = vi.fn().mockResolvedValue(undefined)
 const listRelatedBackordersForOrder = vi.fn().mockResolvedValue([])
 const setOrderIsland = vi.fn().mockResolvedValue(undefined)
+const markPickedUp = vi.fn().mockResolvedValue(undefined)
+const reopenOrder = vi.fn().mockResolvedValue(undefined)
 const useAuthMock = vi.fn()
 
 vi.mock('../../lib/api/orders', () => ({
@@ -15,6 +17,8 @@ vi.mock('../../lib/api/orders', () => ({
   regenTokenLink: (...a: unknown[]) => regenTokenLink(...a),
   deleteOrder: (...a: unknown[]) => deleteOrder(...a),
   setOrderIsland: (...a: unknown[]) => setOrderIsland(...a),
+  markPickedUp: (...a: unknown[]) => markPickedUp(...a),
+  reopenOrder: (...a: unknown[]) => reopenOrder(...a),
 }))
 vi.mock('../../lib/api/backorders', async (importOriginal) => ({
   backorderQty: (await importOriginal<typeof import('../../lib/api/backorders')>()).backorderQty,
@@ -326,4 +330,41 @@ test('a pick-up-at-store order says so at the top', async () => {
   renderPage()
   expect(await screen.findByText('รับเองที่สาขา')).toBeInTheDocument()
   expect(screen.getByText(/ไม่ต้องส่งลงเรือ/)).toBeInTheDocument()
+})
+
+test('an open store pickup gets "ลูกค้ารับแล้ว", confirmed before it closes', async () => {
+  getOrder.mockResolvedValue({ ...order, is_pickup: true, status: 'imported' })
+  useAuthMock.mockReturnValue({ profile: { id: 'u2', name: 'แพ็ค', role: 'packer' } })
+  renderPage()
+  await userEvent.click(await screen.findByRole('button', { name: 'ลูกค้ารับแล้ว' }))
+  expect(markPickedUp).not.toHaveBeenCalled()
+  await userEvent.click(screen.getByRole('button', { name: 'ยืนยัน ลูกค้ารับแล้ว' }))
+  expect(markPickedUp).toHaveBeenCalledWith('ord1')
+})
+
+test('no close button on a boat order', async () => {
+  renderPage()
+  await screen.findByText(/PO-1/)
+  expect(screen.queryByRole('button', { name: 'ลูกค้ารับแล้ว' })).not.toBeInTheDocument()
+})
+
+test('a closed pickup can be reopened by a manager only', async () => {
+  getOrder.mockResolvedValue({ ...order, is_pickup: true, status: 'picked_up' })
+  renderPage()
+  await userEvent.click(await screen.findByRole('button', { name: 'เปิดออเดอร์อีกครั้ง' }))
+  expect(reopenOrder).toHaveBeenCalledWith('ord1')
+})
+
+test('a packer does not see "reopen"', async () => {
+  getOrder.mockResolvedValue({ ...order, is_pickup: true, status: 'picked_up' })
+  useAuthMock.mockReturnValue({ profile: { id: 'u2', name: 'แพ็ค', role: 'packer' } })
+  renderPage()
+  await screen.findByText(/PO-1/)
+  expect(screen.queryByRole('button', { name: 'เปิดออเดอร์อีกครั้ง' })).not.toBeInTheDocument()
+})
+
+test('an order Makro canceled shows a warning at the top', async () => {
+  getOrder.mockResolvedValue({ ...order, makro_order_status: 'Canceled' })
+  renderPage()
+  expect(await screen.findByText(/แม็คโครยกเลิกออเดอร์นี้แล้ว/)).toBeInTheDocument()
 })

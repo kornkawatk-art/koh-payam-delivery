@@ -9,6 +9,7 @@ import { itemRow, planItemSync, type ExistingItem } from '../import/itemSync'
 import { canTransition, type OrderStatus } from '../status'
 import { normCustomerName } from '../groupOrders'
 import { daysAgoISO, fetchAll } from './fetchAll'
+import { isMakroPickedUp } from '../makroStatus'
 
 export type OtherDayOrder = { makro_order_no: string; ship_date: string; status: string }
 
@@ -44,9 +45,14 @@ export async function listOrdersOnOtherDays(
 // too, not just on the order's own item table.
 // A PO that already exists on a DIFFERENT ship day is skipped, never re-created
 // (listOrdersOnOtherDays); the skipped list is returned so the UI can say so.
+// Store pickups Makro marks "Picked up" arrive (or, on a re-import, become)
+// picked_up; `voided` -- POs Makro returned/canceled, which buildImport does
+// not import -- only has its Makro status recorded on POs already here, so
+// they carry a warning badge and can't board a boat.
 export async function commitImport(
   shipDate: string,
   incoming: ParsedOrder[],
+  voided: { makroOrderNo: string; status: string }[] = [],
 ): Promise<{
   created: number
   synced: number
@@ -56,12 +62,16 @@ export async function commitImport(
   const nos = incoming.map((o) => o.makroOrderNo)
   const { data: existing } = await supabase
     .from('orders')
-    .select('id,makro_order_no')
+    .select('id,makro_order_no,status')
     .eq('ship_day_id', day.id)
     .in('makro_order_no', nos)
   const idByNo = new Map<string, string>(
     (existing ?? []).map((r: any) => [r.makro_order_no, r.id]),
   )
+  const statusByNo = new Map<string, string>(
+    (existing ?? []).map((r: any) => [r.makro_order_no, r.status]),
+  )
+  const collected = (o: ParsedOrder) => !!o.isPickup && isMakroPickedUp(o.makroOrderStatus)
 
   // A PO already imported on another day is skipped, never duplicated. (One
   // that also exists on THIS day still syncs in place -- same-day wins.)
@@ -84,7 +94,8 @@ export async function commitImport(
           makro_order_no: o.makroOrderNo,
           customer_name_en: o.customerName,
           ship_date: shipDate,
-          status: 'imported',
+          status: collected(o) ? 'picked_up' : 'imported',
+          ...(collected(o) ? { picked_up_at: new Date().toISOString() } : {}),
           link_token: makeLinkToken(),
           sub_district: o.subDistrict,
           shipping_address: o.shippingAddress || null,
@@ -121,6 +132,10 @@ export async function commitImport(
           // Makro's own fact -- a re-import keeps it current (unlike island,
           // which a manager may have picked by hand)
           is_pickup: o.isPickup,
+          // the customer collected it -- close it, unless it already went further
+          ...(collected(o) && ['imported', 'packed'].includes(statusByNo.get(o.makroOrderNo) ?? '')
+            ? { status: 'picked_up', picked_up_at: new Date().toISOString() }
+            : {}),
         })
         .eq('id', existingId)
       if (eU) throw new Error(`อัปเดตออเดอร์ ${o.makroOrderNo} ไม่สำเร็จ: ${eU.message}`)
@@ -168,6 +183,16 @@ export async function commitImport(
       await syncShortageBackorders(existingId)
       synced++
     }
+  }
+
+  // Makro returned / canceled: not imported (buildImport skipped them), but a
+  // PO already here gets the status so it shows the warning and can't ship.
+  for (const v of voided) {
+    const { error: eV } = await supabase
+      .from('orders')
+      .update({ makro_order_status: v.status })
+      .eq('makro_order_no', v.makroOrderNo)
+    if (eV) throw new Error(`อัปเดตสถานะแม็คโครของ ${v.makroOrderNo} ไม่สำเร็จ: ${eV.message}`)
   }
 
   await linkBackordersToDay(shipDate)
@@ -244,6 +269,39 @@ export async function updateOrderStatus(orderId: string, next: OrderStatus) {
   const { error: e2 } = await supabase.from('orders').update({ status: next }).eq('id', orderId)
   if (e2) throw new Error(e2.message)
   await logAction('status_change', 'order', orderId, { from: (cur as any).status, to: next })
+}
+
+// "ลูกค้ารับแล้ว": a store-pickup order the customer collected at the branch.
+// Any team member can close it (from imported or packed).
+export async function markPickedUp(orderId: string) {
+  const { data: cur, error } = await supabase
+    .from('orders')
+    .select('status,is_pickup')
+    .eq('id', orderId)
+    .single()
+  if (error) throw new Error(error.message)
+  const { status, is_pickup } = cur as { status: OrderStatus; is_pickup: boolean }
+  if (!is_pickup) throw new Error('ไม่ใช่ออเดอร์รับเองที่สาขา')
+  if (!canTransition(status, 'picked_up')) throw new Error('ปิดออเดอร์นี้ไม่ได้ (สถานะไปไกลกว่านั้นแล้ว)')
+  const { error: e2 } = await supabase
+    .from('orders')
+    .update({ status: 'picked_up', picked_up_at: new Date().toISOString() })
+    .eq('id', orderId)
+  if (e2) throw new Error('ปิดออเดอร์ไม่สำเร็จ: ' + e2.message)
+  await logAction('picked_up', 'order', orderId, { from: status })
+}
+
+// A manager undoes a mistaken "ลูกค้ารับแล้ว" (the button is manager-only).
+export async function reopenOrder(orderId: string) {
+  const { data: cur, error } = await supabase.from('orders').select('status').eq('id', orderId).single()
+  if (error) throw new Error(error.message)
+  if ((cur as { status: string }).status !== 'picked_up') throw new Error('ออเดอร์นี้ยังไม่ได้ปิด')
+  const { error: e2 } = await supabase
+    .from('orders')
+    .update({ status: 'imported', picked_up_at: null })
+    .eq('id', orderId)
+  if (e2) throw new Error('เปิดออเดอร์อีกครั้งไม่สำเร็จ: ' + e2.message)
+  await logAction('order_reopened', 'order', orderId, undefined)
 }
 
 // A manager fixes (or, for a pier-only address, first sets) which island an

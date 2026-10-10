@@ -437,3 +437,13 @@ test('a day with two islands gets island chips that filter the list', async () =
   expect(screen.queryByRole('button', { name: /PO-1/ })).not.toBeInTheDocument()
   expect(screen.getByRole('button', { name: /PO-3/ })).toBeInTheDocument()
 })
+
+test('an order Makro returned or canceled cannot ship, and says why', async () => {
+  listOrdersForDay.mockReset().mockResolvedValue([{ ...orders[0], makro_order_status: 'Returned' }])
+  render(<PierLoad />)
+  await userEvent.click(await screen.findByRole('button', { name: /PO-1/ }))
+  await userEvent.click(screen.getByRole('button', { name: 'เรือ 2' }))
+  await userEvent.click(screen.getByRole('button', { name: 'mock-upload' }))
+  expect(screen.getByRole('button', { name: 'ส่งขึ้นเรือแล้ว' })).toBeDisabled()
+  expect(screen.getByText(/แม็คโครคืนสินค้าออเดอร์นี้แล้ว — ห้ามส่งขึ้นเรือ/)).toBeInTheDocument()
+})

@@ -204,7 +204,11 @@ export default function CustomerOrderView() {
         </section>
       )}
 
-      <OrderStatusTimeline status={data.status} lang={lang} />
+      {data.status === 'picked_up' ? (
+        <p className="alert alert-ok my-4 text-center font-semibold">{t(lang, 'status_picked_up')}</p>
+      ) : (
+        <OrderStatusTimeline status={data.status} lang={lang} />
+      )}
 
       <section className="flex flex-col gap-3" aria-label={t(lang, 'boxes')}>
         {(data.foamBoxesOutstanding ?? 0) > 0 && (

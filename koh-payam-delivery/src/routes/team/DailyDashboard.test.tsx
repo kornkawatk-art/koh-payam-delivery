@@ -594,3 +594,15 @@ test('no popup when everyone was reached', async () => {
   await screen.findByText('ส่งลิงก์ไลน์ 3 ฉบับ')
   expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
 })
+
+test('a Makro-returned order carries a red badge; a collected pickup counts as done', async () => {
+  vi.mocked(listOrdersForDay).mockResolvedValueOnce([
+    { id: '1', makro_order_no: 'PO-1', customer_name_en: 'RETURNED SHOP', island: 'payam', makro_order_status: 'Returned', status: 'imported', boat_id: null, paper_box_count: 0, foam_box_count: 0, piece_count: 0, outstanding_amount: 0, customer_phone: '01' },
+    { id: '2', makro_order_no: 'PO-2', customer_name_en: 'PICKED SHOP', island: 'payam', is_pickup: true, status: 'picked_up', boat_id: null, paper_box_count: 0, foam_box_count: 0, piece_count: 0, outstanding_amount: 0, customer_phone: '02' },
+  ])
+  renderPage()
+  const row = (await screen.findByText('RETURNED SHOP')).closest('tr') as HTMLElement
+  expect(within(row).getByText('แม็คโคร: คืนสินค้า')).toHaveClass('badge-danger')
+  // packed tile: the picked-up order counts as done, the returned one doesn't
+  expect(screen.getByText('1/2')).toBeInTheDocument()
+})

@@ -1,11 +1,14 @@
-export const ORDER_STATUS = ['imported', 'packed', 'at_pier', 'shipped'] as const
+// picked_up: a store-pickup order the customer collected (final, like shipped;
+// a manager can reopen it back to imported).
+export const ORDER_STATUS = ['imported', 'packed', 'at_pier', 'shipped', 'picked_up'] as const
 export type OrderStatus = (typeof ORDER_STATUS)[number]
 
 const FORWARD: Record<OrderStatus, OrderStatus[]> = {
-  imported: ['packed'],
-  packed: ['at_pier'],
+  imported: ['packed', 'picked_up'],
+  packed: ['at_pier', 'picked_up'],
   at_pier: ['shipped'],
   shipped: [],
+  picked_up: ['imported'],
 }
 export function canTransition(from: OrderStatus, to: OrderStatus): boolean {
   return FORWARD[from]?.includes(to) ?? false

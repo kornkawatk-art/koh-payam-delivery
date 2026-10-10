@@ -314,3 +314,10 @@ test('the foam box reminder names Makro in Thai too', async () => {
   // red background, white text -- meant to stand out on the page
   expect(box).toHaveClass('bg-danger', 'text-white')
 })
+
+test('a collected store pickup says so instead of the delivery timeline, and offers no claim', async () => {
+  fetchMock.mockResolvedValue(ok({ ...payload, status: 'picked_up', canClaim: false }))
+  renderAt()
+  expect(await screen.findByText('Picked up at the store')).toBeInTheDocument()
+  expect(screen.queryByRole('button', { name: 'Report a problem' })).not.toBeInTheDocument()
+})
