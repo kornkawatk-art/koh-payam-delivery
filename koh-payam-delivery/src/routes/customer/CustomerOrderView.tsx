@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState, type ReactNode } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { Link, useLocation, useParams } from 'react-router-dom'
 import { Boat, CheckCircle, Warning } from '@phosphor-icons/react'
 import { t, type Lang } from './i18n'
 import OrderStatusTimeline from '../../components/OrderStatusTimeline'
@@ -65,6 +65,7 @@ function readLang(): Lang {
 
 export default function CustomerOrderView() {
   const { token } = useParams()
+  const { pathname } = useLocation()
   const [lang, setLang] = useState<Lang>(readLang)
   const [data, setData] = useState<OrderView | null>(null)
   const [err, setErr] = useState<'not_found' | 'error' | null>(null)
@@ -137,7 +138,16 @@ export default function CustomerOrderView() {
               {islandName(data?.island, lang) ?? (lang === 'th' ? 'ติดตามออเดอร์' : 'Order tracking')}
             </span>
           </div>
-          {toggle}
+          <div className="flex items-center gap-2">
+            <Link
+              className="text-sm font-medium text-brand-ink underline-offset-2 hover:underline"
+              to="/help"
+              state={{ from: pathname }}
+            >
+              {t(lang, 'how_to_use')}
+            </Link>
+            {toggle}
+          </div>
         </div>
         {inner}
       </div>
