@@ -17,6 +17,7 @@ import {
   CaretDown,
   CaretRight,
   ListBullets,
+  Printer,
 } from '@phosphor-icons/react'
 import { StatusBadge } from '../../components/ui/StatusBadge'
 import { PageSkeleton } from '../../components/ui/Skeleton'
@@ -35,6 +36,8 @@ import {
 import { PickupBadge } from '../../components/ui/PickupBadge'
 import { LinkSendReport } from '../../components/LinkSendReport'
 import { MakroVoidBadge } from '../../components/ui/MakroVoidBadge'
+import { BulkStickerDialog } from '../../components/BulkStickerPrint'
+import { buildStickerJobs } from '../../lib/bulkStickers'
 
 export default function DailyDashboard() {
   const navigate = useNavigate()
@@ -44,6 +47,8 @@ export default function DailyDashboard() {
   const [q, setQ] = useState('')
   const [island, setIsland] = useState<IslandFilterValue>('all')
   const [scanOpen, setScanOpen] = useState(false)
+  const [bulkOpen, setBulkOpen] = useState(false)
+  const [bulkMsg, setBulkMsg] = useState<string>()
   // undefined = not loaded yet (don't flash the banner while unknown)
   const [linksSentAt, setLinksSentAt] = useState<string | null | undefined>(undefined)
   const [linkSendBusy, setLinkSendBusy] = useState(false)
@@ -134,6 +139,11 @@ export default function DailyDashboard() {
   // group row (see groupByPhone). Grouped from ALL rows -- the search box then
   // keeps any entry with a matching PO, so a group never loses members to it.
   const entries = useMemo(() => groupByPhone<any>(rows ?? []), [rows])
+
+  // "พิมพ์สติ๊กเกอร์ทั้งหมด": per-customer jobs; the button counts what's still due
+  const stickerJobs = useMemo(() => buildStickerJobs(rows ?? []), [rows])
+  const due = stickerJobs.filter((j) => !j.printed)
+  const dueStickers = due.reduce((n, j) => n + j.counts.paper + j.counts.foam + j.counts.piece, 0)
 
   const showIslandFilter = useMemo(
     () => needsIslandFilter((rows ?? []).map((o) => o.island)),
@@ -309,6 +319,33 @@ export default function DailyDashboard() {
             navigate(`/order/${order.id}`)
           }}
           onClose={() => setScanOpen(false)}
+        />
+      )}
+
+      <div className="flex flex-wrap items-center gap-2">
+        <button
+          type="button"
+          className="btn btn-warn btn-sm"
+          disabled={stickerJobs.length === 0}
+          onClick={() => {
+            setBulkMsg(undefined)
+            setBulkOpen(true)
+          }}
+        >
+          <Printer size={16} aria-hidden="true" />
+          พิมพ์สติ๊กเกอร์ ({due.length} เจ้า · {dueStickers} ดวง)
+        </button>
+        {bulkMsg && <span className="text-xs text-ink-soft">{bulkMsg}</span>}
+      </div>
+      {bulkOpen && (
+        <BulkStickerDialog
+          jobs={stickerJobs}
+          onClose={() => setBulkOpen(false)}
+          onPrinted={(warning) => {
+            setBulkOpen(false)
+            setBulkMsg(warning ?? 'ส่งสติ๊กเกอร์ไปพิมพ์แล้ว')
+            load()
+          }}
         />
       )}
 

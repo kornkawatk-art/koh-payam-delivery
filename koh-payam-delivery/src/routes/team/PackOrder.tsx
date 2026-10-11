@@ -290,6 +290,9 @@ export default function PackOrder() {
           <StickerPrintButton
             customer={order}
             island={order.island}
+            printedOrders={[
+              { id: order.id, paper_box_count: paper, foam_box_count: foam, piece_count: piece },
+            ]}
             counts={{ paper, foam, piece }}
             beforePrint={async () => {
               await savePack(packInput())

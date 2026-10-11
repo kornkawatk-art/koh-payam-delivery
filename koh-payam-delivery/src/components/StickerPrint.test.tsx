@@ -6,6 +6,9 @@ const { getShortName, saveShortName } = vi.hoisted(() => ({
   getShortName: vi.fn(),
   saveShortName: vi.fn(),
 }))
+const { markStickersPrinted } = vi.hoisted(() => ({ markStickersPrinted: vi.fn() }))
+vi.mock('../lib/api/stickerPrints', () => ({ markStickersPrinted }))
+
 vi.mock('../lib/api/customerAliases', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../lib/api/customerAliases')>()),
   getShortName,
@@ -106,4 +109,15 @@ test('the sticker carries the island (small) once the order has one, and none wh
   const d2 = screen.getByRole('dialog', { name: 'พิมพ์สติ๊กเกอร์' })
   await within(d2).findByText(/ตัวอย่าง/)
   expect(within(d2).queryByText(/^เกาะ/)).not.toBeInTheDocument()
+})
+
+test('printing records the orders as printed with the counts that were printed', async () => {
+  markStickersPrinted.mockReset().mockResolvedValue(undefined)
+  const printedOrders = [{ id: 'o1', paper_box_count: 2, foam_box_count: 1, piece_count: 0 }]
+  render(<StickerPrintButton customer={customer} counts={counts} printedOrders={printedOrders} />)
+  await userEvent.click(screen.getByRole('button', { name: 'พิมพ์สติ๊กเกอร์ (3 ดวง)' }))
+  const dialog = screen.getByRole('dialog', { name: 'พิมพ์สติ๊กเกอร์' })
+  await within(dialog).findByDisplayValue('JJ')
+  await userEvent.click(within(dialog).getByRole('button', { name: 'พิมพ์' }))
+  await waitFor(() => expect(markStickersPrinted).toHaveBeenCalledWith(printedOrders))
 })

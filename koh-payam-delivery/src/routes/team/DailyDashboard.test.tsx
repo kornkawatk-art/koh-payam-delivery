@@ -29,6 +29,12 @@ vi.mock('../../components/QrOrderScanner', () => ({
   ),
 }))
 
+vi.mock('../../components/BulkStickerPrint', () => ({
+  BulkStickerDialog: ({ jobs }: { jobs: { name: string }[] }) => (
+    <div role="dialog" aria-label="พิมพ์สติ๊กเกอร์ทั้งหมด">{jobs.map((j) => j.name).join(', ')}</div>
+  ),
+}))
+
 vi.mock('../../lib/api/shipDays', () => ({
   listOrdersForDay: vi.fn().mockResolvedValue([
     {
@@ -605,4 +611,15 @@ test('a Makro-returned order carries a red badge; a collected pickup counts as d
   expect(within(row).getByText('แม็คโคร: คืนสินค้า')).toHaveClass('badge-danger')
   // packed tile: the picked-up order counts as done, the returned one doesn't
   expect(screen.getByText('1/2')).toBeInTheDocument()
+})
+
+test('"print all stickers" counts customers and stickers still due, and opens the batch dialog', async () => {
+  vi.mocked(listOrdersForDay).mockResolvedValueOnce([
+    { id: '1', makro_order_no: 'PO-1', customer_name_en: 'DUE ONE', island: 'payam', status: 'packed', boat_id: null, paper_box_count: 2, foam_box_count: 1, piece_count: 0, outstanding_amount: 0, customer_phone: '01', stickers_printed: null },
+    { id: '2', makro_order_no: 'PO-2', customer_name_en: 'DONE', island: 'payam', status: 'packed', boat_id: null, paper_box_count: 1, foam_box_count: 0, piece_count: 0, outstanding_amount: 0, customer_phone: '02', stickers_printed: '1,0,0' },
+    { id: '3', makro_order_no: 'PO-3', customer_name_en: 'NOT PACKED', island: 'payam', status: 'imported', boat_id: null, paper_box_count: 0, foam_box_count: 0, piece_count: 0, outstanding_amount: 0, customer_phone: '03' },
+  ])
+  renderPage()
+  await userEvent.click(await screen.findByRole('button', { name: 'พิมพ์สติ๊กเกอร์ (1 เจ้า · 3 ดวง)' }))
+  expect(screen.getByRole('dialog', { name: 'พิมพ์สติ๊กเกอร์ทั้งหมด' })).toHaveTextContent('DONE, DUE ONE') // island, then name
 })

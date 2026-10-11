@@ -28,6 +28,20 @@ export async function getShortName(ref: CustomerRef): Promise<string | null> {
   return (data?.[0] as { short_name: string } | undefined)?.short_name ?? null
 }
 
+/** Saved short names for many customers in one query (bulk sticker printing). */
+export async function getShortNames(refs: CustomerRef[]): Promise<Map<string, string>> {
+  const keys = Array.from(new Set(refs.map((r) => customerKey(r))))
+  if (!keys.length) return new Map()
+  const { data, error } = await supabase
+    .from('customer_aliases')
+    .select('customer_key,short_name')
+    .in('customer_key', keys)
+  if (error) throw new Error('โหลดชื่อย่อไม่สำเร็จ: ' + error.message)
+  return new Map(
+    ((data ?? []) as { customer_key: string; short_name: string }[]).map((r) => [r.customer_key, r.short_name]),
+  )
+}
+
 export async function saveShortName(ref: CustomerRef, shortName: string): Promise<void> {
   const name = shortName.trim()
   if (!name) throw new Error('ชื่อย่อว่างไม่ได้')
