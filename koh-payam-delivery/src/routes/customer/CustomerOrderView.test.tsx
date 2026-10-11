@@ -321,3 +321,9 @@ test('a collected store pickup says so instead of the delivery timeline, and off
   expect(await screen.findByText('Picked up at the store')).toBeInTheDocument()
   expect(screen.queryByRole('button', { name: 'Report a problem' })).not.toBeInTheDocument()
 })
+
+test('the order page links to the how-to guide', async () => {
+  renderAt()
+  await screen.findByText(/PO-1001/)
+  expect(screen.getByRole('link', { name: 'How to use' })).toHaveAttribute('href', '/help')
+})

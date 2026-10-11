@@ -26,6 +26,7 @@ const OrderDetail = lazyPage(() => import('./routes/team/OrderDetail'))
 const PackOrder = lazyPage(() => import('./routes/team/PackOrder'))
 const PackGroup = lazyPage(() => import('./routes/team/PackGroup'))
 const CustomerOrderView = lazyPage(() => import('./routes/customer/CustomerOrderView'))
+const CustomerHelp = lazyPage(() => import('./routes/customer/CustomerHelp'))
 const LineRegister = lazyPage(() => import('./routes/customer/LineRegister'))
 
 const LOADING = (
@@ -62,6 +63,7 @@ export default function App() {
           <Route path="/login" element={<Login />} />
           {/* Customer order link — no team session; the link_token is the only credential. */}
           <Route path="/o/:token" element={<CustomerOrderView />} />
+          <Route path="/help" element={<CustomerHelp />} />
           {/* LIFF registration page — opened inside LINE's in-app browser; no team session, no link_token. */}
           <Route path="/liff/register" element={<LineRegister />} />
           <Route path="/2fa/setup" element={<TwoFactorSetup />} />

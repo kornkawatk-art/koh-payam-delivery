@@ -8,6 +8,7 @@ export type Lang = 'en' | 'th'
 export const STRINGS: Record<Lang, Record<string, string>> = {
   en: {
     title: 'Order',
+    how_to_use: 'How to use',
     loading: 'Loading…',
     not_found: 'This order link was not found or has expired.',
     error: 'Something went wrong. Please try again later.',
@@ -80,6 +81,7 @@ export const STRINGS: Record<Lang, Record<string, string>> = {
   },
   th: {
     title: 'ออเดอร์',
+    how_to_use: 'วิธีใช้',
     loading: 'กำลังโหลด…',
     not_found: 'ไม่พบลิงก์ออเดอร์นี้ หรือลิงก์หมดอายุแล้ว',
     error: 'เกิดข้อผิดพลาด กรุณาลองใหม่ภายหลัง',
