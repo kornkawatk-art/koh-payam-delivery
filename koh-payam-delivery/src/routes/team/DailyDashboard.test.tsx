@@ -623,3 +623,19 @@ test('"print all stickers" counts customers and stickers still due, and opens th
   await userEvent.click(await screen.findByRole('button', { name: 'พิมพ์สติ๊กเกอร์ (1 เจ้า · 3 ดวง)' }))
   expect(screen.getByRole('dialog', { name: 'พิมพ์สติ๊กเกอร์ทั้งหมด' })).toHaveTextContent('DONE, DUE ONE') // island, then name
 })
+
+test('the sticker button explains a zero: nothing packed yet, or everything already printed', async () => {
+  const row = (id: string, status: string, printed: string | null) => ({
+    id, makro_order_no: 'PO-' + id, customer_name_en: 'SHOP ' + id, island: 'payam', status, boat_id: null,
+    paper_box_count: 1, foam_box_count: 0, piece_count: 0, outstanding_amount: 0, customer_phone: '0' + id, stickers_printed: printed,
+  })
+  vi.mocked(listOrdersForDay).mockResolvedValueOnce([row('1', 'shipped', null), row('2', 'imported', null)])
+  const { unmount } = renderPage()
+  expect(await screen.findByText('ยังไม่มีออเดอร์ที่แพ็คเสร็จรอพิมพ์')).toBeInTheDocument()
+  unmount()
+
+  vi.mocked(listOrdersForDay).mockResolvedValueOnce([row('3', 'packed', '1,0,0')])
+  renderPage()
+  expect(await screen.findByText('พิมพ์ครบทุกเจ้าแล้ว')).toBeInTheDocument()
+  expect(screen.getByRole('button', { name: 'พิมพ์สติ๊กเกอร์ (0 เจ้า · 0 ดวง)' })).toBeEnabled() // still opens, for a reprint
+})
