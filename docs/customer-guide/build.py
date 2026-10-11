@@ -1,0 +1,135 @@
+# Builds the customer link-guide infographics (Thai + English) as HTML, ready
+# for a headless browser screenshot at 1080x1920 (LINE-friendly portrait).
+# Run: python build.py  ->  link-guide-th.html, link-guide-en.html
+import io, os
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+
+LOGO = """<svg width="96" height="96" viewBox="0 0 64 64"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#1c1917"/><stop offset="1" stop-color="#7c5214"/></linearGradient></defs><rect width="64" height="64" rx="14" fill="url(#g)"/><path d="M18 34h28l-5 9H23z" fill="#fff"/><rect x="30" y="18" width="3" height="16" fill="#fff"/><path d="M33 19l9 12h-9z" fill="#f2c46d"/><path d="M12 48c4 0 4-3 8-3s4 3 8 3 4-3 8-3 4 3 8 3 4-3 8-3" fill="none" stroke="#f2c46d" stroke-width="3" stroke-linecap="round"/></svg>"""
+
+COPY = {
+    'th': {
+        'lang': 'th',
+        'kicker': 'ลูกค้าเกาะพยาม · เกาะช้าง',
+        'title': 'ลิงก์ติดตามออเดอร์<br>ดูอะไรได้บ้าง?',
+        'sub': 'ทุกวันที่มีของส่ง เราส่งลิงก์ให้ทาง LINE — กดเปิดได้เลย ไม่ต้องล็อกอิน',
+        'mock': {
+            'island': 'เกาะพยาม', 'po': 'PO 1234567890', 'foam': 'คุณมีลังโฟมของแม็คโครค้างอยู่ 3 ใบ',
+            'steps': ['รับออเดอร์', 'แพ็คเสร็จ', 'ถึงท่าเรือ', 'ขึ้นเรือ'], 'boat': 'เรือ 2',
+            'items': [('ข้าวหอมมะลิ 5 กก.', '2/2', ''), ('ไข่ไก่ 30 ฟอง x5', '1/1', ''), ('น้ำปลา 700 มล.', '2/4', 'ขาด')],
+            'photos': 'รูปตอนแพ็ค / ตอนขึ้นเรือ', 'report': 'แจ้งปัญหา',
+        },
+        'points': [
+            ('สถานะออเดอร์', 'รู้ว่าของอยู่ขั้นไหน และขึ้นเรือลำไหน'),
+            ('รายการสินค้า', 'จำนวนที่ส่งจริง · ของที่แม็คโครส่งไม่ครบมีป้าย “ขาด”'),
+            ('รูปถ่ายลัง', 'รูปตอนแพ็คและตอนส่งขึ้นเรือ แตะเพื่อดูรูปใหญ่'),
+            ('แจ้งปัญหา', 'ของขาด เสียหาย ไข่แตก — แจ้งได้ภายใน 48 ชม. หลังของออกเรือ'),
+            ('ลังโฟม', 'แถบแดงบอกจำนวนลังที่ค้าง — คืนกับเรือรอบถัดไป'),
+        ],
+        'cta': 'ยังไม่ได้รับลิงก์? ลงทะเบียนเบอร์โทรกับ LINE ร้าน — ทักถามในไลน์กลุ่มท่าเรือ',
+        'help': 'ในลิงก์มีปุ่ม “วิธีใช้” อ่านคู่มือได้ทุกเมื่อ',
+    },
+    'en': {
+        'lang': 'en',
+        'kicker': 'For Koh Payam · Koh Chang customers',
+        'title': 'Your order link —<br>what can you see?',
+        'sub': 'Every delivery day we send you a link on LINE. Just tap it — no login needed.',
+        'mock': {
+            'island': 'Koh Payam', 'po': 'PO 1234567890', 'foam': 'You have 3 Makro foam boxes',
+            'steps': ['Received', 'Packed', 'At pier', 'Shipped'], 'boat': 'Boat 2',
+            'items': [('Jasmine rice 5 kg', '2/2', ''), ('Eggs 30 x5', '1/1', ''), ('Fish sauce 700 ml', '2/4', 'Short')],
+            'photos': 'Packing / boat photos', 'report': 'Report a problem',
+        },
+        'points': [
+            ('Order status', 'See which step your order is at, and which boat it is on'),
+            ('Your items', 'What was shipped · anything Makro couldn’t supply is marked “Short”'),
+            ('Box photos', 'Photos at packing and at the boat — tap to enlarge'),
+            ('Report a problem', 'Missing, damaged, broken eggs — within 48 h after the boat leaves'),
+            ('Foam boxes', 'A red banner shows boxes you hold — return them with the boat'),
+        ],
+        'cta': 'Not getting the link? Register your phone with our LINE — ask in the pier LINE group',
+        'help': 'Tap “How to use” in the link for the full guide anytime',
+    },
+}
+
+CSS = """
+*{box-sizing:border-box;margin:0;padding:0}
+body{width:1080px;height:1920px;font-family:'IBM Plex Sans Thai','Inter',sans-serif;background:#faf9f7;color:#1c1917;overflow:hidden}
+.wrap{padding:80px 72px 72px;height:100%;display:flex;flex-direction:column;justify-content:space-between;position:relative}
+.glow{position:absolute;top:-200px;left:50%;width:900px;height:600px;transform:translateX(-50%);background:radial-gradient(closest-side,rgba(154,106,28,.18),transparent);pointer-events:none}
+header{display:flex;gap:32px;align-items:center;position:relative}
+.kicker{font-size:30px;font-weight:600;color:#9a6a1c;letter-spacing:.5px}
+h1{font-size:68px;line-height:1.15;font-weight:700;margin-top:6px}
+.sub{font-size:32px;line-height:1.45;color:#57534e;position:relative}
+.main{display:flex;gap:44px;align-items:flex-start;position:relative}
+.phone{width:440px;flex:none;border-radius:56px;background:#1c1917;padding:18px;box-shadow:0 30px 60px rgba(28,25,23,.25)}
+.screen{border-radius:40px;background:#faf9f7;padding:30px 22px 36px;display:flex;flex-direction:column;gap:18px;font-size:19px}
+.bar{display:flex;align-items:center;gap:10px;font-weight:700;font-size:21px}
+.bar .dot{width:30px;height:30px;border-radius:8px;background:linear-gradient(135deg,#1c1917,#7c5214)}
+.po{font-size:17px;color:#57534e}
+.foam{background:#b91c1c;color:#fff;font-weight:700;border-radius:12px;padding:12px 14px;font-size:18px;line-height:1.35}
+.steps{display:flex;justify-content:space-between;gap:6px}
+.step{flex:1;text-align:center;font-size:14px;color:#57534e}
+.step i{display:block;width:30px;height:30px;margin:0 auto 4px;border-radius:50%;background:#15803d;border:3px solid #15803d}
+.step.cur i{background:#9a6a1c;border-color:#9a6a1c}
+.boat{font-size:17px;color:#57534e;text-align:center}
+.card{background:#fff;border:1px solid #e7e5e4;border-radius:14px;padding:12px 14px}
+.row{display:flex;justify-content:space-between;align-items:center;padding:6px 0;font-size:17px;border-bottom:1px solid #f0eeec}
+.row:last-child{border:0}
+.short{background:#fef2f2;color:#991b1b;border:1px solid #fecaca;border-radius:999px;padding:2px 10px;font-size:14px;margin-left:6px}
+.thumbs{display:flex;gap:8px;margin-top:8px}
+.thumbs b{flex:1;height:96px;border-radius:10px;background:linear-gradient(135deg,#d6d3d1,#a8a29e)}
+.btn{background:#9a6a1c;color:#fff;font-weight:700;text-align:center;border-radius:12px;padding:14px;font-size:19px}
+.slabel{font-size:15px;color:#a8a29e;font-weight:600}
+.num{display:inline-flex;align-items:center;justify-content:center;width:34px;height:34px;border-radius:50%;background:#9a6a1c;color:#fff;font-weight:700;font-size:19px;flex:none;box-shadow:0 0 0 4px #faf9f7}
+.tag{position:relative}
+.tag .num{position:absolute;left:-30px;top:-14px}
+ol{list-style:none;display:flex;flex-direction:column;gap:40px;flex:1;padding-top:16px}
+li{display:flex;gap:20px;align-items:flex-start}
+li .num{width:58px;height:58px;font-size:30px;box-shadow:none}
+li h3{font-size:40px;font-weight:700;line-height:1.2}
+li p{font-size:29px;line-height:1.45;color:#57534e;margin-top:8px}
+.cta{background:#1c1917;color:#fff;border-radius:28px;padding:34px 40px;font-size:31px;line-height:1.45;font-weight:600;position:relative}
+.cta small{display:block;font-size:25px;font-weight:500;color:#f2c46d;margin-top:10px}
+"""
+
+
+def render(c):
+    m = c['mock']
+    steps = ''.join(
+        f'<div class="step{" cur" if i == 3 else ""}"><i></i>{s}</div>' for i, s in enumerate(m['steps'])
+    )
+    rows = ''.join(
+        f'<div class="row"><span>{n}</span><span>{q}{f"<span class=short>{b}</span>" if b else ""}</span></div>'
+        for n, q, b in m['items']
+    )
+    points = ''.join(
+        f'<li><span class="num">{i + 1}</span><div><h3>{h}</h3><p>{p}</p></div></li>'
+        for i, (h, p) in enumerate(c['points'])
+    )
+    return f"""<!doctype html><html lang="{c['lang']}"><head><meta charset="utf-8">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@400;500;600;700&family=Inter:wght@400;600;700&display=block">
+<style>{CSS}</style></head><body><div class="wrap"><div class="glow"></div>
+<header>{LOGO}<div><div class="kicker">{c['kicker']}</div><h1>{c['title']}</h1></div></header>
+<p class="sub">{c['sub']}</p>
+<div class="main">
+ <div class="phone"><div class="screen">
+  <div class="bar"><span class="dot"></span>{m['island']}</div>
+  <div class="po">{m['po']}</div>
+  <div class="tag"><span class="num">5</span><div class="foam">{m['foam']}</div></div>
+  <div class="tag"><span class="num">1</span><div class="steps">{steps}</div></div>
+  <div class="boat">⛴ {m['boat']}</div>
+  <div class="tag"><span class="num">2</span><div class="card">{rows}</div></div>
+  <div class="tag"><span class="num">3</span><div class="card"><div class="slabel">{m['photos']}</div><div class="thumbs"><b></b><b></b><b></b></div></div></div>
+  <div class="tag"><span class="num">4</span><div class="btn">{m['report']}</div></div>
+ </div></div>
+ <ol>{points}</ol>
+</div>
+<div class="cta">{c['cta']}<small>{c['help']}</small></div>
+</div></body></html>"""
+
+
+for key, c in COPY.items():
+    with io.open(os.path.join(HERE, f'link-guide-{key}.html'), 'w', encoding='utf-8') as f:
+        f.write(render(c))
+print('ok')
