@@ -9,6 +9,7 @@ import {
   suggestShortName,
   type CustomerRef,
 } from '../lib/api/customerAliases'
+import { markStickersPrinted } from '../lib/api/stickerPrints'
 
 type Counts = { paper: number; foam: number; piece: number }
 
@@ -17,7 +18,7 @@ type Counts = { paper: number; foam: number; piece: number }
  * boat -- left off while the order's island is still unpicked), the
  * customer's short name, then "3 / 29 · ลังโฟม".
  */
-function StickerFace({ name, s, island }: { name: string; s: Sticker; island?: unknown }) {
+export function StickerFace({ name, s, island }: { name: string; s: Sticker; island?: unknown }) {
   const where = islandName(island)
   return (
     <div className="sticker">
@@ -40,9 +41,12 @@ function StickerFace({ name, s, island }: { name: string; s: Sticker; island?: u
  * counts. `beforePrint` runs first (the pack pages save the counts, so the
  * stickers never disagree with what's recorded).
  */
+type PrintedOrder = { id: string; paper_box_count: number; foam_box_count: number; piece_count: number }
+
 export function StickerPrintButton({
   customer,
   island,
+  printedOrders,
   counts,
   beforePrint,
   disabled,
@@ -50,6 +54,8 @@ export function StickerPrintButton({
 }: {
   customer: CustomerRef
   island?: unknown
+  /** the orders these stickers are for, with the counts printed (marks them printed) */
+  printedOrders?: PrintedOrder[]
   counts: Counts
   beforePrint?: () => Promise<void>
   disabled?: boolean
@@ -72,6 +78,7 @@ export function StickerPrintButton({
         <StickerPrintDialog
           customer={customer}
           island={island}
+          printedOrders={printedOrders}
           counts={counts}
           beforePrint={beforePrint}
           onClose={() => setOpen(false)}
@@ -84,12 +91,14 @@ export function StickerPrintButton({
 export function StickerPrintDialog({
   customer,
   island,
+  printedOrders,
   counts,
   beforePrint,
   onClose,
 }: {
   customer: CustomerRef
   island?: unknown
+  printedOrders?: PrintedOrder[]
   counts: Counts
   beforePrint?: () => Promise<void>
   onClose: () => void
@@ -147,6 +156,9 @@ export function StickerPrintDialog({
       await saveShortName(customer, trimmed) // remembered for this customer's next orders
       await beforePrint?.()
       setPrinting(chosen)
+      // best effort: the stickers are printing either way; at worst the bulk
+      // print later lists this customer as still due
+      if (printedOrders?.length) await markStickersPrinted(printedOrders).catch(() => {})
     } catch (e) {
       setErr((e as Error).message)
     } finally {

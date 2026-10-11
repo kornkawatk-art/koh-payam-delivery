@@ -303,6 +303,7 @@ export default function OrderDetail() {
           className="btn btn-warn min-h-[3.25rem] flex-1 text-lg"
           customer={order}
           island={order.island}
+          printedOrders={[order]}
           counts={{
             paper: order.paper_box_count ?? 0,
             foam: order.foam_box_count ?? 0,

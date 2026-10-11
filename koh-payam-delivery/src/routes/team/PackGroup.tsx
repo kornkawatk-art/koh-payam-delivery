@@ -383,6 +383,11 @@ export default function PackGroup() {
             <StickerPrintButton
               customer={primary}
               island={primary.island}
+              printedOrders={orders.map((o: any) =>
+                o.id === primary.id
+                  ? { id: o.id, paper_box_count: paper, foam_box_count: foam, piece_count: piece }
+                  : { id: o.id, paper_box_count: 0, foam_box_count: 0, piece_count: 0 },
+              )}
               counts={{ paper, foam, piece }}
               beforePrint={async () => {
                 await savePackGroup(packInput())
