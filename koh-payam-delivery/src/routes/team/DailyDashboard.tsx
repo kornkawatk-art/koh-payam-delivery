@@ -335,7 +335,13 @@ export default function DailyDashboard() {
           <Printer size={16} aria-hidden="true" />
           พิมพ์สติ๊กเกอร์ ({due.length} เจ้า · {dueStickers} ดวง)
         </button>
-        {bulkMsg && <span className="text-xs text-ink-soft">{bulkMsg}</span>}
+        {bulkMsg ? (
+          <span className="text-xs text-ink-soft">{bulkMsg}</span>
+        ) : stickerJobs.length === 0 ? (
+          <span className="text-xs text-ink-soft">ยังไม่มีออเดอร์ที่แพ็คเสร็จรอพิมพ์</span>
+        ) : (
+          due.length === 0 && <span className="text-xs text-ink-soft">พิมพ์ครบทุกเจ้าแล้ว</span>
+        )}
       </div>
       {bulkOpen && (
         <BulkStickerDialog
