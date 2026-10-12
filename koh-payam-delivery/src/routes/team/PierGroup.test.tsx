@@ -2,6 +2,20 @@ import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import PierGroup from './PierGroup'
 
+const lockState = { current: null as null | Record<string, unknown> }
+// a real hook inside, so hook-order mistakes still crash here; no ref = not looked up
+vi.mock('../../components/PaymentLockNote', async () => {
+  const { useState } = await import('react')
+  return {
+    usePaymentLock: (ref: unknown) => {
+      useState(0)
+      return ref ? lockState.current : null
+    },
+    PaymentLockNote: ({ lock }: { lock: { locked?: boolean } | null }) =>
+      lock?.locked ? <p role="alert">ค้างชำระ</p> : null,
+  }
+})
+
 const listOrdersForCustomerDay = vi.fn()
 const setOrderBoats = vi.fn().mockResolvedValue(2)
 const setOrderPierName = vi.fn().mockResolvedValue(undefined)

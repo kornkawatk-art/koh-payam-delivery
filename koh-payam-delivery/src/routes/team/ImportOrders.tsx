@@ -16,6 +16,7 @@ import { UploadSimple, Warning } from '@phosphor-icons/react'
 import { PageHeader } from '../../components/ui/PageHeader'
 import { todayLocalISO } from '../../lib/format'
 import { ISLAND_LIST, ISLANDS } from '../../lib/islands'
+import { PaymentRefreshCard } from '../../components/PaymentRefreshCard'
 
 function loadMapping<T>(key: string, fallback: T): T {
   try {
@@ -147,7 +148,8 @@ export default function ImportOrders() {
       const r = await commitImport(shipDate, result.orders, result.skippedVoid ?? [])
       setImportMsg(
         `นำเข้า ${r.created} ใหม่ · sync ${r.synced}` +
-          (r.skipped.length > 0 ? ` · ข้าม ${r.skipped.length} ที่เคยนำเข้าแล้ว` : ''),
+          (r.skipped.length > 0 ? ` · ข้าม ${r.skipped.length} ที่เคยนำเข้าแล้ว` : '') +
+          (r.refreshed ? ` · อัปเดตการจ่ายเงิน ${r.refreshed}` : ''),
       )
     } catch (e) {
       setError((e as Error).message)
@@ -162,6 +164,8 @@ export default function ImportOrders() {
   return (
     <div className="flex flex-col gap-5">
       <PageHeader title="นำเข้าออเดอร์" icon={UploadSimple} accent="emerald" />
+
+      <PaymentRefreshCard orderMapping={om} />
 
       <div className="card grid gap-4 sm:grid-cols-2">
         <label className="field">

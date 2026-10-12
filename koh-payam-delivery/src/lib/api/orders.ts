@@ -10,6 +10,8 @@ import { canTransition, type OrderStatus } from '../status'
 import { normCustomerName } from '../groupOrders'
 import { daysAgoISO, fetchAll } from './fetchAll'
 import { isMakroPickedUp } from '../makroStatus'
+import { paymentPatch } from '../payments'
+import { refreshPayments } from './paymentRefresh'
 
 export type OtherDayOrder = { makro_order_no: string; ship_date: string; status: string }
 
@@ -57,6 +59,8 @@ export async function commitImport(
   created: number
   synced: number
   skipped: { makroOrderNo: string; shipDate: string }[]
+  // POs on another day whose payment facts were refreshed (payment lock)
+  refreshed: number
 }> {
   const day = await getOrCreateShipDay(shipDate)
   const nos = incoming.map((o) => o.makroOrderNo)
@@ -81,6 +85,9 @@ export async function commitImport(
       elsewhere.set(r.makro_order_no, r.ship_date)
   const orders = incoming.filter((o) => !elsewhere.has(o.makroOrderNo))
   const skipped = Array.from(elsewhere, ([makroOrderNo, d]) => ({ makroOrderNo, shipDate: d }))
+  // A PO already imported on another day isn't re-created, but its payment
+  // facts must stay current -- the payment lock reads them.
+  const { refreshed } = await refreshPayments(incoming.filter((o) => elsewhere.has(o.makroOrderNo)))
 
   let created = 0
   let synced = 0
@@ -124,10 +131,8 @@ export async function commitImport(
           customer_name_en: o.customerName,
           sub_district: o.subDistrict,
           shipping_address: o.shippingAddress || null,
-          makro_order_status: o.makroOrderStatus,
-          payment_method: o.paymentMethod,
-          payment_status: o.paymentStatus,
-          outstanding_amount: o.outstandingAmount,
+          // payment facts; Makro "not paid" also clears a manager's paid mark
+          ...paymentPatch(o),
           customer_phone: o.customerPhone,
           // Makro's own fact -- a re-import keeps it current (unlike island,
           // which a manager may have picked by hand)
@@ -202,7 +207,7 @@ export async function commitImport(
     synced,
     skipped: skipped.length,
   })
-  return { created, synced, skipped }
+  return { created, synced, skipped, refreshed }
 }
 
 // Lookup by the Makro shipping-label QR code (plain text = makro_order_no).

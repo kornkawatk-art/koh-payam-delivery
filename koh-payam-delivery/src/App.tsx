@@ -19,6 +19,7 @@ const FoamBoxes = lazyPage(() => import('./routes/team/FoamBoxes'))
 const ClaimsQueue = lazyPage(() => import('./routes/team/ClaimsQueue'))
 const ClaimDetail = lazyPage(() => import('./routes/team/ClaimDetail'))
 const LineContacts = lazyPage(() => import('./routes/team/LineContacts'))
+const Debts = lazyPage(() => import('./routes/team/Debts'))
 const AuditLog = lazyPage(() => import('./routes/team/AuditLog'))
 const ShortageReport = lazyPage(() => import('./routes/team/ShortageReport'))
 const CustomerAliases = lazyPage(() => import('./routes/team/CustomerAliases'))
@@ -121,6 +122,14 @@ export default function App() {
               element={
                 <RequireRole path="/claims">
                   <ClaimDetail />
+                </RequireRole>
+              }
+            />
+            <Route
+              path="/debts"
+              element={
+                <RequireRole path="/debts">
+                  <Debts />
                 </RequireRole>
               }
             />

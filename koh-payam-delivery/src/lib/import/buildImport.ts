@@ -402,3 +402,41 @@ export function buildImport(
     shippedAllZero,
   }
 }
+
+export type PaymentRow = {
+  makroOrderNo: string
+  paymentMethod: string | null
+  paymentStatus: string | null
+  outstandingAmount: number
+  makroOrderStatus: string | null
+}
+
+/** Payment facts of every order row -- for the refresh-only import (no filtering). */
+export function buildPaymentRefresh(orderRows: RawRow[], om: OrderMapping): PaymentRow[] {
+  // A wrong file (e.g. the OrderDetailExport) would blank every PO's payment
+  // facts -- refuse unless all the payment columns are really there.
+  const headers = new Set(orderRows.flatMap((r) => Object.keys(r)))
+  const need: [string, string][] = [
+    [om.orderNo, 'เลขออเดอร์'],
+    [om.paymentMethod, 'วิธีชำระเงิน'],
+    [om.paymentStatus, 'สถานะการชำระ'],
+    [om.outstandingAmount, 'ยอดค้างชำระ'],
+  ]
+  const missing = need.filter(([col]) => !col || !headers.has(col)).map(([, label]) => label)
+  if (orderRows.length && missing.length)
+    throw new Error(`ไฟล์นี้ไม่ใช่ OrderExport — ไม่พบคอลัมน์ ${missing.join(', ')}`)
+  const cell = (r: RawRow, col: string) => (col ? String(r[col] ?? '').trim() : '')
+  const out: PaymentRow[] = []
+  for (const r of orderRows) {
+    const no = cell(r, om.orderNo)
+    if (!no) continue
+    out.push({
+      makroOrderNo: no,
+      paymentMethod: cell(r, om.paymentMethod) || null,
+      paymentStatus: cell(r, om.paymentStatus) || null,
+      outstandingAmount: om.outstandingAmount ? toNum(r[om.outstandingAmount]) : 0,
+      makroOrderStatus: cell(r, om.orderStatus) || null,
+    })
+  }
+  return out
+}

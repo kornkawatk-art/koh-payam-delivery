@@ -20,6 +20,7 @@ import { IslandBadge } from '../../components/ui/Island'
 import { isIsland } from '../../lib/islands'
 import { FoamOwedNote } from '../../components/FoamOwedNote'
 import { makroVoid } from '../../lib/makroStatus'
+import { PaymentLockNote, usePaymentLock } from '../../components/PaymentLockNote'
 
 const R2 = import.meta.env.VITE_R2_PUBLIC_BASE_URL as string
 const READY = ['packed', 'at_pier']
@@ -89,6 +90,8 @@ export default function PierGroup({
     return Array.from(seen)
   }, [ready, photoKeys])
 
+  const lock = usePaymentLock(ready[0], ready[0] ? date : null)
+
   if (failed) return <p className="alert alert-danger">โหลดออเดอร์ไม่สำเร็จ</p>
   if (!orders) return <PageSkeleton />
 
@@ -110,7 +113,9 @@ export default function PierGroup({
     // an untagged PO can't board until a manager picks its island
     ready.every((o) => isIsland(o.island)) &&
     // nor one Makro returned / canceled
-    !ready.some((o) => makroVoid(o.makro_order_status))
+    !ready.some((o) => makroVoid(o.makro_order_status)) &&
+    // nor a customer owing an earlier bill (payment lock)
+    !lock?.locked
 
   async function chooseBoat(id: string) {
     setMsg(undefined)
@@ -215,6 +220,7 @@ export default function PierGroup({
         ))}
       </div>
       {ready[0] && <FoamOwedNote customer={ready[0]} />}
+      <PaymentLockNote lock={lock} />
 
       {waiting.length > 0 && (
         <div className="alert alert-warn flex items-start gap-2">

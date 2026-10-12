@@ -3,6 +3,20 @@ import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Routes, Route } from 'react-router-dom'
 import PackGroup from './PackGroup'
 
+const lockState = { current: null as null | Record<string, unknown> }
+// a real hook inside, so hook-order mistakes still crash here; no ref = not looked up
+vi.mock('../../components/PaymentLockNote', async () => {
+  const { useState } = await import('react')
+  return {
+    usePaymentLock: (ref: unknown) => {
+      useState(0)
+      return ref ? lockState.current : null
+    },
+    PaymentLockNote: ({ lock }: { lock: { locked?: boolean } | null }) =>
+      lock?.locked ? <p role="alert">ค้างชำระ</p> : null,
+  }
+})
+
 const listOrdersForCustomerDay = vi.fn()
 const updateOrderStatus = vi.fn().mockResolvedValue(undefined)
 const savePackGroup = vi.fn().mockResolvedValue(undefined)
@@ -425,4 +439,13 @@ test('combined "บันทึก + แพ็คเสร็จ" also requires 
   expect(packBtn).toBeEnabled()
   await userEvent.clear(screen.getByLabelText('ชื่อคนแพ็ค'))
   expect(packBtn).toBeDisabled()
+})
+
+test('a group of store pickups is never payment-locked', async () => {
+  lockState.current = { locked: true, released: false, priorBills: [{}], total: 500, oldestDays: 3 }
+  listOrdersForCustomerDay.mockResolvedValue(orders().map((o) => ({ ...o, is_pickup: true })))
+  renderPage()
+  await screen.findByText('rice')
+  expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+  lockState.current = null
 })

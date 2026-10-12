@@ -5,6 +5,7 @@ import { readFileSync } from 'node:fs'
 import { parseMakroFile, type RawRow } from './parseMakroFile'
 import {
   buildImport,
+  buildPaymentRefresh,
   classifyIsland,
   isNotMakroDirect,
   isPayam,
@@ -708,4 +709,30 @@ test('buildImport skips Makro returned / canceled orders but lists them (so exis
     { makroOrderNo: 'RET', status: 'Returned' },
     { makroOrderNo: 'CAN', status: 'Canceled' },
   ])
+})
+
+test('buildPaymentRefresh reads every order row’s payment facts', () => {
+  const O = DEFAULT_ORDER_MAPPING
+  const rows = buildPaymentRefresh(
+    [
+      { [O.orderNo]: 'P-1', [O.paymentMethod]: 'Pay On Delivery', [O.paymentStatus]: 'Paid', [O.outstandingAmount]: '0', [O.orderStatus]: 'Delivered' },
+      { [O.orderNo]: ' ', [O.paymentStatus]: 'Unpaid' },
+      { [O.orderNo]: 'P-2', [O.paymentMethod]: 'Pay On Delivery', [O.paymentStatus]: 'Unpaid', [O.outstandingAmount]: '1,250.50', [O.orderStatus]: 'Delivered' },
+    ],
+    O,
+  )
+  expect(rows).toEqual([
+    { makroOrderNo: 'P-1', paymentMethod: 'Pay On Delivery', paymentStatus: 'Paid', outstandingAmount: 0, makroOrderStatus: 'Delivered' },
+    { makroOrderNo: 'P-2', paymentMethod: 'Pay On Delivery', paymentStatus: 'Unpaid', outstandingAmount: 1250.5, makroOrderStatus: 'Delivered' },
+  ])
+})
+
+test('buildPaymentRefresh refuses a file without the payment columns (e.g. the OrderDetailExport)', () => {
+  const O = DEFAULT_ORDER_MAPPING
+  expect(() =>
+    buildPaymentRefresh([{ [O.orderNo]: 'P-1', 'Article No': '123', Qty: '2' }], O),
+  ).toThrow(/ไม่พบคอลัมน์/)
+  expect(() =>
+    buildPaymentRefresh([{ [O.orderNo]: 'P-1', [O.paymentStatus]: 'Paid', [O.outstandingAmount]: '0' }], { ...O, paymentMethod: '' }),
+  ).toThrow(/ไม่พบคอลัมน์/)
 })
