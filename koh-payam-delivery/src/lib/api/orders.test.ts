@@ -155,6 +155,8 @@ vi.mock('./backorders', () => ({
 }))
 
 const logAction = vi.fn().mockResolvedValue(undefined)
+const refreshPayments = vi.fn().mockResolvedValue({ refreshed: 0, notInApp: [] })
+vi.mock('./paymentRefresh', () => ({ refreshPayments: (...a: unknown[]) => refreshPayments(...a) }))
 vi.mock('./audit', () => ({ logAction: (...a: unknown[]) => logAction(...a) }))
 
 const parsedOrders = [
@@ -214,7 +216,7 @@ beforeEach(() => {
 
 test('fresh import inserts orders + items and counts created', async () => {
   const r = await commitImport('2026-10-01', parsedOrders as any)
-  expect(r).toEqual({ created: 1, synced: 0, skipped: [] })
+  expect(r).toEqual({ created: 1, synced: 0, skipped: [], refreshed: 0 })
   const ordIns = state.inserted.find((i) => i.table === 'orders')
   expect(ordIns.rows).toMatchObject({
     makro_order_no: 'PO-1',
@@ -249,7 +251,7 @@ test('fresh import inserts orders + items and counts created', async () => {
 test('re-import of an existing order syncs without touching protected columns', async () => {
   state.existing = [{ id: 'old1', makro_order_no: 'PO-1' }]
   const r = await commitImport('2026-10-01', parsedOrders as any)
-  expect(r).toEqual({ created: 0, synced: 1, skipped: [] })
+  expect(r).toEqual({ created: 0, synced: 1, skipped: [], refreshed: 0 })
 
   // orders row is not inserted again
   expect(state.inserted.some((i) => i.table === 'orders')).toBe(false)
@@ -264,6 +266,9 @@ test('re-import of an existing order syncs without touching protected columns', 
     payment_method: 'Pay On Delivery',
     payment_status: 'Unpaid',
     outstanding_amount: 6172.5,
+    // Makro says still unpaid -> any manager "paid" mark is cleared (payment lock)
+    paid_marked_at: null,
+    paid_marked_by: null,
     customer_phone: '0826289533',
   })
   for (const k of [
@@ -514,6 +519,7 @@ test('a PO already imported on ANOTHER day is skipped: nothing is created, synce
     created: 0,
     synced: 0,
     skipped: [{ makroOrderNo: 'PO-1', shipDate: '2026-09-19' }],
+    refreshed: 0, // payment facts refresh is stubbed here (paymentRefresh.test)
   })
   expect(state.inserted.some((i) => i.table === 'orders' || i.table === 'order_items')).toBe(false)
   expect(state.updated.some((u) => u.table === 'orders')).toBe(false)
@@ -530,7 +536,7 @@ test('a PO that exists on THIS day (and also on another) still syncs in place --
   state.existing = [{ id: 'old1', makro_order_no: 'PO-1' }]
   state.elsewhere = [{ makro_order_no: 'PO-1', ship_date: '2026-09-19', status: 'shipped' }]
   const r = await commitImport('2026-10-01', parsedOrders as any)
-  expect(r).toEqual({ created: 0, synced: 1, skipped: [] })
+  expect(r).toEqual({ created: 0, synced: 1, skipped: [], refreshed: 0 })
 })
 
 test('in a mixed file only the already-imported POs are skipped; the new ones are created', async () => {
@@ -614,4 +620,14 @@ test('reopenOrder puts a picked-up order back to imported', async () => {
   await reopenOrder('o1')
   expect(orderUpdates()[0]).toEqual({ status: 'imported', picked_up_at: null })
   expect(logAction).toHaveBeenCalledWith('order_reopened', 'order', 'o1', undefined)
+})
+
+test('commitImport refreshes payment facts of POs that live on another day, without re-creating them', async () => {
+  state.elsewhere = [{ makro_order_no: 'PO-1', ship_date: '2026-09-20', status: 'shipped' }]
+  refreshPayments.mockResolvedValueOnce({ refreshed: 1, notInApp: [] })
+  const paid = { ...parsedOrders[0], paymentStatus: 'Paid', outstandingAmount: 0 }
+  const r = await commitImport('2026-10-01', [paid] as any)
+  expect(state.inserted.filter((i) => i.table === 'orders')).toEqual([])
+  expect(refreshPayments).toHaveBeenCalledWith([paid])
+  expect(r.refreshed).toBe(1)
 })

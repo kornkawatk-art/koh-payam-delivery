@@ -402,3 +402,29 @@ export function buildImport(
     shippedAllZero,
   }
 }
+
+export type PaymentRow = {
+  makroOrderNo: string
+  paymentMethod: string | null
+  paymentStatus: string | null
+  outstandingAmount: number
+  makroOrderStatus: string | null
+}
+
+/** Payment facts of every order row -- for the refresh-only import (no filtering). */
+export function buildPaymentRefresh(orderRows: RawRow[], om: OrderMapping): PaymentRow[] {
+  const cell = (r: RawRow, col: string) => (col ? String(r[col] ?? '').trim() : '')
+  const out: PaymentRow[] = []
+  for (const r of orderRows) {
+    const no = cell(r, om.orderNo)
+    if (!no) continue
+    out.push({
+      makroOrderNo: no,
+      paymentMethod: cell(r, om.paymentMethod) || null,
+      paymentStatus: cell(r, om.paymentStatus) || null,
+      outstandingAmount: om.outstandingAmount ? toNum(r[om.outstandingAmount]) : 0,
+      makroOrderStatus: cell(r, om.orderStatus) || null,
+    })
+  }
+  return out
+}
