@@ -1,4 +1,4 @@
-import { deptGroupOf, deptGroupLabel, DEPT_GROUP_ORDER } from './departments'
+import { deptGroupOf, deptGroupLabel, DEPT_GROUP_ORDER, DEPT_COLORS } from './departments'
 
 test('maps every Makro Dept number to its department group', () => {
   const expected: Record<string, string> = {
@@ -25,4 +25,8 @@ test('blank, missing, unlisted or odd values fall into the unknown group', () =>
   expect(deptGroupOf(' 07 ')).toBe('DF1') // tolerant of padding / a leading zero
   expect(deptGroupLabel('UNKNOWN')).toBe('ไม่ทราบแผนก')
   expect(DEPT_GROUP_ORDER.at(-1)).toBe('UNKNOWN')
+})
+
+test('DF2 (the darkest hue) follows the theme so it stays visible on a dark card', () => {
+  expect(DEPT_COLORS.DF2).toBe('rgb(var(--c-dept-df2))')
 })

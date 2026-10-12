@@ -16,6 +16,20 @@
       href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap"
     />
     <title>Island Delivery</title>
+    <!-- Apply a stored dark theme before the app loads (no light flash on
+         reload). Same rules as src/lib/theme.ts: only team pages; login, 2FA,
+         customer and LINE pages are always light. AppShell takes over after. -->
+    <script id="theme-boot">
+      try {
+        var p = location.pathname
+        var light = /^\/(login|2fa|o|help|liff)(\/|$)/.test(p)
+        if (!light && localStorage.getItem('theme') === 'dark') {
+          document.documentElement.setAttribute('data-theme', 'dark')
+          var m = document.querySelector('meta[name="theme-color"]')
+          if (m) m.setAttribute('content', '#121212')
+        }
+      } catch (e) {}
+    </script>
   </head>
   <body>
     <div id="root"></div>

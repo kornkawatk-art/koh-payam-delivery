@@ -3,7 +3,7 @@
   "short_name": "จัดส่งเกาะ",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#faf9f7",
-  "theme_color": "#faf9f7",
+  "background_color": "#fbfbfa",
+  "theme_color": "#fbfbfa",
   "icons": [{ "src": "/favicon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }]
 }

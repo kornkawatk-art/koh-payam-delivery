@@ -101,7 +101,8 @@ describe('dark mode switch', () => {
   test('light unless this device chose dark', () => {
     renderShell()
     expect(document.documentElement.hasAttribute('data-theme')).toBe(false)
-    expect(screen.getByRole('button', { name: 'โหมดมืด' })).toHaveAttribute('aria-pressed', 'false')
+    // the label says what a tap does; no aria-pressed, so it isn't read as 'โหมดสว่าง, pressed'
+    expect(screen.getByRole('button', { name: 'โหมดมืด' })).not.toHaveAttribute('aria-pressed')
   })
 
   test('switching to dark applies it and remembers it on this device', async () => {
@@ -110,7 +111,7 @@ describe('dark mode switch', () => {
     expect(document.documentElement.dataset.theme).toBe('dark')
     expect(localStorage.getItem('theme')).toBe('dark')
     const back = screen.getByRole('button', { name: 'โหมดสว่าง' })
-    expect(back).toHaveAttribute('aria-pressed', 'true')
+    expect(back).not.toHaveAttribute('aria-pressed')
     await userEvent.click(back)
     expect(document.documentElement.hasAttribute('data-theme')).toBe(false)
     expect(localStorage.getItem('theme')).toBe('light')
@@ -123,4 +124,9 @@ describe('dark mode switch', () => {
     unmount() // e.g. signed out to the login page, or a customer link
     expect(document.documentElement.hasAttribute('data-theme')).toBe(false)
   })
+})
+
+test('the current page is clearly marked in the menu', () => {
+  renderShell()
+  expect(screen.getByRole('link', { name: /งานวันนี้/ })).toHaveClass('bg-line')
 })

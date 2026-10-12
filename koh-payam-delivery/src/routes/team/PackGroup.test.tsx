@@ -449,3 +449,9 @@ test('a group of store pickups is never payment-locked', async () => {
   expect(screen.queryByRole('alert')).not.toBeInTheDocument()
   lockState.current = null
 })
+
+test('PO numbers on the combined pack list use the monospace number style', async () => {
+  renderPage()
+  await screen.findByText('rice')
+  expect(within(screen.getByText('rice').closest('tr')!).getByText('PO-1')).toHaveClass('num')
+})

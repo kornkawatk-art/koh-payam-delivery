@@ -154,7 +154,11 @@ export default function PackOrder() {
     <div className="flex flex-col gap-5">
       <PageHeader
         back={{ to: `/order/${id}`, label: 'รายละเอียดออเดอร์' }}
-        title={`แพ็ค · ${order.makro_order_no} · ${order.customer_name_en}`}
+        title={
+          <>
+            แพ็ค · <span className="num">{order.makro_order_no}</span> · {order.customer_name_en}
+          </>
+        }
       />
       {order.is_pickup && (
         <p className="alert alert-info flex flex-wrap items-center gap-2">
@@ -387,7 +391,7 @@ export function PackItemRow({
       </td>
       {orderNo !== undefined && (
         <td data-label="ออเดอร์" className="whitespace-nowrap text-xs text-ink-soft">
-          {orderNo}
+          <span className="num">{orderNo}</span>
         </td>
       )}
       <td data-label="รหัสสินค้า" className="tnum">

@@ -34,6 +34,7 @@
     --c-chart-1: 139 92 246; /* #8b5cf6 */
     --c-chart-2: 109 40 217; /* #6d28d9 */
     --c-chart-3: 76 29 149; /* #4c1d95 */
+    --c-dept-df2: 74 58 167; /* #4a3aa7 */
   }
 
   html[data-theme='dark'] {
@@ -64,6 +65,7 @@
     --c-chart-1: 139 92 246; /* #8b5cf6 */
     --c-chart-2: 167 139 250; /* #a78bfa */
     --c-chart-3: 196 181 253; /* #c4b5fd */
+    --c-dept-df2: 139 127 224; /* #8b7fe0 */
   }
 
   html {
@@ -243,7 +245,7 @@
   }
 
   .btn-primary {
-    @apply bg-brand text-on hover:bg-brand/90;
+    @apply bg-brand text-on hover:bg-brand-ink;
   }
 
   .btn-secondary {
@@ -255,15 +257,15 @@
   }
 
   .btn-danger {
-    @apply bg-danger text-on hover:bg-danger/90;
+    @apply bg-danger text-on hover:bg-danger-ink;
   }
 
   .btn-ok {
-    @apply bg-ok text-on hover:bg-ok/90;
+    @apply bg-ok text-on hover:bg-ok-ink;
   }
 
   .btn-warn {
-    @apply bg-warn text-on hover:bg-warn/90;
+    @apply bg-warn text-on hover:bg-warn-ink;
   }
 
   .btn-sm {
@@ -587,6 +589,7 @@
     --c-chart-1: 139 92 246; /* #8b5cf6 */
     --c-chart-2: 109 40 217; /* #6d28d9 */
     --c-chart-3: 76 29 149; /* #4c1d95 */
+    --c-dept-df2: 74 58 167; /* #4a3aa7 */
   }
 
   body.printing-stickers {

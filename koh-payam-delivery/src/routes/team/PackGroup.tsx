@@ -276,7 +276,7 @@ export default function PackGroup() {
             {backorders.map((b) => (
               <li key={b.id} className="flex items-center gap-3">
                 <span>
-                  {b.product_name} {backorderQty(b)} <span className="muted text-xs">({b.orderNo})</span>
+                  {b.product_name} {backorderQty(b)} <span className="muted num text-xs">({b.orderNo})</span>
                 </span>
                 <button className="btn btn-secondary btn-sm" onClick={() => fulfil(b.id)}>
                   ส่งแล้ว
