@@ -77,7 +77,8 @@ export default function PackOrder() {
   }, [id])
 
   // payment lock: owes a bill from an earlier delivery -> can't finish packing
-  const lock = usePaymentLock(order, order?.ship_date)
+  // (store pickups are never locked)
+  const lock = usePaymentLock(order?.is_pickup ? null : order, order?.ship_date)
 
   if (failed) return <p className="alert alert-danger">โหลดออเดอร์ไม่สำเร็จ</p>
   if (!order) return <PageSkeleton />

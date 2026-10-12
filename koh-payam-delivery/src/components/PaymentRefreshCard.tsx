@@ -18,10 +18,18 @@ export function PaymentRefreshCard({ orderMapping }: { orderMapping: OrderMappin
     setErr(undefined)
     const f = e.target.files?.[0]
     if (!f) return
+    setRows([])
+    let raw
     try {
-      setRows(buildPaymentRefresh(await parseMakroFile(f), orderMapping))
+      raw = await parseMakroFile(f)
     } catch {
       setErr('อ่านไฟล์ไม่สำเร็จ')
+      return
+    }
+    try {
+      setRows(buildPaymentRefresh(raw, orderMapping))
+    } catch (e) {
+      setErr((e as Error).message)
     }
   }
 

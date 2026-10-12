@@ -726,3 +726,13 @@ test('buildPaymentRefresh reads every order row’s payment facts', () => {
     { makroOrderNo: 'P-2', paymentMethod: 'Pay On Delivery', paymentStatus: 'Unpaid', outstandingAmount: 1250.5, makroOrderStatus: 'Delivered' },
   ])
 })
+
+test('buildPaymentRefresh refuses a file without the payment columns (e.g. the OrderDetailExport)', () => {
+  const O = DEFAULT_ORDER_MAPPING
+  expect(() =>
+    buildPaymentRefresh([{ [O.orderNo]: 'P-1', 'Article No': '123', Qty: '2' }], O),
+  ).toThrow(/ไม่พบคอลัมน์/)
+  expect(() =>
+    buildPaymentRefresh([{ [O.orderNo]: 'P-1', [O.paymentStatus]: 'Paid', [O.outstandingAmount]: '0' }], { ...O, paymentMethod: '' }),
+  ).toThrow(/ไม่พบคอลัมน์/)
+})

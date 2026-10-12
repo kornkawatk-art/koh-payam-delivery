@@ -4,11 +4,18 @@ import { MemoryRouter, Routes, Route } from 'react-router-dom'
 import PackOrder from './PackOrder'
 
 const lockState = { current: null as null | Record<string, unknown> }
-vi.mock('../../components/PaymentLockNote', () => ({
-  usePaymentLock: () => lockState.current,
-  PaymentLockNote: ({ lock }: { lock: { locked?: boolean } | null }) =>
-    lock?.locked ? <p role="alert">ค้างชำระ</p> : null,
-}))
+// a real hook inside, so hook-order mistakes still crash here; no ref = not looked up
+vi.mock('../../components/PaymentLockNote', async () => {
+  const { useState } = await import('react')
+  return {
+    usePaymentLock: (ref: unknown) => {
+      useState(0)
+      return ref ? lockState.current : null
+    },
+    PaymentLockNote: ({ lock }: { lock: { locked?: boolean } | null }) =>
+      lock?.locked ? <p role="alert">ค้างชำระ</p> : null,
+  }
+})
 
 const getOrder = vi.fn()
 const updateOrderStatus = vi.fn().mockResolvedValue(undefined)
@@ -546,5 +553,14 @@ test('a customer owing an earlier bill can’t be finished, even with everything
   for (const cb of screen.getAllByRole('checkbox')) await userEvent.click(cb)
   expect(screen.getByRole('button', { name: 'บันทึก + แพ็คเสร็จ' })).toBeDisabled()
   expect(screen.getByRole('button', { name: 'บันทึก' })).toBeEnabled() // counts can still be saved
+  lockState.current = null
+})
+
+test('a store pickup is never payment-locked on the pack page', async () => {
+  lockState.current = { locked: true, released: false, priorBills: [{}], total: 500, oldestDays: 3 }
+  getOrder.mockResolvedValue({ ...order, is_pickup: true })
+  renderPage()
+  await screen.findByText('rice')
+  expect(screen.queryByRole('alert')).not.toBeInTheDocument()
   lockState.current = null
 })

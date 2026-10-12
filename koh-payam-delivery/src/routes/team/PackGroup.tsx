@@ -110,8 +110,11 @@ export default function PackGroup() {
   )
   const editableItems = items.filter((i) => i.editable)
 
+  // payment lock (store pickups are never locked); hook stays above every early return
+  const lockRef = orders?.every((o) => o.is_pickup) ? null : (primary ?? orders?.[0])
+  const lock = usePaymentLock(lockRef, lockRef?.ship_date)
+
   if (failed) return <p className="alert alert-danger">โหลดออเดอร์ไม่สำเร็จ</p>
-  const lock = usePaymentLock(primary ?? orders?.[0], (primary ?? orders?.[0])?.ship_date)
 
   if (!orders) return <PageSkeleton />
   if (orders.length === 0)
