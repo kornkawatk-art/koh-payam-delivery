@@ -1,5 +1,8 @@
 import { getNavCounts } from './navCounts'
 
+const countLockedToday = vi.fn().mockResolvedValue(0)
+vi.mock('./payments', () => ({ countLockedToday: (...a: unknown[]) => countLockedToday(...a) }))
+
 // Each query records its table and filters; the count it resolves to is
 // looked up by table + the status filter.
 const calls: { table: string; filters: unknown[][] }[] = []
@@ -67,4 +70,11 @@ test('one failing count leaves the others intact', async () => {
   counts['orders:"imported"'] = 2
   counts['claims:"open"'] = new Error('boom')
   expect(await getNavCounts('manager', '2026-10-04')).toEqual({ '/': 2 })
+})
+
+test('managers also see how many customers are locked for unpaid bills today', async () => {
+  countLockedToday.mockResolvedValueOnce(2)
+  const counts = await getNavCounts('manager', '2026-10-04')
+  expect(counts['/debts']).toBe(2)
+  expect(countLockedToday).toHaveBeenCalledWith('2026-10-04')
 })

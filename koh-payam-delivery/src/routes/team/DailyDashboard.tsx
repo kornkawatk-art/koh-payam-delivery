@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
+import { Fragment, useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import {
   listOrdersForDay,
@@ -38,8 +38,14 @@ import { LinkSendReport } from '../../components/LinkSendReport'
 import { MakroVoidBadge } from '../../components/ui/MakroVoidBadge'
 import { BulkStickerDialog } from '../../components/BulkStickerPrint'
 import { buildStickerJobs } from '../../lib/bulkStickers'
+import { useAuth } from '../../lib/auth'
+import { getDayLocks, releaseCustomer } from '../../lib/api/payments'
+import type { Lock } from '../../lib/payments'
+import { customerKey } from '../../../supabase/functions/_shared/customerKey'
 
 export default function DailyDashboard() {
+  const { profile } = useAuth()
+  const isManager = profile?.role === 'manager'
   const navigate = useNavigate()
   const [date, setDate] = useState(todayLocalISO())
   const [rows, setRows] = useState<any[] | null>(null)
@@ -48,6 +54,9 @@ export default function DailyDashboard() {
   const [island, setIsland] = useState<IslandFilterValue>('all')
   const [scanOpen, setScanOpen] = useState(false)
   const [bulkOpen, setBulkOpen] = useState(false)
+  // payment lock: customers owing a bill from an earlier delivery (spec 2026-10-12)
+  const [locks, setLocks] = useState<Map<string, Lock>>(new Map())
+  const [lockTick, setLockTick] = useState(0)
   const [bulkMsg, setBulkMsg] = useState<string>()
   // undefined = not loaded yet (don't flash the banner while unknown)
   const [linksSentAt, setLinksSentAt] = useState<string | null | undefined>(undefined)
@@ -172,12 +181,29 @@ export default function DailyDashboard() {
   // is obvious at a glance; everything past "packed" (packed/at_pier/shipped
   // -- same grouping as the counts.packed tile above) sinks below a divider.
   // A customer group stays on top while any of its POs is still just imported.
+  useEffect(() => {
+    if (!rows?.length) {
+      setLocks(new Map())
+      return
+    }
+    let live = true
+    getDayLocks(date, rows)
+      .then((m) => live && setLocks(m))
+      .catch(() => live && setLocks(new Map())) // fail soft: show nothing locked
+    return () => {
+      live = false
+    }
+  }, [rows, date, lockTick])
+  const lockOf = (e: DayEntry<any>) => locks.get(customerKey(entryOrders(e)[0]))
+
   // A customer whose every PO is a store pickup gets its own section at the end.
   const isPickupEntry = (e: DayEntry<any>) => entryOrders(e).every((o) => o.is_pickup)
   const boatEntries = useMemo(() => filtered.filter((e) => !isPickupEntry(e)), [filtered])
   const pickupEntries = useMemo(() => filtered.filter(isPickupEntry), [filtered])
-  const notPacked = useMemo(() => boatEntries.filter((e) => entryHasUnpacked(e)), [boatEntries])
-  const packedOrAhead = useMemo(() => boatEntries.filter((e) => !entryHasUnpacked(e)), [boatEntries])
+  const lockedEntries = boatEntries.filter((e) => lockOf(e)?.locked)
+  const openEntries = boatEntries.filter((e) => !lockOf(e)?.locked)
+  const notPacked = openEntries.filter((e) => entryHasUnpacked(e))
+  const packedOrAhead = openEntries.filter((e) => !entryHasUnpacked(e))
 
   if (failed)
     return (
@@ -397,6 +423,25 @@ export default function DailyDashboard() {
               </tr>
             </thead>
             <tbody>
+              {lockedEntries.length > 0 && (
+                <tr className="row-divider">
+                  <td colSpan={7} className="bg-danger-soft text-xs font-semibold text-danger-ink">
+                    ค้างชำระ — ห้ามแพ็ค ({lockedEntries.length})
+                  </td>
+                </tr>
+              )}
+              {lockedEntries.map((e) => (
+                <Fragment key={entryKey(e)}>
+                  <LockedRow
+                    entry={e}
+                    lock={lockOf(e)!}
+                    date={date}
+                    canRelease={isManager}
+                    onReleased={() => setLockTick((n) => n + 1)}
+                  />
+                  <EntryRows entry={e} date={date} showIsland={showIslandFilter} />
+                </Fragment>
+              ))}
               {notPacked.length > 0 && (
                 <tr className="row-divider">
                   <td colSpan={7} className="bg-paper text-xs font-semibold text-ink-soft">
@@ -405,7 +450,13 @@ export default function DailyDashboard() {
                 </tr>
               )}
               {notPacked.map((e) => (
-                <EntryRows key={entryKey(e)} entry={e} date={date} showIsland={showIslandFilter} />
+                <EntryRows
+                  key={entryKey(e)}
+                  entry={e}
+                  date={date}
+                  showIsland={showIslandFilter}
+                  released={!!lockOf(e)?.released}
+                />
               ))}
               {packedOrAhead.length > 0 && (
                 <tr className="row-divider">
@@ -415,7 +466,13 @@ export default function DailyDashboard() {
                 </tr>
               )}
               {packedOrAhead.map((e) => (
-                <EntryRows key={entryKey(e)} entry={e} date={date} showIsland={showIslandFilter} />
+                <EntryRows
+                  key={entryKey(e)}
+                  entry={e}
+                  date={date}
+                  showIsland={showIslandFilter}
+                  released={!!lockOf(e)?.released}
+                />
               ))}
               {pickupEntries.length > 0 && (
                 <tr className="row-divider">
@@ -425,7 +482,13 @@ export default function DailyDashboard() {
                 </tr>
               )}
               {pickupEntries.map((e) => (
-                <EntryRows key={entryKey(e)} entry={e} date={date} showIsland={showIslandFilter} />
+                <EntryRows
+                  key={entryKey(e)}
+                  entry={e}
+                  date={date}
+                  showIsland={showIslandFilter}
+                  released={!!lockOf(e)?.released}
+                />
               ))}
             </tbody>
           </table>
@@ -494,23 +557,104 @@ function EntryRows({
   entry,
   date,
   showIsland,
+  released,
 }: {
   entry: DayEntry<any>
   date: string
   showIsland: boolean
+  released?: boolean
 }) {
-  if (entry.kind === 'single') return <OrderRow order={entry.order} showIsland={showIsland} />
-  return <GroupRows group={entry} date={date} showIsland={showIsland} />
+  if (entry.kind === 'single')
+    return <OrderRow order={entry.order} showIsland={showIsland} released={released} />
+  return <GroupRows group={entry} date={date} showIsland={showIsland} released={released} />
+}
+
+const ReleasedBadge = () => <span className="badge badge-warn ml-1.5">ปลดแล้ว</span>
+
+/** Red line above a locked customer: what they owe, and (manager) the release. */
+function LockedRow({
+  entry,
+  lock,
+  date,
+  canRelease,
+  onReleased,
+}: {
+  entry: DayEntry<any>
+  lock: Lock
+  date: string
+  canRelease: boolean
+  onReleased: () => void
+}) {
+  const [open, setOpen] = useState(false)
+  const [reason, setReason] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [err, setErr] = useState<string>()
+  const ref = entryOrders(entry)[0]
+
+  async function release() {
+    setBusy(true)
+    setErr(undefined)
+    try {
+      await releaseCustomer(ref, date, reason)
+      onReleased()
+    } catch (e) {
+      setErr((e as Error).message)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <tr>
+      <td colSpan={7} className="bg-danger-soft/60">
+        <div className="flex flex-wrap items-center gap-2 text-sm">
+          <span className="font-semibold text-danger-ink">
+            ค้างชำระ {lock.priorBills.length} บิล · {lock.oldestDays} วัน
+          </span>
+          {canRelease &&
+            (!open ? (
+              <button type="button" className="btn btn-secondary btn-sm" onClick={() => setOpen(true)}>
+                ปลดให้แพ็ค
+              </button>
+            ) : (
+              <>
+                <input
+                  className="min-w-0 flex-1"
+                  aria-label="เหตุผลที่ปลด"
+                  placeholder="เหตุผล เช่น ลูกค้าโอนแล้ว รอแม็คโครอัปเดต"
+                  value={reason}
+                  onChange={(e) => setReason(e.target.value)}
+                />
+                <button
+                  type="button"
+                  className="btn btn-primary btn-sm"
+                  disabled={busy || !reason.trim()}
+                  onClick={() => void release()}
+                >
+                  ยืนยันปลด
+                </button>
+                <button type="button" className="btn btn-ghost btn-sm" onClick={() => setOpen(false)}>
+                  ยกเลิก
+                </button>
+              </>
+            ))}
+          {err && <span className="text-danger-ink">{err}</span>}
+        </div>
+      </td>
+    </tr>
+  )
 }
 
 function GroupRows({
   group,
   date,
   showIsland,
+  released,
 }: {
   group: Extract<DayEntry<any>, { kind: 'group' }>
   date: string
   showIsland: boolean
+  released?: boolean
 }) {
   const [open, setOpen] = useState(false)
   const os = group.orders
@@ -533,6 +677,7 @@ function GroupRows({
         </td>
         <td data-label="ลูกค้า">
           <span className="font-medium">{group.name}</span>
+          {released && <ReleasedBadge />}
           {showIsland &&
             uniq(os.map((o) => o.island ?? 'none')).map((i) => (
               <IslandBadge key={i} island={i} className="ml-1.5" />
@@ -589,10 +734,12 @@ function OrderRow({
   order: o,
   indent,
   showIsland,
+  released,
 }: {
   order: any
   indent?: boolean
   showIsland: boolean
+  released?: boolean
 }) {
   return (
     <tr className={indent ? 'row-child' : undefined}>
@@ -603,6 +750,7 @@ function OrderRow({
       </td>
       <td data-label="ลูกค้า">
         {o.customer_name_en}
+        {released && <ReleasedBadge />}
         {showIsland && <IslandBadge island={o.island} className="ml-1.5" />}
       </td>
       <td data-label="สถานะ">

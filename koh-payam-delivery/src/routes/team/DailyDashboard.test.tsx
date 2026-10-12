@@ -81,6 +81,15 @@ vi.mock('../../lib/api/shipDays', () => ({
 }))
 
 const listBackordersForDay = vi.fn().mockResolvedValue([])
+const authRole = { current: 'packer' }
+vi.mock('../../lib/auth', () => ({ useAuth: () => ({ profile: { id: 'u1', name: 'x', role: authRole.current } }) }))
+const getDayLocks = vi.fn().mockResolvedValue(new Map())
+const releaseCustomer = vi.fn().mockResolvedValue(undefined)
+vi.mock('../../lib/api/payments', () => ({
+  getDayLocks: (...a: unknown[]) => getDayLocks(...a),
+  releaseCustomer: (...a: unknown[]) => releaseCustomer(...a),
+}))
+
 vi.mock('../../lib/api/backorders', () => ({
   listBackordersForDay: (...a: unknown[]) => listBackordersForDay(...a),
 }))
@@ -666,4 +675,48 @@ test('store pickups stay out of the boat tiles: own line under them, own section
   expect(cells.findIndex((t) => t.startsWith('PICKUP DONE'))).toBeGreaterThan(pickupHeader)
   // a waiting pickup is not part of the "ยังไม่แพ็ค" boat queue
   expect(cells).not.toContain('ยังไม่แพ็ค (1)')
+})
+
+const lockedRows = () => [
+  { id: '1', makro_order_no: 'PO-1', customer_name_en: 'OWES MONEY', island: 'payam', status: 'imported', boat_id: null, paper_box_count: 0, foam_box_count: 0, piece_count: 0, outstanding_amount: 0, customer_phone: '0811111111' },
+  { id: '2', makro_order_no: 'PO-2', customer_name_en: 'ALL PAID', island: 'payam', status: 'imported', boat_id: null, paper_box_count: 0, foam_box_count: 0, piece_count: 0, outstanding_amount: 0, customer_phone: '0822222222' },
+]
+const OWES_KEY = 'phone:0811111111|name:OWES MONEY'
+const lockOf = (o: Record<string, unknown>) => ({ locked: false, released: false, priorBills: [], total: 0, oldestDays: 0, ...o })
+
+test('a customer owing an earlier bill moves to a red "do not pack" section', async () => {
+  authRole.current = 'packer'
+  vi.mocked(listOrdersForDay).mockResolvedValueOnce(lockedRows())
+  getDayLocks.mockResolvedValueOnce(new Map([[OWES_KEY, lockOf({ locked: true, priorBills: [{}, {}], total: 900, oldestDays: 4 })]]))
+  renderPage()
+  expect(await screen.findByText('ค้างชำระ — ห้ามแพ็ค (1)')).toBeInTheDocument()
+  expect(screen.getByText('ค้างชำระ 2 บิล · 4 วัน')).toBeInTheDocument()
+  expect(screen.getByText('ยังไม่แพ็ค (1)')).toBeInTheDocument() // only ALL PAID
+  expect(screen.queryByRole('button', { name: 'ปลดให้แพ็ค' })).not.toBeInTheDocument() // packer
+})
+
+test('a manager releases a locked customer for this delivery with a reason', async () => {
+  authRole.current = 'manager'
+  vi.mocked(listOrdersForDay).mockResolvedValueOnce(lockedRows())
+  getDayLocks.mockResolvedValue(new Map([[OWES_KEY, lockOf({ locked: true, priorBills: [{}], total: 500, oldestDays: 2 })]]))
+  renderPage()
+  await userEvent.click(await screen.findByRole('button', { name: 'ปลดให้แพ็ค' }))
+  await userEvent.type(screen.getByLabelText('เหตุผลที่ปลด'), 'โอนแล้ว')
+  await userEvent.click(screen.getByRole('button', { name: 'ยืนยันปลด' }))
+  expect(releaseCustomer).toHaveBeenCalledWith(
+    expect.objectContaining({ customer_phone: '0811111111', customer_name_en: 'OWES MONEY' }),
+    todayLocalISO(),
+    'โอนแล้ว',
+  )
+  getDayLocks.mockResolvedValue(new Map())
+})
+
+test('a released customer is back in the normal queue with a "ปลดแล้ว" badge', async () => {
+  authRole.current = 'packer'
+  vi.mocked(listOrdersForDay).mockResolvedValueOnce(lockedRows())
+  getDayLocks.mockResolvedValueOnce(new Map([[OWES_KEY, lockOf({ released: true, priorBills: [{}] })]]))
+  renderPage()
+  expect(await screen.findByText('ปลดแล้ว')).toBeInTheDocument()
+  expect(screen.queryByText(/ค้างชำระ — ห้ามแพ็ค/)).not.toBeInTheDocument()
+  expect(screen.getByText('ยังไม่แพ็ค (2)')).toBeInTheDocument()
 })

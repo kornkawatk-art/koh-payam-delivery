@@ -1,5 +1,6 @@
 import { supabase } from '../supabase'
 import type { Role } from '../roles'
+import { countLockedToday } from './payments'
 
 /** Outstanding work per menu path; a path with nothing waiting is left out. */
 export type NavCounts = Partial<Record<string, number>>
@@ -29,6 +30,8 @@ export async function getNavCounts(role: Role, today: string): Promise<NavCounts
   if (role === 'pier' || role === 'manager')
     jobs.push(['/pier', count(todays().in('status', ['packed', 'at_pier']))])
   if (role === 'manager') {
+    // customers locked for unpaid bills who have an order today
+    jobs.push(['/debts', countLockedToday(today)])
     jobs.push([
       '/claims',
       count(supabase.from('claims').select('id', { count: 'exact', head: true }).eq('status', 'open')),
@@ -54,4 +57,4 @@ export async function getNavCounts(role: Role, today: string): Promise<NavCounts
 }
 
 /** Paths whose badge means "a manager must decide" -- red, and lights the mobile menu dot. */
-export const URGENT_NAV_PATHS = ['/claims', '/line-contacts']
+export const URGENT_NAV_PATHS = ['/claims', '/line-contacts', '/debts']
