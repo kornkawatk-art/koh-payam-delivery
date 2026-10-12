@@ -711,3 +711,20 @@ test('actions: picked_up and order_reopened', async () => {
     'เปิดออเดอร์ PO-7 อีกครั้ง (กลับเป็น "นำเข้าแล้ว") โดย สมชาย',
   ])
 })
+
+test('actions: payment_marked and payment_released', async () => {
+  profilesData = [PROFILE]
+  ordersData = [{ id: 'o1', makro_order_no: 'PO-7', ship_day_id: null }]
+  auditRows = [
+    { id: 50, user_id: 'u1', action: 'payment_marked', entity_type: 'order', entity_id: 'o1', meta: null, created_at: '2026-10-12T00:00:00.000Z' },
+    {
+      id: 51, user_id: 'u1', action: 'payment_released', entity_type: 'customer', entity_id: 'phone:0826289533|name:JJ PAYAM',
+      meta: { name: 'JJ Payam', shipDate: '2026-10-12', reason: 'โอนแล้ว' }, created_at: '2026-10-12T00:00:00.000Z',
+    },
+  ]
+  const rows = await listAuditLogs()
+  expect(rows.map((r) => r.message)).toEqual([
+    'บันทึกรับเงินบิล PO-7 โดย สมชาย',
+    'ปลดให้แพ็ค JJ Payam (รอบส่ง 2026-10-12) — โอนแล้ว โดย สมชาย',
+  ])
+})

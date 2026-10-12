@@ -89,6 +89,12 @@ function buildMessage(
     case 'pier_name_set':
       return `บันทึกชื่อคนลงเรือ "${meta.pierName}" ให้ออเดอร์ ${orderNo(r.entity_id)}${by}`
 
+    case 'payment_marked':
+      return `บันทึกรับเงินบิล ${orderNo(r.entity_id)}${by}`
+
+    case 'payment_released':
+      return `ปลดให้แพ็ค ${meta.name} (รอบส่ง ${meta.shipDate}) — ${meta.reason}${by}`
+
     case 'picked_up':
       return `ปิดออเดอร์ ${orderNo(r.entity_id)} — ลูกค้ามารับที่สาขาแล้ว${by}`
 
