@@ -256,26 +256,26 @@ export default function DailyDashboard() {
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         <div className="card flex flex-col gap-1 p-3 sm:p-4">
           <span className="flex items-center gap-1.5 text-xs font-medium text-ink-soft">
-            <ListBullets size={14} className="text-accent-indigo" aria-hidden="true" />
+            <ListBullets size={14} className="text-ink-faint" aria-hidden="true" />
             ออเดอร์ทั้งหมด
           </span>
           <span className="text-2xl font-semibold tracking-tight text-ink">{counts.total}</span>
         </div>
         <ProgressTile
-          icon={<Package size={14} className="text-accent-amber" aria-hidden="true" />}
+          icon={<Package size={14} className="text-ink-faint" aria-hidden="true" />}
           label="แพ็คแล้ว"
           progressLabel="ความคืบหน้าการแพ็ค"
           done={counts.packed}
           total={counts.total}
-          barClass="bg-accent-amber"
+          barClass="bg-brand"
         />
         <ProgressTile
-          icon={<MapPin size={14} className="text-accent-teal" aria-hidden="true" />}
+          icon={<MapPin size={14} className="text-ink-faint" aria-hidden="true" />}
           label="ถึงท่าเรือ"
           progressLabel="ความคืบหน้าถึงท่าเรือ"
           done={counts.atPier}
           total={counts.total}
-          barClass="bg-accent-teal"
+          barClass="bg-brand"
         />
         <ProgressTile
           icon={<CheckCircle size={14} weight="fill" className="text-ok" aria-hidden="true" />}

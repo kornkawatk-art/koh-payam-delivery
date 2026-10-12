@@ -108,7 +108,7 @@ export default function ClaimsQueue() {
       {outstandingFailed ? (
         <p className="alert alert-danger">โหลดจำนวนเคลมค้างอยู่ไม่สำเร็จ</p>
       ) : outstandingCount !== null ? (
-        <p className="inline-flex w-fit items-center gap-2 rounded-lg border border-accent-rose/25 bg-accent-rose-soft px-3 py-2 font-semibold text-accent-rose">
+        <p className="inline-flex w-fit items-center gap-2 rounded-lg border border-danger/25 bg-danger-soft px-3 py-2 font-semibold text-danger-ink">
           <Flag size={16} weight="fill" aria-hidden="true" />
           ค้างอยู่ {outstandingCount} รายการ
         </p>
