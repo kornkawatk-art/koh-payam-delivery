@@ -80,7 +80,7 @@ export default function LineContacts() {
 
   return (
     <div className="flex flex-col gap-5">
-      <PageHeader title="ผู้ลงทะเบียน LINE" icon={ChatCircle} accent="line" />
+      <PageHeader title="ผู้ลงทะเบียน LINE" icon={ChatCircle} />
 
       {(pending.length > 0 || pendingFailed) && (
         <section className="flex flex-col gap-2">

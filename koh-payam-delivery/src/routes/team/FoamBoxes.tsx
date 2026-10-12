@@ -48,7 +48,7 @@ export default function FoamBoxes() {
   if (rows === null)
     return (
       <div className="flex flex-col gap-4">
-        <PageHeader title="ลังโฟม" icon={Package} accent="amber" />
+        <PageHeader title="ลังโฟม" icon={Package} />
         <p className="alert alert-warn">ยังไม่ได้เปิดใช้ระบบติดตามลังโฟม (รอรัน migration 0031)</p>
       </div>
     )
@@ -57,7 +57,7 @@ export default function FoamBoxes() {
 
   return (
     <div className="flex flex-col gap-4">
-      <PageHeader title="ลังโฟม" icon={Package} accent="amber" />
+      <PageHeader title="ลังโฟม" icon={Package} />
       <p className="text-sm text-ink-soft">
         ลูกค้าถือลังโฟมของร้านอยู่รวม <strong className="text-ink">{total}</strong> ใบ
       </p>

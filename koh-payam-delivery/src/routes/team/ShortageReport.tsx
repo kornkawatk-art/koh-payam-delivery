@@ -149,7 +149,7 @@ export default function ShortageReport() {
       <PageHeader
         title="รายงานของขาด"
         icon={ChartBar}
-        accent="violet"
+       
         actions={
           <button
             type="button"

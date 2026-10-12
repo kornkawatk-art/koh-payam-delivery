@@ -1,9 +1,9 @@
 import { Suspense, useEffect, useState } from 'react'
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
-import { List, SignOut } from '@phosphor-icons/react'
+import { List, Moon, SignOut, Sun } from '@phosphor-icons/react'
 import { useAuth } from '../lib/auth'
 import { NAV, canAccess } from '../lib/roles'
-import { NAV_ACCENT_CLASSES } from '../lib/navAccentStyles'
+import { applyTheme, getTheme, setTheme, type Theme } from '../lib/theme'
 import { useAppUpdate } from '../lib/useAppUpdate'
 import { PageSkeleton } from './ui/Skeleton'
 import { useNavCounts } from '../lib/useNavCounts'
@@ -22,6 +22,19 @@ export default function AppShell() {
   // Only decisions waiting on a manager light the mobile menu dot -- the
   // routine pack/pier counts are non-zero most of the day.
   const urgent = URGENT_NAV_PATHS.reduce((n, p) => n + (counts[p] ?? 0), 0)
+
+  // Dark mode lives inside the team shell only: leaving it (sign-out, a
+  // customer link) puts the page back to light.
+  const [theme, setThemeState] = useState<Theme>(getTheme)
+  useEffect(() => {
+    applyTheme(theme)
+    return () => applyTheme(null)
+  }, [theme])
+  const toggleTheme = () => {
+    const next: Theme = theme === 'dark' ? 'light' : 'dark'
+    setTheme(next)
+    setThemeState(next)
+  }
 
   // Close the mobile drawer on navigation and on Escape.
   useEffect(() => setOpen(false), [pathname])
@@ -86,34 +99,24 @@ export default function AppShell() {
           <ul className="flex flex-col gap-1">
             {items.map((n) => {
               const Icon = n.icon
-              const accent = NAV_ACCENT_CLASSES[n.accent]
               return (
                 <li key={n.path}>
                   <NavLink
                     to={n.path}
                     end
                     className={({ isActive }) =>
-                      'flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium transition-colors ' +
-                      (isActive
-                        ? accent.activeBg + ' ' + accent.activeText
-                        : 'text-ink-soft hover:bg-paper hover:text-ink')
+                      'flex items-center gap-2.5 rounded-md px-3 py-2 text-sm font-medium transition-colors ' +
+                      (isActive ? 'bg-line/70 text-ink' : 'text-ink-soft hover:bg-paper hover:text-ink')
                     }
                   >
                     {({ isActive }) => (
                       <>
-                        <span
-                          className={
-                            'flex h-7 w-7 shrink-0 items-center justify-center rounded-md ' +
-                            (isActive ? 'bg-surface/60' : accent.chipBg)
-                          }
-                        >
-                          <Icon
-                            size={16}
-                            weight={isActive ? 'fill' : 'regular'}
-                            className={accent.icon}
-                            aria-hidden="true"
-                          />
-                        </span>
+                        <Icon
+                          size={18}
+                          weight={isActive ? 'fill' : 'regular'}
+                          className={'shrink-0 ' + (isActive ? 'text-ink' : 'text-ink-soft')}
+                          aria-hidden="true"
+                        />
                         {n.label}
                         {!!counts[n.path] && (
                           <span
@@ -141,6 +144,19 @@ export default function AppShell() {
           <p className="truncate px-1 pb-2 text-xs text-ink-faint">
             {profile?.name} · {role}
           </p>
+          <button
+            type="button"
+            className="btn btn-ghost btn-sm mb-1.5 w-full justify-start gap-1.5 text-ink-soft"
+            aria-pressed={theme === 'dark'}
+            onClick={toggleTheme}
+          >
+            {theme === 'dark' ? (
+              <Sun size={16} weight="bold" aria-hidden="true" />
+            ) : (
+              <Moon size={16} weight="bold" aria-hidden="true" />
+            )}
+            {theme === 'dark' ? 'โหมดสว่าง' : 'โหมดมืด'}
+          </button>
           <button className="btn btn-secondary btn-sm w-full gap-1.5" onClick={signOut}>
             <SignOut size={16} weight="bold" aria-hidden="true" />
             ออกจากระบบ

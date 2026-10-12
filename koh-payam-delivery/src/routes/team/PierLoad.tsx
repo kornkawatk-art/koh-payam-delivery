@@ -205,7 +205,7 @@ export default function PierLoad() {
         <PageHeader
           title="ที่ท่าเรือ"
           icon={MapPin}
-          accent="teal"
+         
           actions={
             <input
               type="date"

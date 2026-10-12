@@ -44,7 +44,7 @@ export default function Debts() {
     )
   }, [debts, q])
 
-  const header = <PageHeader title="ยอดค้างชำระ" icon={Money} accent="rose" />
+  const header = <PageHeader title="ยอดค้างชำระ" icon={Money} />
   if (debts === undefined) return <PageSkeleton rows={6} />
   if (debts === null)
     return (

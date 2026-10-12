@@ -103,7 +103,7 @@ export default function ClaimsQueue() {
 
   return (
     <div className="flex flex-col gap-5">
-      <PageHeader title="คิวเคลม" icon={Flag} accent="rose" />
+      <PageHeader title="คิวเคลม" icon={Flag} />
 
       {outstandingFailed ? (
         <p className="alert alert-danger">โหลดจำนวนเคลมค้างอยู่ไม่สำเร็จ</p>
