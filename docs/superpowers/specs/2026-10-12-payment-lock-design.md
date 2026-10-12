@@ -75,6 +75,17 @@ other day), if Makro does **not** say Paid and outstanding > 0, clear
 were "already imported on another day"; the result also counts how many
 had their payment refreshed.
 
+### Payment-refresh-only import (added after spec review)
+
+The normal import assigns every PO in the file to the one ship date picked
+on the page, so feeding it a multi-day back-catalogue (Q9) would create
+never-imported POs on the wrong date. The import page gets a second mode,
+**"อัปเดตสถานะการจ่ายเงินอย่างเดียว"**: only the OrderExport file is needed;
+for every PO in it that already exists (any ship date) it refreshes the
+payment facts above (same Q8 rule); it never creates or deletes an order and
+never touches items. The result says how many POs were refreshed and how many
+in the file aren't in the app (ignored).
+
 ## Logic (pure, tested)
 
 `src/lib/payments.ts`:
@@ -101,7 +112,8 @@ had their payment refreshed.
 1. Migration 0034 on "รันได้".
 2. Push (the app works without the old files imported — it just locks too much,
    so step 3 should follow quickly).
-3. Import OrderExport files from 2026-09-12 onward (Q9), check the
+3. Import OrderExport files from 2026-09-12 onward with the payment-refresh-only
+   mode (Q9), check the
    ยอดค้างชำระ page, then announce to the team.
 
 ## Testing
