@@ -19,3 +19,5 @@ creds*.txt
 # stray SDD ledger written under the app dir by subagents (root .superpowers/sdd is the real one)
 koh-payam-delivery/.superpowers/
 scratchpad/
+# brainstorm mockups + execution ledgers (scratch)
+.superpowers/
