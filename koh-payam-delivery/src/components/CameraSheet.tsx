@@ -114,7 +114,7 @@ export function CameraSheet({
         )}
         {err && (
           <p
-            className="absolute inset-x-4 top-1/2 -translate-y-1/2 rounded-xl bg-white p-4 text-center text-sm text-danger-ink"
+            className="absolute inset-x-4 top-1/2 -translate-y-1/2 rounded-xl bg-surface p-4 text-center text-sm text-danger-ink"
             role="alert"
           >
             {err}

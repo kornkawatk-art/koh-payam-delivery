@@ -5,7 +5,10 @@ import { join, relative, resolve } from 'node:path'
 // (always dark), and the logo keeps its own colours, so they're exempt.
 const EXEMPT = ['components/CameraSheet.tsx', 'components/ui/PhotoGallery.tsx', 'components/AppLogo.tsx']
 const BAD =
-  /\b(?:text-white|bg-white|bg-ink\/\d+|(?:bg|text|border|ring)-(?:red|green|blue|amber|yellow|emerald|gray|slate|stone|zinc|neutral)-\d{2,3})\b|#[0-9a-fA-F]{6}\b/g
+  /\b(?:text-white|bg-white(?!\/)|bg-ink\/\d+|(?:bg|text|border|ring|fill|stroke|from|via|to)-[a-z]+-\d{2,3})\b|#[0-9a-fA-F]{6}\b/g
+// Photo/camera overlays may use translucent white over the image; an opaque
+// bg-white or a palette colour is still flagged there.
+const OVERLAY_OK = /^(?:text-white|bg-white\/\d+|border-white|bg-black(?:\/\d+)?)$/
 
 const src = resolve(__dirname, '..')
 const walk = (d: string): string[] =>
@@ -18,7 +21,10 @@ test('no theme-blind colours in components (use tokens: text-on, bg-surface, bg-
   const hits = walk(src)
     .filter((p) => p.endsWith('.tsx') && !p.includes('.test.'))
     .map((p) => relative(src, p).split('\\').join('/'))
-    .filter((p) => !EXEMPT.includes(p))
-    .flatMap((p) => [...readFileSync(join(src, p), 'utf8').matchAll(BAD)].map((m) => `${p}: ${m[0]}`))
+    .flatMap((p) =>
+      [...readFileSync(join(src, p), 'utf8').matchAll(BAD)]
+        .filter((m) => !(EXEMPT.includes(p) && (OVERLAY_OK.test(m[0]) || p.endsWith('AppLogo.tsx'))))
+        .map((m) => `${p}: ${m[0]}`),
+    )
   expect(hits).toEqual([])
 })

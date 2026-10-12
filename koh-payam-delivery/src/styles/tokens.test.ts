@@ -32,3 +32,14 @@ test('printing puts every light value back, so stickers from dark mode print the
   expect(pairs(body)).toEqual(pairs(lightBlock))
   expect(pairs(body).length).toBeGreaterThan(20)
 })
+
+test("dark mode draws the 'already packed' tick dark, so it shows on the light green", () => {
+  const rule = css.slice(css.indexOf("html[data-theme='dark'] input[type='checkbox']:disabled:checked"))
+  expect(rule.length).toBeGreaterThan(0)
+  expect(rule.slice(0, rule.indexOf('}'))).toContain("stroke='%230f0f0f'")
+})
+
+test('table column headers use the readable secondary grey, not the faint one', () => {
+  const rule = css.slice(css.indexOf('.data-table thead th {'))
+  expect(rule.slice(0, rule.indexOf('}'))).toContain('text-ink-soft')
+})

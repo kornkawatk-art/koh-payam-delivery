@@ -31,6 +31,9 @@
     --c-info: 29 78 216; /* #1d4ed8 */
     --c-info-ink: 30 64 175; /* #1e40af */
     --c-info-soft: 239 246 255; /* #eff6ff */
+    --c-chart-1: 139 92 246; /* #8b5cf6 */
+    --c-chart-2: 109 40 217; /* #6d28d9 */
+    --c-chart-3: 76 29 149; /* #4c1d95 */
   }
 
   html[data-theme='dark'] {
@@ -58,6 +61,9 @@
     --c-info: 96 165 250; /* #60a5fa */
     --c-info-ink: 147 197 253; /* #93c5fd */
     --c-info-soft: 21 32 47; /* #15202f */
+    --c-chart-1: 139 92 246; /* #8b5cf6 */
+    --c-chart-2: 167 139 250; /* #a78bfa */
+    --c-chart-3: 196 181 253; /* #c4b5fd */
   }
 
   html {
@@ -165,9 +171,14 @@
     border-radius: 0.375rem;
     cursor: default;
     background-color: theme('colors.ok.DEFAULT');
-    /* white tick: on the dark-mode (light) green it is still legible at 24px */
     background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='white' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3.5 8.4l3 3 6-6.6'/%3E%3C/svg%3E");
     background-size: 100% 100%;
+  }
+
+  /* Dark mode's green is light: draw the tick dark so it stays visible.
+     (A CSS variable can't reach inside a data URI.) */
+  html[data-theme='dark'] input[type='checkbox']:disabled:checked {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%230f0f0f' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3.5 8.4l3 3 6-6.6'/%3E%3C/svg%3E");
   }
 
   input[type='file'] {
@@ -359,7 +370,7 @@
   }
 
   .data-table thead th {
-    @apply whitespace-nowrap border-b border-line bg-surface px-3 py-2.5 text-left font-mono text-[11px] font-medium uppercase tracking-wider text-ink-faint;
+    @apply whitespace-nowrap border-b border-line bg-surface px-3 py-2.5 text-left font-mono text-[11px] font-medium uppercase tracking-wider text-ink-soft;
   }
 
   .data-table tbody td {
@@ -573,6 +584,9 @@
     --c-info: 29 78 216; /* #1d4ed8 */
     --c-info-ink: 30 64 175; /* #1e40af */
     --c-info-soft: 239 246 255; /* #eff6ff */
+    --c-chart-1: 139 92 246; /* #8b5cf6 */
+    --c-chart-2: 109 40 217; /* #6d28d9 */
+    --c-chart-3: 76 29 149; /* #4c1d95 */
   }
 
   body.printing-stickers {

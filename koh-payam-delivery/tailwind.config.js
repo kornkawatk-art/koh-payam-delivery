@@ -28,6 +28,8 @@ export default {
         ok: { DEFAULT: 'rgb(var(--c-ok) / <alpha-value>)', ink: 'rgb(var(--c-ok-ink) / <alpha-value>)', soft: 'rgb(var(--c-ok-soft) / <alpha-value>)' },
         warn: { DEFAULT: 'rgb(var(--c-warn) / <alpha-value>)', ink: 'rgb(var(--c-warn-ink) / <alpha-value>)', soft: 'rgb(var(--c-warn-soft) / <alpha-value>)' },
         danger: { DEFAULT: 'rgb(var(--c-danger) / <alpha-value>)', ink: 'rgb(var(--c-danger-ink) / <alpha-value>)', soft: 'rgb(var(--c-danger-soft) / <alpha-value>)' },
+        // shortage charts' magnitude ramp: darker = more in light, brighter = more in dark
+        chart: { 1: 'rgb(var(--c-chart-1) / <alpha-value>)', 2: 'rgb(var(--c-chart-2) / <alpha-value>)', 3: 'rgb(var(--c-chart-3) / <alpha-value>)' },
         info: { DEFAULT: 'rgb(var(--c-info) / <alpha-value>)', ink: 'rgb(var(--c-info-ink) / <alpha-value>)', soft: 'rgb(var(--c-info-soft) / <alpha-value>)' },
       },
       borderRadius: {

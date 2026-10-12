@@ -70,12 +70,12 @@ test('trend: an empty range (e.g. a date field cleared mid-edit) renders without
   expect(screen.getByText('ไม่มีของขาดในช่วงนี้')).toBeInTheDocument()
 })
 
-test('rampClass: color follows magnitude -- light violet for the lowest third, darkest for the top third', () => {
-  expect(rampClass(1, 9)).toBe('bg-violet-500')
-  expect(rampClass(3, 9)).toBe('bg-violet-500')
-  expect(rampClass(5, 9)).toBe('bg-violet-700')
-  expect(rampClass(9, 9)).toBe('bg-violet-900')
-  expect(rampClass(0, 0)).toBe('bg-violet-500')
+test('rampClass: color follows magnitude -- chart-1 for the lowest third, chart-3 for the top third', () => {
+  expect(rampClass(1, 9)).toBe('bg-chart-1')
+  expect(rampClass(3, 9)).toBe('bg-chart-1')
+  expect(rampClass(5, 9)).toBe('bg-chart-2')
+  expect(rampClass(9, 9)).toBe('bg-chart-3')
+  expect(rampClass(0, 0)).toBe('bg-chart-1')
 })
 
 test('department bars: each bar wears its own department color; once one is picked the others go gray', () => {
