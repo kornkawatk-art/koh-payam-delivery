@@ -26,7 +26,7 @@
 //   0. Today-only guard: BoatSetup.tsx's date picker makes ANY past date
 //      reachable in one click ("let me check yesterday's boats"), and saving
 //      from there would re-send links that order-view already treats as
-//      expired (48h after shipped_at) — a shop-branded "your order is ready"
+//      expired (7 days after shipped_at) — a shop-branded "your order is ready"
 //      pointing at a 404. Only *today* (Asia/Bangkok, see guards.ts) sends.
 //      Any other date is a QUIET skip, not an error: setting up boats for a
 //      future date in advance is legitimate existing behaviour — it is only
