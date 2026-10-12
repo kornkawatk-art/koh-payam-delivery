@@ -30,6 +30,8 @@ import { ShippingAddress } from '../../components/ui/ShippingAddress'
 import { PickupBadge } from '../../components/ui/PickupBadge'
 import { MakroVoidBadge } from '../../components/ui/MakroVoidBadge'
 import { makroVoid } from '../../lib/makroStatus'
+import { markBillPaid } from '../../lib/api/payments'
+import { isUnpaidBill, type Bill } from '../../lib/payments'
 
 export default function OrderDetail() {
   const { id } = useParams()
@@ -42,6 +44,7 @@ export default function OrderDetail() {
   const [busy, setBusy] = useState(false)
   const [deleteOpen, setDeleteOpen] = useState(false)
   const [closeOpen, setCloseOpen] = useState(false)
+  const [payOpen, setPayOpen] = useState(false)
   const [confirmText, setConfirmText] = useState('')
 
   const load = useCallback(() => {
@@ -207,6 +210,44 @@ export default function OrderDetail() {
           amount={order.outstanding_amount}
           note={order.payment_method}
         />
+      )}
+
+      {order.paid_marked_at ? (
+        <p className="muted text-sm">ทีมบันทึกรับเงินแล้ว — รอแม็คโครอัปเดต</p>
+      ) : (
+        profile?.role === 'manager' &&
+        isUnpaidBill(order as Bill) &&
+        (!payOpen ? (
+          <button
+            type="button"
+            className="btn btn-secondary btn-sm self-start"
+            disabled={busy}
+            onClick={() => setPayOpen(true)}
+          >
+            รับเงินแล้ว
+          </button>
+        ) : (
+          <div className="flex flex-wrap items-center gap-2 text-sm">
+            <span>ยืนยันว่าได้รับเงินบิลนี้แล้ว?</span>
+            <button
+              type="button"
+              className="btn btn-ok btn-sm"
+              aria-label="ยืนยัน รับเงินแล้ว"
+              disabled={busy}
+              onClick={() =>
+                void run(async () => {
+                  await markBillPaid(id!)
+                  setPayOpen(false)
+                }, 'บันทึกรับเงินแล้ว')
+              }
+            >
+              ยืนยัน
+            </button>
+            <button type="button" className="btn btn-ghost btn-sm" onClick={() => setPayOpen(false)}>
+              ยกเลิก
+            </button>
+          </div>
+        ))
       )}
 
       <section className="card flex flex-col gap-4" aria-label="สรุปการจัดส่ง">

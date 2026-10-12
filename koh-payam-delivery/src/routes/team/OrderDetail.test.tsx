@@ -24,6 +24,8 @@ vi.mock('../../lib/api/backorders', async (importOriginal) => ({
   backorderQty: (await importOriginal<typeof import('../../lib/api/backorders')>()).backorderQty,
   listRelatedBackordersForOrder: (...a: unknown[]) => listRelatedBackordersForOrder(...a),
 }))
+const markBillPaid = vi.fn().mockResolvedValue(undefined)
+vi.mock('../../lib/api/payments', () => ({ markBillPaid: (...a: unknown[]) => markBillPaid(...a) }))
 vi.mock('../../lib/auth', () => ({
   useAuth: () => useAuthMock(),
 }))
@@ -367,4 +369,30 @@ test('an order Makro canceled shows a warning at the top', async () => {
   getOrder.mockResolvedValue({ ...order, makro_order_status: 'Canceled' })
   renderPage()
   expect(await screen.findByText(/แม็คโครยกเลิกออเดอร์นี้แล้ว/)).toBeInTheDocument()
+})
+
+const unpaid = { payment_method: 'Pay On Delivery', payment_status: 'Unpaid', outstanding_amount: 6172.5, paid_marked_at: null }
+
+test('a manager marks an unpaid cash-on-delivery bill paid (after confirming)', async () => {
+  getOrder.mockResolvedValue({ ...order, ...unpaid })
+  renderPage()
+  await userEvent.click(await screen.findByRole('button', { name: 'รับเงินแล้ว' }))
+  expect(markBillPaid).not.toHaveBeenCalled()
+  await userEvent.click(screen.getByRole('button', { name: 'ยืนยัน รับเงินแล้ว' }))
+  expect(markBillPaid).toHaveBeenCalledWith('ord1')
+})
+
+test('a packer does not get "รับเงินแล้ว"', async () => {
+  getOrder.mockResolvedValue({ ...order, ...unpaid })
+  useAuthMock.mockReturnValue({ profile: { id: 'u2', name: 'แพ็ค', role: 'packer' } })
+  renderPage()
+  await screen.findByText(/PO-1/)
+  expect(screen.queryByRole('button', { name: 'รับเงินแล้ว' })).not.toBeInTheDocument()
+})
+
+test('a bill the team marked paid says so and offers no button', async () => {
+  getOrder.mockResolvedValue({ ...order, ...unpaid, paid_marked_at: '2026-10-12T03:00:00Z' })
+  renderPage()
+  expect(await screen.findByText('ทีมบันทึกรับเงินแล้ว — รอแม็คโครอัปเดต')).toBeInTheDocument()
+  expect(screen.queryByRole('button', { name: 'รับเงินแล้ว' })).not.toBeInTheDocument()
 })
