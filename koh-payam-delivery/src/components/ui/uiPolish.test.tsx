@@ -5,6 +5,8 @@ import { PageHeader } from './PageHeader'
 import { EmptyState } from './EmptyState'
 import { PageSkeleton } from './Skeleton'
 import { Notice, flash } from './Notice'
+import { AmountDue } from './AmountDue'
+import { StatTile, TotalCount } from './Stat'
 
 test('PageHeader with `back` renders an on-screen link to the parent page', () => {
   render(
@@ -36,4 +38,21 @@ test('Notice: errors are announced as alerts, successes as status, each with its
   expect(screen.getByRole('status')).toHaveClass('alert-warn')
   rerender(<Notice flash={undefined} />)
   expect(screen.queryByRole('status')).not.toBeInTheDocument()
+})
+
+describe('numbers use the monospace number style', () => {
+  test('AmountDue amount', () => {
+    render(<AmountDue label="ยอดเก็บปลายทาง" amount={1250} />)
+    expect(screen.getByText(/1,250/)).toHaveClass('num')
+  })
+  test('StatTile value and TotalCount', () => {
+    render(
+      <dl>
+        <StatTile label="ลัง" value={7} />
+      </dl>,
+    )
+    expect(screen.getByText('7')).toHaveClass('num')
+    render(<TotalCount total={12} />)
+    expect(screen.getByText('12')).toHaveClass('num')
+  })
 })

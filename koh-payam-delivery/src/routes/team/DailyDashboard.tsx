@@ -259,7 +259,7 @@ export default function DailyDashboard() {
             <ListBullets size={14} className="text-ink-faint" aria-hidden="true" />
             ออเดอร์ทั้งหมด
           </span>
-          <span className="text-2xl font-semibold tracking-tight text-ink">{counts.total}</span>
+          <span className="num text-2xl font-semibold tracking-tight text-ink">{counts.total}</span>
         </div>
         <ProgressTile
           icon={<Package size={14} className="text-ink-faint" aria-hidden="true" />}
@@ -524,7 +524,7 @@ function ProgressTile({
         {icon}
         {label}
       </span>
-      <span className="text-2xl font-semibold tracking-tight text-ink">
+      <span className="num text-2xl font-semibold tracking-tight text-ink">
         {done}/{total}
       </span>
       <span
@@ -744,7 +744,7 @@ function OrderRow({
   return (
     <tr className={indent ? 'row-child' : undefined}>
       <td className={`stack-lead whitespace-nowrap ${indent ? 'pl-8' : ''}`}>
-        <Link className="link" to={`/order/${o.id}`}>
+        <Link className="link num" to={`/order/${o.id}`}>
           {o.makro_order_no}
         </Link>
       </td>

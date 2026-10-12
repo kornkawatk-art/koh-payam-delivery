@@ -4,7 +4,8 @@ import { join, relative, resolve } from 'node:path'
 // Colours that only work in one theme. Photo/camera overlays sit on images
 // (always dark), and the logo keeps its own colours, so they're exempt.
 const EXEMPT = ['components/CameraSheet.tsx', 'components/ui/PhotoGallery.tsx', 'components/AppLogo.tsx']
-const BAD = /\b(?:text-white|bg-white|bg-ink\/\d+)\b|#[0-9a-fA-F]{6}\b/g
+const BAD =
+  /\b(?:text-white|bg-white|bg-ink\/\d+|(?:bg|text|border|ring)-(?:red|green|blue|amber|yellow|emerald|gray|slate|stone|zinc|neutral)-\d{2,3})\b|#[0-9a-fA-F]{6}\b/g
 
 const src = resolve(__dirname, '..')
 const walk = (d: string): string[] =>

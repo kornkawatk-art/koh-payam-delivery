@@ -152,9 +152,9 @@ export default function ClaimsQueue() {
                 const overdue =
                   c.status === 'open' && new Date(c.deadline_at).getTime() < now
                 return (
-                  <tr key={c.id} className={overdue ? 'bg-red-50' : undefined}>
+                  <tr key={c.id} className={overdue ? 'bg-danger-soft' : undefined}>
                     <td className="stack-lead whitespace-nowrap">
-                      <Link className="link" to={`/claims/${c.id}`}>
+                      <Link className="link num" to={`/claims/${c.id}`}>
                         {c.makro_order_no}
                       </Link>
                     </td>
@@ -202,7 +202,7 @@ export default function ClaimsQueue() {
                   const daysWaiting = Math.floor((now - new Date(b.createdAt).getTime()) / MS_PER_DAY)
                   const stale = daysWaiting > 7
                   return (
-                    <tr key={b.id} className={stale ? 'bg-red-50' : undefined}>
+                    <tr key={b.id} className={stale ? 'bg-danger-soft' : undefined}>
                       <td className="stack-lead">{b.customerName}</td>
                       <td data-label="สินค้า">
                         {b.productName} {backorderQty(b)}

@@ -104,7 +104,7 @@ export default function LineContacts() {
               <tbody>
                 {pending.map((p) => (
                   <tr key={p.phone}>
-                    <td className="stack-lead whitespace-nowrap">{p.phone}</td>
+                    <td className="stack-lead num whitespace-nowrap">{p.phone}</td>
                     <td data-label="ชื่อ LINE เดิม">{p.oldDisplayName || '—'}</td>
                     <td data-label="ชื่อ LINE ใหม่">{p.pendingDisplayName || '—'}</td>
                     <td data-label="วันที่ขอ" className="whitespace-nowrap">
@@ -164,7 +164,7 @@ export default function LineContacts() {
             <tbody>
               {filtered.map((c) => (
                 <tr key={c.phone}>
-                  <td className="stack-lead whitespace-nowrap">{c.phone}</td>
+                  <td className="stack-lead num whitespace-nowrap">{c.phone}</td>
                   <td data-label="ชื่อ LINE">{c.displayName || '—'}</td>
                   <td data-label="วันที่ลงทะเบียน" className="whitespace-nowrap">
                     {formatDateTimeTH(c.createdAt)}

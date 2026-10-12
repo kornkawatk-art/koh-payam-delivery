@@ -78,3 +78,9 @@ test('a customer released for today shows so instead of the lock', async () => {
   expect(await screen.findByText('ปลดแล้ววันนี้')).toBeInTheDocument()
   expect(screen.queryByText('ล็อกแพ็ค')).not.toBeInTheDocument()
 })
+
+test('money shows in the monospace number style', async () => {
+  renderPage()
+  const rows = await screen.findAllByRole('listitem')
+  expect(within(rows[0]).getByText(/1,500/)).toHaveClass('num')
+})

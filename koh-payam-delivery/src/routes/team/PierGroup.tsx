@@ -255,7 +255,7 @@ export default function PierGroup({
           <ul className="card flex flex-col gap-1.5 text-sm">
             {ready.map((o) => (
               <li key={o.id} className="flex flex-wrap items-center justify-between gap-2">
-                <span className="font-medium">{o.makro_order_no}</span>
+                <span className="num font-medium">{o.makro_order_no}</span>
                 <span className="muted text-xs">
                   {o.paper_box_count + o.foam_box_count + o.piece_count} รวม
                   {o.packed_with_order_id &&

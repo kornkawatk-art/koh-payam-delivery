@@ -326,7 +326,7 @@ export default function OrderDetail() {
       {order.packed_with?.makro_order_no && (
         <p className="alert alert-info">
           แพ็ครวมกับออเดอร์{' '}
-          <Link className="link" to={`/order/${order.packed_with_order_id}`}>
+          <Link className="link num" to={`/order/${order.packed_with_order_id}`}>
             {order.packed_with.makro_order_no}
           </Link>{' '}
           — ลัง/ชิ้น/รูปตอนแพ็คบันทึกไว้ที่ออเดอร์นั้น

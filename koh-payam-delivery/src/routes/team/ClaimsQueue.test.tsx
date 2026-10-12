@@ -94,9 +94,9 @@ test('highlights an open row whose deadline has already passed', async () => {
   const overdue = (await screen.findByText('PO-OVERDUE')).closest('tr')
   const fresh = screen.getByText('PO-FRESH').closest('tr')
   const done = screen.getByText('PO-DONE').closest('tr')
-  expect(overdue?.className).toContain('bg-red-50')
-  expect(fresh?.className).not.toContain('bg-red-50')
-  expect(done?.className).not.toContain('bg-red-50')
+  expect(overdue?.className).toContain('bg-danger-soft')
+  expect(fresh?.className).not.toContain('bg-danger-soft')
+  expect(done?.className).not.toContain('bg-danger-soft')
 })
 
 test('changing the filter refetches with the chosen status', async () => {
@@ -152,8 +152,8 @@ test('highlights an unmatched backorder waiting more than 7 days, not one waitin
   renderPage()
   const old = (await screen.findByText('PALM BEACH')).closest('tr')
   const fresh = screen.getByText('REEF LODGE').closest('tr')
-  expect(old?.className).toContain('bg-red-50')
-  expect(fresh?.className).not.toContain('bg-red-50')
+  expect(old?.className).toContain('bg-danger-soft')
+  expect(fresh?.className).not.toContain('bg-danger-soft')
 })
 
 test('shows the empty state when there are zero unmatched backorders', async () => {
