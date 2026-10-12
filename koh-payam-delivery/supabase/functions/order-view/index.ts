@@ -11,18 +11,12 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { cors } from '../_shared/cors.ts'
 import { customerKey } from '../_shared/customerKey.ts'
 import { foamBalance, sentEvents, type FoamEvent } from '../_shared/foamBalance.ts'
+import { CLAIM_WINDOW_MS, isLinkValid } from '../_shared/linkWindow.ts'
 
 const JSON_HEADERS = { ...cors, 'Content-Type': 'application/json' }
-const CLAIM_WINDOW_MS = 48 * 60 * 60 * 1000
-
-// I3: an order's link is valid until 48h after it shipped. Not-yet-shipped
-// orders (shippedAt == null) stay valid indefinitely. Shared by the primary
-// order's expiry check and by the sibling-order filter below so the two
-// never drift apart.
-function isLinkValid(shippedAt: string | null): boolean {
-  const shippedMs = shippedAt ? new Date(shippedAt).getTime() : null
-  return shippedMs == null || Date.now() - shippedMs <= CLAIM_WINDOW_MS
-}
+// The link is viewable for 7 days after shipping; claims close after 48h
+// (_shared/linkWindow.ts). isLinkValid serves both the primary order's expiry
+// check and the sibling-order filter below so the two never drift apart.
 
 // Best-effort, in-memory, per-instance rate limit (~60 req/min/IP). NOT durable
 // and NOT shared across edge-function instances — a determined caller can still
@@ -73,7 +67,7 @@ Deno.serve(async (req) => {
 
   const shippedMs = o.shipped_at ? new Date(o.shipped_at).getTime() : null
 
-  // I3: link expires 48h after the order shipped. Not-yet-shipped orders stay
+  // I3: link expires 7 days after the order shipped. Not-yet-shipped orders stay
   // viewable indefinitely. Expired links get the same 404 as an unknown token so
   // the customer page shows its existing "link not found / expired" message.
   if (!isLinkValid(o.shipped_at)) {
