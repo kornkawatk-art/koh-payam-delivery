@@ -9,6 +9,7 @@ import {
   ChartBar,
   Tag,
   Package,
+  Money,
   type Icon,
 } from '@phosphor-icons/react'
 
@@ -48,6 +49,7 @@ export const NAV: { path: string; label: string; roles: Role[]; icon: Icon; acce
     { path: '/pier', label: 'ที่ท่าเรือ', roles: ['pier', 'manager'], icon: MapPin, accent: 'teal' },
     { path: '/foam', label: 'ลังโฟม', roles: ['pier', 'manager'], icon: Package, accent: 'amber' },
     { path: '/claims', label: 'คิวเคลม', roles: ['manager'], icon: Flag, accent: 'rose' },
+    { path: '/debts', label: 'ยอดค้างชำระ', roles: ['manager'], icon: Money, accent: 'rose' },
     {
       path: '/line-contacts',
       label: 'ผู้ลงทะเบียน LINE',
