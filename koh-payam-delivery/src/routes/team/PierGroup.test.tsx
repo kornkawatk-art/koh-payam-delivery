@@ -2,6 +2,13 @@ import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import PierGroup from './PierGroup'
 
+const lockState = { current: null as null | Record<string, unknown> }
+vi.mock('../../components/PaymentLockNote', () => ({
+  usePaymentLock: () => lockState.current,
+  PaymentLockNote: ({ lock }: { lock: { locked?: boolean } | null }) =>
+    lock?.locked ? <p role="alert">ค้างชำระ</p> : null,
+}))
+
 const listOrdersForCustomerDay = vi.fn()
 const setOrderBoats = vi.fn().mockResolvedValue(2)
 const setOrderPierName = vi.fn().mockResolvedValue(undefined)

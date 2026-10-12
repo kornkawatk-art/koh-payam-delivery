@@ -3,6 +3,13 @@ import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Routes, Route } from 'react-router-dom'
 import PackOrder from './PackOrder'
 
+const lockState = { current: null as null | Record<string, unknown> }
+vi.mock('../../components/PaymentLockNote', () => ({
+  usePaymentLock: () => lockState.current,
+  PaymentLockNote: ({ lock }: { lock: { locked?: boolean } | null }) =>
+    lock?.locked ? <p role="alert">ค้างชำระ</p> : null,
+}))
+
 const getOrder = vi.fn()
 const updateOrderStatus = vi.fn().mockResolvedValue(undefined)
 const savePack = vi.fn().mockResolvedValue(undefined)
@@ -524,4 +531,20 @@ test('"พิมพ์สติ๊กเกอร์" counts the boxes typed so 
   await waitFor(() => expect(window.print).toHaveBeenCalled())
   expect(savePack).toHaveBeenCalledWith(expect.objectContaining({ paperCount: 2, pieceCount: 1 }))
   document.body.classList.remove('printing-stickers')
+})
+
+test('a customer owing an earlier bill can’t be finished, even with everything else done', async () => {
+  lockState.current = { locked: true, released: false, priorBills: [{}], total: 500, oldestDays: 3 }
+  renderPage()
+  await screen.findByText('rice')
+  expect(screen.getByRole('alert')).toHaveTextContent('ค้างชำระ')
+  const piece = screen.getByLabelText(/จำนวนชิ้น/)
+  await userEvent.clear(piece)
+  await userEvent.type(piece, '3')
+  await userEvent.click(screen.getByRole('button', { name: 'mock-upload' }))
+  await waitFor(() => expect(attachEvidencePhoto).toHaveBeenCalled())
+  for (const cb of screen.getAllByRole('checkbox')) await userEvent.click(cb)
+  expect(screen.getByRole('button', { name: 'บันทึก + แพ็คเสร็จ' })).toBeDisabled()
+  expect(screen.getByRole('button', { name: 'บันทึก' })).toBeEnabled() // counts can still be saved
+  lockState.current = null
 })

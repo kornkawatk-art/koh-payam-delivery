@@ -19,6 +19,7 @@ import { StickerPrintButton } from '../../components/StickerPrint'
 import { ShippingAddress } from '../../components/ui/ShippingAddress'
 import { MAX_COUNT, toCount } from '../../lib/stickers'
 import { PickupBadge } from '../../components/ui/PickupBadge'
+import { PaymentLockNote, usePaymentLock } from '../../components/PaymentLockNote'
 
 const R2 = import.meta.env.VITE_R2_PUBLIC_BASE_URL as string
 
@@ -75,6 +76,9 @@ export default function PackOrder() {
       .catch(() => setPackerNames([]))
   }, [id])
 
+  // payment lock: owes a bill from an earlier delivery -> can't finish packing
+  const lock = usePaymentLock(order, order?.ship_date)
+
   if (failed) return <p className="alert alert-danger">โหลดออเดอร์ไม่สำเร็จ</p>
   if (!order) return <PageSkeleton />
 
@@ -108,7 +112,9 @@ export default function PackOrder() {
   // fields -- AND every line item ticked as physically packed. The plain
   // "บันทึก" save stays ungated.
   const allItemsPacked = items.length > 0 && items.every((it) => packedIds.has(it.id))
-  const packGateBlocked = !(
+  const packGateBlocked =
+    !!lock?.locked ||
+    !(
     packPhotoCount >= 1 &&
     paper + foam + piece >= 1 &&
     packerName.trim() !== '' &&
@@ -156,6 +162,7 @@ export default function PackOrder() {
         </p>
       )}
 
+      <PaymentLockNote lock={lock} />
       <ShippingAddress addresses={[order.shipping_address]} />
 
       {backorders.length > 0 && (

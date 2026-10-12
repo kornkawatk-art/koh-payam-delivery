@@ -3,6 +3,13 @@ import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Routes, Route } from 'react-router-dom'
 import PackGroup from './PackGroup'
 
+const lockState = { current: null as null | Record<string, unknown> }
+vi.mock('../../components/PaymentLockNote', () => ({
+  usePaymentLock: () => lockState.current,
+  PaymentLockNote: ({ lock }: { lock: { locked?: boolean } | null }) =>
+    lock?.locked ? <p role="alert">ค้างชำระ</p> : null,
+}))
+
 const listOrdersForCustomerDay = vi.fn()
 const updateOrderStatus = vi.fn().mockResolvedValue(undefined)
 const savePackGroup = vi.fn().mockResolvedValue(undefined)

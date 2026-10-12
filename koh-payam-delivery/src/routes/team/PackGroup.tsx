@@ -22,6 +22,7 @@ import { StickerPrintButton } from '../../components/StickerPrint'
 import { ShippingAddress } from '../../components/ui/ShippingAddress'
 import { MAX_COUNT, toCount } from '../../lib/stickers'
 import { PickupBadge } from '../../components/ui/PickupBadge'
+import { PaymentLockNote, usePaymentLock } from '../../components/PaymentLockNote'
 
 const R2 = import.meta.env.VITE_R2_PUBLIC_BASE_URL as string
 
@@ -110,6 +111,8 @@ export default function PackGroup() {
   const editableItems = items.filter((i) => i.editable)
 
   if (failed) return <p className="alert alert-danger">โหลดออเดอร์ไม่สำเร็จ</p>
+  const lock = usePaymentLock(primary ?? orders?.[0], (primary ?? orders?.[0])?.ship_date)
+
   if (!orders) return <PageSkeleton />
   if (orders.length === 0)
     return <p className="alert alert-danger">ไม่พบออเดอร์ของลูกค้ารายนี้ในวันนี้</p>
@@ -117,7 +120,9 @@ export default function PackGroup() {
   const customerName = orders[0].customer_name_en as string
   const allEditablePacked =
     editableItems.length > 0 && editableItems.every((i) => packedIds.has(i.id))
-  const packGateBlocked = !(
+  const packGateBlocked =
+    !!lock?.locked ||
+    !(
     primary &&
     packPhotoCount >= 1 &&
     paper + foam + piece >= 1 &&
@@ -248,6 +253,7 @@ export default function PackGroup() {
         </Link>
       </div>
 
+      <PaymentLockNote lock={lock} />
       <ShippingAddress addresses={orders.map((o) => o.shipping_address)} />
 
       {willReset.length > 0 && (

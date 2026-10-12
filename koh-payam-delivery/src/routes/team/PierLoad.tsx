@@ -36,6 +36,7 @@ import { PickupBadge } from '../../components/ui/PickupBadge'
 import { FoamOwedNote } from '../../components/FoamOwedNote'
 import { MakroVoidBadge } from '../../components/ui/MakroVoidBadge'
 import { makroVoid } from '../../lib/makroStatus'
+import { PaymentLockNote, usePaymentLock } from '../../components/PaymentLockNote'
 
 type Boat = { id: string; name: string }
 type PierOrder = {
@@ -166,6 +167,8 @@ export default function PierLoad() {
     )
   }, [all, island])
   const showIslandFilter = useMemo(() => needsIslandFilter(all.map((o) => o.island)), [all])
+
+  const lock = usePaymentLock(sel, sel ? date : null)
 
   if (failed)
     return (
@@ -312,6 +315,7 @@ export default function PierLoad() {
         {sel.makro_order_no} · {sel.customer_name_en}
       </h1>
       <IslandBadge island={sel.island} className="self-start" />
+      <PaymentLockNote lock={lock} />
       <FoamOwedNote customer={sel} />
 
       {sel.outstanding_amount != null && sel.outstanding_amount > 0 && (
@@ -405,7 +409,8 @@ export default function PierLoad() {
           !pierName.trim() ||
           shipping ||
           !isIsland(sel.island) ||
-          !!makroVoid(sel.makro_order_status)
+          !!makroVoid(sel.makro_order_status) ||
+          !!lock?.locked
         }
       >
         ส่งขึ้นเรือแล้ว
