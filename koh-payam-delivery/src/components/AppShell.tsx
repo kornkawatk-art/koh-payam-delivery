@@ -106,7 +106,7 @@ export default function AppShell() {
                     end
                     className={({ isActive }) =>
                       'flex items-center gap-2.5 rounded-md px-3 py-2 text-sm font-medium transition-colors ' +
-                      (isActive ? 'bg-line/70 text-ink' : 'text-ink-soft hover:bg-paper hover:text-ink')
+                      (isActive ? 'bg-line text-ink' : 'text-ink-soft hover:bg-paper hover:text-ink')
                     }
                   >
                     {({ isActive }) => (
@@ -147,7 +147,6 @@ export default function AppShell() {
           <button
             type="button"
             className="btn btn-ghost btn-sm mb-1.5 w-full justify-start gap-1.5 text-ink-soft"
-            aria-pressed={theme === 'dark'}
             onClick={toggleTheme}
           >
             {theme === 'dark' ? (

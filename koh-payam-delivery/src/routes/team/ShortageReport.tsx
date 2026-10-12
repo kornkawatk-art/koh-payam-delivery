@@ -149,7 +149,6 @@ export default function ShortageReport() {
       <PageHeader
         title="รายงานของขาด"
         icon={ChartBar}
-       
         actions={
           <button
             type="button"
@@ -461,7 +460,7 @@ function ProductRow({
               {p.details.map((d) => (
                 <tr key={d.orderId}>
                   <td className="stack-lead whitespace-nowrap">
-                    <Link className="link" to={`/order/${d.orderId}`}>
+                    <Link className="link num" to={`/order/${d.orderId}`}>
                       {d.makroOrderNo}
                     </Link>
                   </td>

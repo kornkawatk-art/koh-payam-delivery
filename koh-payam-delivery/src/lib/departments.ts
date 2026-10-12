@@ -54,7 +54,7 @@ export const DEPT_COLORS: Record<DeptGroupCode, string> = {
   BK: '#eda100',
   FZ: '#1baf7a',
   DF1: '#eb6834',
-  DF2: '#4a3aa7',
+  DF2: 'rgb(var(--c-dept-df2))', // #4a3aa7; lighter in dark mode (src/index.css)
   NF: '#e87ba4',
   UNKNOWN: '#a8a29e',
 }

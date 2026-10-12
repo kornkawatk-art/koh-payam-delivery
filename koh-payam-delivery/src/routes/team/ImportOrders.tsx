@@ -329,7 +329,7 @@ export default function ImportOrders() {
               <tbody>
                 {result.orders.map((o) => (
                   <tr key={o.makroOrderNo}>
-                    <td className="stack-lead whitespace-nowrap">{o.makroOrderNo}</td>
+                    <td className="stack-lead num whitespace-nowrap">{o.makroOrderNo}</td>
                     <td data-label="ลูกค้า">{o.customerName}</td>
                     <td data-label="#รายการ" className="tnum">
                       {o.items.length}

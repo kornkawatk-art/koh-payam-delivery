@@ -43,3 +43,16 @@ test('table column headers use the readable secondary grey, not the faint one', 
   const rule = css.slice(css.indexOf('.data-table thead th {'))
   expect(rule.slice(0, rule.indexOf('}'))).toContain('text-ink-soft')
 })
+
+test('solid buttons darken to their -ink shade on hover (keeps text contrast)', () => {
+  for (const [cls, c] of [['btn-primary', 'brand'], ['btn-ok', 'ok'], ['btn-warn', 'warn'], ['btn-danger', 'danger']]) {
+    const rule = css.slice(css.indexOf(`.${cls} {`))
+    expect(rule.slice(0, rule.indexOf('}'))).toContain(`hover:bg-${c}-ink`)
+  }
+})
+
+test('the installed-app colours match the new page background', () => {
+  const manifest = JSON.parse(readFileSync(resolve(__dirname, '../../public/manifest.webmanifest'), 'utf8'))
+  expect(manifest.theme_color).toBe('#fbfbfa')
+  expect(manifest.background_color).toBe('#fbfbfa')
+})

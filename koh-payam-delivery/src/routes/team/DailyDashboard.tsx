@@ -242,7 +242,6 @@ export default function DailyDashboard() {
       <PageHeader
         title="งานวันนี้"
         icon={House}
-       
         actions={
           <input
             type="date"

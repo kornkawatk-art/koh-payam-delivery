@@ -57,7 +57,7 @@ export function LinkSendReport({
               </span>
               <span className="flex flex-wrap gap-x-3 gap-y-1">
                 {u.orders.map((o) => (
-                  <Link key={o.id} className="link" to={`/order/${o.id}`} onClick={onClose}>
+                  <Link key={o.id} className="link num" to={`/order/${o.id}`} onClick={onClose}>
                     {o.makroOrderNo}
                   </Link>
                 ))}
