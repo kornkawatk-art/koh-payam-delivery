@@ -19,6 +19,14 @@ async function retryIfExpired<T extends { error: { message: string } | null }>(
 }
 
 export async function enrollTotp() {
+  // Leaving this page before typing the code leaves an unverified factor
+  // behind, and enrolling again then fails ('A factor with the friendly name ""
+  // ... already exists') with no QR. Clear such leftovers first. Only
+  // unverified ones: a verified factor is the user's working 2FA.
+  const { data: list } = await supabase.auth.mfa.listFactors()
+  for (const f of list?.all ?? [])
+    if (f.factor_type === 'totp' && f.status === 'unverified')
+      await retryIfExpired(() => supabase.auth.mfa.unenroll({ factorId: f.id }))
   const { data, error } = await retryIfExpired(() =>
     supabase.auth.mfa.enroll({ factorType: 'totp' }),
   )

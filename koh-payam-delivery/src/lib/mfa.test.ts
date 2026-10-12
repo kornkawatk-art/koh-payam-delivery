@@ -7,6 +7,8 @@ vi.mock('./supabase', () => ({
       refreshSession: vi.fn(),
       mfa: {
         enroll: vi.fn(),
+        unenroll: vi.fn(),
+        listFactors: vi.fn(),
         challenge: vi.fn(),
         verify: vi.fn(),
       },
@@ -16,7 +18,7 @@ vi.mock('./supabase', () => ({
 
 const auth = supabase.auth as unknown as {
   refreshSession: ReturnType<typeof vi.fn>
-  mfa: Record<'enroll' | 'challenge' | 'verify', ReturnType<typeof vi.fn>>
+  mfa: Record<'enroll' | 'unenroll' | 'listFactors' | 'challenge' | 'verify', ReturnType<typeof vi.fn>>
 }
 
 const ENROLLED = {
@@ -35,6 +37,8 @@ const EXPIRED = {
 beforeEach(() => {
   auth.refreshSession.mockReset().mockResolvedValue({ data: { session: {} }, error: null })
   auth.mfa.enroll.mockReset().mockResolvedValue(ENROLLED)
+  auth.mfa.unenroll.mockReset().mockResolvedValue({ data: {}, error: null })
+  auth.mfa.listFactors.mockReset().mockResolvedValue({ data: { all: [], totp: [] }, error: null })
   auth.mfa.challenge.mockReset().mockResolvedValue({ data: { id: 'c1' }, error: null })
   auth.mfa.verify.mockReset().mockResolvedValue({ data: {}, error: null })
 })
@@ -75,4 +79,25 @@ test('verifyEnroll: an expired token on the challenge step is refreshed and retr
   expect(await verifyEnroll('f1', '123456')).toEqual({})
   expect(auth.refreshSession).toHaveBeenCalledTimes(1)
   expect(auth.mfa.verify).toHaveBeenCalledWith({ factorId: 'f1', challengeId: 'c1', code: '123456' })
+})
+
+// Leaving /2fa/setup before typing the code leaves an unverified factor
+// behind; the next enroll then fails with 'A factor with the friendly name ""
+// for this user already exists' and no QR shows. Clear leftovers first.
+test('enrollTotp removes a leftover unverified TOTP factor before enrolling', async () => {
+  auth.mfa.listFactors.mockResolvedValue({
+    data: {
+      all: [
+        { id: 'old', factor_type: 'totp', status: 'unverified' },
+        { id: 'good', factor_type: 'totp', status: 'verified' },
+      ],
+      totp: [{ id: 'good', factor_type: 'totp', status: 'verified' }],
+    },
+    error: null,
+  })
+  const r = await enrollTotp()
+  expect(auth.mfa.unenroll).toHaveBeenCalledTimes(1)
+  expect(auth.mfa.unenroll).toHaveBeenCalledWith({ factorId: 'old' })
+  expect(auth.mfa.unenroll.mock.invocationCallOrder[0]).toBeLessThan(auth.mfa.enroll.mock.invocationCallOrder[0])
+  expect(r.factorId).toBe('f1')
 })
