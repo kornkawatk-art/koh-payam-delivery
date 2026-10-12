@@ -348,6 +348,8 @@ pg_restore --no-owner --no-privileges --clean --if-exists \
 
 ### เพิ่ม / ลบ / เปลี่ยนบทบาทสมาชิกทีม
 
+> **คู่มือแบบ copy-paste ใช้อีเมล (แนะนำ):** [team-users-th.md](team-users-th.md)
+
 บทบาทมี 3 แบบ (คอลัมน์ `role` ในตาราง `public.profiles`):
 
 | role ในระบบ | เรียกในคู่มือ | เข้าถึงได้ |
