@@ -113,7 +113,7 @@ export default function BoatSetup() {
       <PageHeader
         title="ตั้งค่าเรือประจำวัน"
         icon={Anchor}
-        accent="amber"
+       
         actions={
           <input
             type="date"

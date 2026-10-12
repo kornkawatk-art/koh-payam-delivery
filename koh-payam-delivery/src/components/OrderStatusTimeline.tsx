@@ -41,9 +41,9 @@ export default function OrderStatusTimeline({
                 className={
                   'flex h-9 w-9 shrink-0 items-center justify-center rounded-full border-2 transition-colors ' +
                   (current
-                    ? 'border-brand bg-brand text-white shadow-pop'
+                    ? 'border-brand bg-brand text-on shadow-pop'
                     : done
-                      ? 'border-ok bg-ok text-white'
+                      ? 'border-ok bg-ok text-on'
                       : 'border-line-strong bg-surface text-ink-faint')
                 }
               >

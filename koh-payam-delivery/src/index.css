@@ -3,8 +3,67 @@
 @tailwind utilities;
 
 @layer base {
+  /* Colour tokens as RGB channels (tailwind.config.js reads them). Dark
+     values apply only when AppShell sets data-theme='dark' -- see
+     src/lib/theme.ts. Every --c-* needs both values (src/styles/tokens.test.ts). */
   :root {
     color-scheme: light;
+    --c-paper: 251 251 250; /* #fbfbfa */
+    --c-surface: 255 255 255; /* #ffffff */
+    --c-on: 255 255 255; /* #ffffff */
+    --c-ink: 23 23 23; /* #171717 */
+    --c-ink-soft: 106 106 106; /* #6a6a6a */
+    --c-ink-faint: 163 163 163; /* #a3a3a3 */
+    --c-line: 235 235 234; /* #ebebea */
+    --c-line-strong: 220 220 218; /* #dcdcda */
+    --c-brand: 154 106 28; /* #9a6a1c */
+    --c-brand-ink: 124 82 20; /* #7c5214 */
+    --c-brand-soft: 246 239 225; /* #f6efe1 */
+    --c-ok: 21 128 61; /* #15803d */
+    --c-ok-ink: 22 101 52; /* #166534 */
+    --c-ok-soft: 240 253 244; /* #f0fdf4 */
+    --c-warn: 180 83 9; /* #b45309 */
+    --c-warn-ink: 154 52 18; /* #9a3412 */
+    --c-warn-soft: 255 251 235; /* #fffbeb */
+    --c-danger: 185 28 28; /* #b91c1c */
+    --c-danger-ink: 153 27 27; /* #991b1b */
+    --c-danger-soft: 254 242 242; /* #fef2f2 */
+    --c-info: 29 78 216; /* #1d4ed8 */
+    --c-info-ink: 30 64 175; /* #1e40af */
+    --c-info-soft: 239 246 255; /* #eff6ff */
+    --c-chart-1: 139 92 246; /* #8b5cf6 */
+    --c-chart-2: 109 40 217; /* #6d28d9 */
+    --c-chart-3: 76 29 149; /* #4c1d95 */
+  }
+
+  html[data-theme='dark'] {
+    color-scheme: dark;
+    --c-paper: 18 18 18; /* #121212 */
+    --c-surface: 27 27 27; /* #1b1b1b */
+    --c-on: 15 15 15; /* #0f0f0f */
+    --c-ink: 237 237 237; /* #ededed */
+    --c-ink-soft: 161 161 161; /* #a1a1a1 */
+    --c-ink-faint: 108 108 108; /* #6c6c6c */
+    --c-line: 41 41 41; /* #292929 */
+    --c-line-strong: 56 56 56; /* #383838 */
+    --c-brand: 217 165 74; /* #d9a54a */
+    --c-brand-ink: 230 184 101; /* #e6b865 */
+    --c-brand-soft: 42 34 20; /* #2a2214 */
+    --c-ok: 74 222 128; /* #4ade80 */
+    --c-ok-ink: 134 239 172; /* #86efac */
+    --c-ok-soft: 19 38 26; /* #13261a */
+    --c-warn: 251 191 36; /* #fbbf24 */
+    --c-warn-ink: 252 211 77; /* #fcd34d */
+    --c-warn-soft: 42 34 16; /* #2a2210 */
+    --c-danger: 248 113 113; /* #f87171 */
+    --c-danger-ink: 252 165 165; /* #fca5a5 */
+    --c-danger-soft: 44 23 23; /* #2c1717 */
+    --c-info: 96 165 250; /* #60a5fa */
+    --c-info-ink: 147 197 253; /* #93c5fd */
+    --c-info-soft: 21 32 47; /* #15202f */
+    --c-chart-1: 139 92 246; /* #8b5cf6 */
+    --c-chart-2: 167 139 250; /* #a78bfa */
+    --c-chart-3: 196 181 253; /* #c4b5fd */
   }
 
   html {
@@ -38,7 +97,7 @@
   }
 
   ::selection {
-    background: #f0e2c8;
+    background: theme('colors.brand.soft');
   }
 
   /* Numeric-heavy UI: keep digits aligned in tables and counts. */
@@ -47,10 +106,17 @@
     font-variant-numeric: tabular-nums;
   }
 
+  /* PO numbers, phones, money, counts: monospace, digits aligned. */
+  .num,
+  .tnum {
+    font-family: theme('fontFamily.mono');
+    font-variant-numeric: tabular-nums;
+  }
+
   input,
   select,
   textarea {
-    @apply w-full rounded-lg border border-line bg-surface px-3 text-ink shadow-sm;
+    @apply w-full rounded-md border border-line-strong bg-surface px-3 text-ink;
     min-height: 2.75rem;
     transition: border-color 0.15s ease, box-shadow 0.15s ease;
   }
@@ -107,6 +173,12 @@
     background-color: theme('colors.ok.DEFAULT');
     background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='white' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3.5 8.4l3 3 6-6.6'/%3E%3C/svg%3E");
     background-size: 100% 100%;
+  }
+
+  /* Dark mode's green is light: draw the tick dark so it stays visible.
+     (A CSS variable can't reach inside a data URI.) */
+  html[data-theme='dark'] input[type='checkbox']:disabled:checked {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%230f0f0f' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3.5 8.4l3 3 6-6.6'/%3E%3C/svg%3E");
   }
 
   input[type='file'] {
@@ -167,15 +239,15 @@
   }
 
   .btn {
-    @apply inline-flex min-h-[2.75rem] cursor-pointer items-center justify-center gap-2 rounded-lg border border-transparent px-4 text-sm font-medium transition-[color,background-color,border-color,box-shadow,transform] duration-150 active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-50 disabled:active:scale-100;
+    @apply inline-flex min-h-[2.75rem] cursor-pointer items-center justify-center gap-2 rounded-md border border-transparent px-4 text-sm font-medium transition-[color,background-color,border-color,box-shadow,transform] duration-150 active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-50 disabled:active:scale-100;
   }
 
   .btn-primary {
-    @apply bg-ink text-white hover:bg-ink/90;
+    @apply bg-brand text-on hover:bg-brand/90;
   }
 
   .btn-secondary {
-    @apply border-line-strong bg-surface text-ink hover:bg-paper;
+    @apply border-line-strong bg-surface text-ink hover:border-ink-faint hover:bg-paper;
   }
 
   .btn-ghost {
@@ -183,15 +255,15 @@
   }
 
   .btn-danger {
-    @apply bg-danger text-white hover:bg-danger/90;
+    @apply bg-danger text-on hover:bg-danger/90;
   }
 
   .btn-ok {
-    @apply bg-ok text-white hover:bg-ok/90;
+    @apply bg-ok text-on hover:bg-ok/90;
   }
 
   .btn-warn {
-    @apply bg-warn text-white hover:bg-warn/90;
+    @apply bg-warn text-on hover:bg-warn/90;
   }
 
   .btn-sm {
@@ -221,7 +293,7 @@
   }
 
   .badge {
-    @apply inline-flex items-center gap-1 whitespace-nowrap rounded-full border px-2.5 py-0.5 text-xs font-medium;
+    @apply inline-flex items-center gap-1 whitespace-nowrap rounded-md border px-2 py-0.5 text-xs font-medium;
   }
 
   .badge-neutral {
@@ -235,7 +307,7 @@
   /* Final state (shipped): solid fill so it reads apart from the soft green
      "packed" badge at a glance, not just by its label. */
   .badge-ok-solid {
-    @apply border-ok bg-ok text-white;
+    @apply border-ok bg-ok text-on;
   }
 
   .badge-warn {
@@ -298,7 +370,7 @@
   }
 
   .data-table thead th {
-    @apply whitespace-nowrap border-b border-line bg-paper px-3 py-2.5 text-left text-xs font-semibold text-ink-soft;
+    @apply whitespace-nowrap border-b border-line bg-surface px-3 py-2.5 text-left font-mono text-[11px] font-medium uppercase tracking-wider text-ink-soft;
   }
 
   .data-table tbody td {
@@ -486,6 +558,41 @@
 }
 
 @media print {
+  /* Paper is always light: a sticker printed from dark mode matches light mode. */
+  html[data-theme='dark'] {
+    color-scheme: light;
+    --c-paper: 251 251 250; /* #fbfbfa */
+    --c-surface: 255 255 255; /* #ffffff */
+    --c-on: 255 255 255; /* #ffffff */
+    --c-ink: 23 23 23; /* #171717 */
+    --c-ink-soft: 106 106 106; /* #6a6a6a */
+    --c-ink-faint: 163 163 163; /* #a3a3a3 */
+    --c-line: 235 235 234; /* #ebebea */
+    --c-line-strong: 220 220 218; /* #dcdcda */
+    --c-brand: 154 106 28; /* #9a6a1c */
+    --c-brand-ink: 124 82 20; /* #7c5214 */
+    --c-brand-soft: 246 239 225; /* #f6efe1 */
+    --c-ok: 21 128 61; /* #15803d */
+    --c-ok-ink: 22 101 52; /* #166534 */
+    --c-ok-soft: 240 253 244; /* #f0fdf4 */
+    --c-warn: 180 83 9; /* #b45309 */
+    --c-warn-ink: 154 52 18; /* #9a3412 */
+    --c-warn-soft: 255 251 235; /* #fffbeb */
+    --c-danger: 185 28 28; /* #b91c1c */
+    --c-danger-ink: 153 27 27; /* #991b1b */
+    --c-danger-soft: 254 242 242; /* #fef2f2 */
+    --c-info: 29 78 216; /* #1d4ed8 */
+    --c-info-ink: 30 64 175; /* #1e40af */
+    --c-info-soft: 239 246 255; /* #eff6ff */
+    --c-chart-1: 139 92 246; /* #8b5cf6 */
+    --c-chart-2: 109 40 217; /* #6d28d9 */
+    --c-chart-3: 76 29 149; /* #4c1d95 */
+  }
+
+  body.printing-stickers {
+    background: #fff;
+  }
+
   body.printing-stickers > *:not(.sticker-print-root) {
     display: none !important;
   }

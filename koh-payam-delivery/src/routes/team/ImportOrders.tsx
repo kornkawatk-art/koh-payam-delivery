@@ -163,7 +163,7 @@ export default function ImportOrders() {
 
   return (
     <div className="flex flex-col gap-5">
-      <PageHeader title="นำเข้าออเดอร์" icon={UploadSimple} accent="emerald" />
+      <PageHeader title="นำเข้าออเดอร์" icon={UploadSimple} />
 
       <PaymentRefreshCard orderMapping={om} />
 

@@ -149,7 +149,7 @@ export default function ShortageReport() {
       <PageHeader
         title="รายงานของขาด"
         icon={ChartBar}
-        accent="violet"
+       
         actions={
           <button
             type="button"
@@ -296,7 +296,7 @@ function FilterChip({
     >
       {color && (
         <span
-          className="h-2.5 w-2.5 shrink-0 rounded-full ring-2 ring-white/70"
+          className="h-2.5 w-2.5 shrink-0 rounded-full ring-2 ring-on/70"
           style={{ backgroundColor: color }}
           aria-hidden="true"
         />
@@ -304,7 +304,7 @@ function FilterChip({
       {label}
       <span
         className={
-          'tnum rounded-full px-1.5 text-xs ' + (active ? 'bg-white/20' : 'bg-paper text-ink-soft')
+          'tnum rounded-full px-1.5 text-xs ' + (active ? 'bg-on/20' : 'bg-paper text-ink-soft')
         }
       >
         {count}

@@ -15,68 +15,48 @@ import {
 
 export type Role = 'packer' | 'pier' | 'manager'
 
-// One vivid identity color per destination (defined in tailwind.config.js
-// under `accent`) -- purely decorative wayfinding, never a status/semantic
-// meaning (that stays the ok/warn/danger/info tokens used elsewhere).
-export type NavAccent =
-  | 'indigo'
-  | 'emerald'
-  | 'amber'
-  | 'teal'
-  | 'rose'
-  | 'line'
-  | 'slate'
-  | 'violet'
-  | 'cyan'
-
-export const NAV: { path: string; label: string; roles: Role[]; icon: Icon; accent: NavAccent }[] =
+export const NAV: { path: string; label: string; roles: Role[]; icon: Icon }[] =
   [
-    { path: '/', label: 'งานวันนี้', roles: ['packer', 'pier', 'manager'], icon: House, accent: 'indigo' },
+    { path: '/', label: 'งานวันนี้', roles: ['packer', 'pier', 'manager'], icon: House },
     {
       path: '/import',
       label: 'นำเข้าออเดอร์',
       roles: ['packer', 'manager'],
       icon: UploadSimple,
-      accent: 'emerald',
     },
     {
       path: '/boats',
       label: 'ตั้งค่าเรือวันนี้',
       roles: ['pier', 'manager'],
       icon: Anchor,
-      accent: 'amber',
     },
-    { path: '/pier', label: 'ที่ท่าเรือ', roles: ['pier', 'manager'], icon: MapPin, accent: 'teal' },
-    { path: '/foam', label: 'ลังโฟม', roles: ['pier', 'manager'], icon: Package, accent: 'amber' },
-    { path: '/claims', label: 'คิวเคลม', roles: ['manager'], icon: Flag, accent: 'rose' },
-    { path: '/debts', label: 'ยอดค้างชำระ', roles: ['manager'], icon: Money, accent: 'rose' },
+    { path: '/pier', label: 'ที่ท่าเรือ', roles: ['pier', 'manager'], icon: MapPin },
+    { path: '/foam', label: 'ลังโฟม', roles: ['pier', 'manager'], icon: Package },
+    { path: '/claims', label: 'คิวเคลม', roles: ['manager'], icon: Flag },
+    { path: '/debts', label: 'ยอดค้างชำระ', roles: ['manager'], icon: Money },
     {
       path: '/line-contacts',
       label: 'ผู้ลงทะเบียน LINE',
       roles: ['manager'],
       icon: ChatCircle,
-      accent: 'line',
     },
     {
       path: '/audit-log',
       label: 'ประวัติการใช้งาน',
       roles: ['manager'],
       icon: ClockCounterClockwise,
-      accent: 'slate',
     },
     {
       path: '/shortage-report',
       label: 'รายงานของขาด',
       roles: ['manager'],
       icon: ChartBar,
-      accent: 'violet',
     },
     {
       path: '/customer-aliases',
       label: 'ชื่อย่อลูกค้า',
       roles: ['manager'],
       icon: Tag,
-      accent: 'cyan',
     },
   ]
 

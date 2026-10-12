@@ -25,7 +25,7 @@ export default function AuditLog() {
 
   return (
     <div className="flex flex-col gap-5">
-      <PageHeader title="ประวัติการใช้งาน" icon={ClockCounterClockwise} accent="slate" />
+      <PageHeader title="ประวัติการใช้งาน" icon={ClockCounterClockwise} />
 
       {failed ? (
         <p className="alert alert-danger">โหลดประวัติการใช้งานไม่สำเร็จ</p>

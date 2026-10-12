@@ -91,3 +91,36 @@ test('the menu shows the new logo (not "KP") and the app version', () => {
   expect(screen.queryByText('KP')).not.toBeInTheDocument()
   expect(screen.getByText('เวอร์ชัน dev')).toBeInTheDocument()
 })
+
+describe('dark mode switch', () => {
+  beforeEach(() => {
+    localStorage.clear()
+    document.documentElement.removeAttribute('data-theme')
+  })
+
+  test('light unless this device chose dark', () => {
+    renderShell()
+    expect(document.documentElement.hasAttribute('data-theme')).toBe(false)
+    expect(screen.getByRole('button', { name: 'โหมดมืด' })).toHaveAttribute('aria-pressed', 'false')
+  })
+
+  test('switching to dark applies it and remembers it on this device', async () => {
+    renderShell()
+    await userEvent.click(screen.getByRole('button', { name: 'โหมดมืด' }))
+    expect(document.documentElement.dataset.theme).toBe('dark')
+    expect(localStorage.getItem('theme')).toBe('dark')
+    const back = screen.getByRole('button', { name: 'โหมดสว่าง' })
+    expect(back).toHaveAttribute('aria-pressed', 'true')
+    await userEvent.click(back)
+    expect(document.documentElement.hasAttribute('data-theme')).toBe(false)
+    expect(localStorage.getItem('theme')).toBe('light')
+  })
+
+  test('a stored dark choice applies inside the team shell only, and is cleared on leaving it', () => {
+    localStorage.setItem('theme', 'dark')
+    const { unmount } = renderShell()
+    expect(document.documentElement.dataset.theme).toBe('dark')
+    unmount() // e.g. signed out to the login page, or a customer link
+    expect(document.documentElement.hasAttribute('data-theme')).toBe(false)
+  })
+})

@@ -4,6 +4,8 @@ export default {
   theme: {
     extend: {
       fontFamily: {
+        // PO numbers, phones, money, counts (.num); Thai inside falls back to Plex
+        mono: ['"JetBrains Mono"', '"IBM Plex Sans Thai"', 'ui-monospace', 'monospace'],
         sans: [
           'Inter',
           '"IBM Plex Sans Thai"',
@@ -14,69 +16,29 @@ export default {
           'sans-serif',
         ],
       },
+      // Every colour is a CSS variable (RGB channels, src/index.css) so dark
+      // mode only redefines the variables and opacity modifiers keep working.
       colors: {
-        paper: '#faf9f7',
-        surface: '#ffffff',
-        ink: {
-          DEFAULT: '#1c1917',
-          soft: '#57534e',
-          faint: '#a8a29e',
-        },
-        line: {
-          DEFAULT: '#e7e5e4',
-          strong: '#d6d3d1',
-        },
-        brand: {
-          DEFAULT: '#9a6a1c',
-          ink: '#7c5214',
-          soft: '#f6efe1',
-        },
-        ok: {
-          DEFAULT: '#15803d',
-          ink: '#166534',
-          soft: '#ecfdf3',
-        },
-        warn: {
-          DEFAULT: '#b45309',
-          ink: '#9a3412',
-          soft: '#fff5e9',
-        },
-        danger: {
-          DEFAULT: '#b91c1c',
-          ink: '#991b1b',
-          soft: '#fef2f2',
-        },
-        info: {
-          DEFAULT: '#1d4ed8',
-          ink: '#1e40af',
-          soft: '#eff4ff',
-        },
-        // Vivid, jewel-toned identity colors -- decorative accents (nav icons,
-        // section highlights), never status/semantic meaning (that stays
-        // ok/warn/danger/info above). Chosen distinctly from those four hues
-        // so an accent chip next to a status badge never reads as a status.
-        // One color per team nav destination, in src/lib/roles.ts's NAV order;
-        // `line` intentionally reuses LINE's own brand green so the LINE
-        // registrations menu is instantly recognizable.
-        accent: {
-          indigo: { DEFAULT: '#4f46e5', soft: '#eef2ff' },
-          emerald: { DEFAULT: '#059669', soft: '#ecfdf5' },
-          amber: { DEFAULT: '#d97706', soft: '#fffbeb' },
-          teal: { DEFAULT: '#0d9488', soft: '#f0fdfa' },
-          rose: { DEFAULT: '#e11d48', soft: '#fff1f2' },
-          line: { DEFAULT: '#06c755', soft: '#eafff2' },
-          slate: { DEFAULT: '#475569', soft: '#f1f5f9' },
-          violet: { DEFAULT: '#7c3aed', soft: '#f5f3ff' },
-          cyan: { DEFAULT: '#0891b2', soft: '#ecfeff' },
-        },
+        paper: 'rgb(var(--c-paper) / <alpha-value>)',
+        surface: 'rgb(var(--c-surface) / <alpha-value>)',
+        on: 'rgb(var(--c-on) / <alpha-value>)',
+        ink: { DEFAULT: 'rgb(var(--c-ink) / <alpha-value>)', soft: 'rgb(var(--c-ink-soft) / <alpha-value>)', faint: 'rgb(var(--c-ink-faint) / <alpha-value>)' },
+        line: { DEFAULT: 'rgb(var(--c-line) / <alpha-value>)', strong: 'rgb(var(--c-line-strong) / <alpha-value>)' },
+        brand: { DEFAULT: 'rgb(var(--c-brand) / <alpha-value>)', ink: 'rgb(var(--c-brand-ink) / <alpha-value>)', soft: 'rgb(var(--c-brand-soft) / <alpha-value>)' },
+        ok: { DEFAULT: 'rgb(var(--c-ok) / <alpha-value>)', ink: 'rgb(var(--c-ok-ink) / <alpha-value>)', soft: 'rgb(var(--c-ok-soft) / <alpha-value>)' },
+        warn: { DEFAULT: 'rgb(var(--c-warn) / <alpha-value>)', ink: 'rgb(var(--c-warn-ink) / <alpha-value>)', soft: 'rgb(var(--c-warn-soft) / <alpha-value>)' },
+        danger: { DEFAULT: 'rgb(var(--c-danger) / <alpha-value>)', ink: 'rgb(var(--c-danger-ink) / <alpha-value>)', soft: 'rgb(var(--c-danger-soft) / <alpha-value>)' },
+        // shortage charts' magnitude ramp: darker = more in light, brighter = more in dark
+        chart: { 1: 'rgb(var(--c-chart-1) / <alpha-value>)', 2: 'rgb(var(--c-chart-2) / <alpha-value>)', 3: 'rgb(var(--c-chart-3) / <alpha-value>)' },
+        info: { DEFAULT: 'rgb(var(--c-info) / <alpha-value>)', ink: 'rgb(var(--c-info-ink) / <alpha-value>)', soft: 'rgb(var(--c-info-soft) / <alpha-value>)' },
       },
       borderRadius: {
-        xl: '0.875rem',
-        '2xl': '1.125rem',
+        xl: '0.5rem',
+        '2xl': '0.625rem',
       },
       boxShadow: {
-        card: '0 1px 2px 0 rgb(28 25 23 / 0.04), 0 1px 3px 0 rgb(28 25 23 / 0.06)',
-        pop: '0 8px 30px -8px rgb(28 25 23 / 0.18)',
+        card: 'none', // borders carry the edges, Supabase-style
+        pop: '0 8px 24px -12px rgb(0 0 0 / 0.25)',
       },
       maxWidth: {
         page: '64rem',

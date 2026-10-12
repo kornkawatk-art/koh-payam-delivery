@@ -45,7 +45,7 @@ export default function CustomerAliases() {
 
   return (
     <div className="flex flex-col gap-5">
-      <PageHeader title="ชื่อย่อลูกค้า" icon={Tag} accent="cyan" />
+      <PageHeader title="ชื่อย่อลูกค้า" icon={Tag} />
       <p className="muted">
         ชื่อที่พิมพ์บนสติ๊กเกอร์ติดลัง (ชื่อที่คนเรือเรียก) — ตั้งครั้งเดียว ใช้กับทุกออเดอร์ของลูกค้ารายนั้น
         คนแพ็คตั้ง/แก้ได้ตอนกดพิมพ์สติ๊กเกอร์ด้วย

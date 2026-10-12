@@ -44,7 +44,7 @@ export default function Debts() {
     )
   }, [debts, q])
 
-  const header = <PageHeader title="ยอดค้างชำระ" icon={Money} accent="rose" />
+  const header = <PageHeader title="ยอดค้างชำระ" icon={Money} />
   if (debts === undefined) return <PageSkeleton rows={6} />
   if (debts === null)
     return (
@@ -61,7 +61,7 @@ export default function Debts() {
       {header}
       <p className="text-sm text-ink-soft">
         ลูกค้าค้างจ่าย {debts.length} ราย · ยอดค้างรวม{' '}
-        <strong className="text-ink">{formatTHB(total)}</strong>
+        <strong className="num text-ink">{formatTHB(total)}</strong>
       </p>
       <input
         className="min-w-0"
@@ -134,9 +134,9 @@ function DebtRow({
       >
         <Caret size={16} aria-hidden="true" />
         <span className="font-medium">{d.name}</span>
-        {d.phone && <span className="text-sm text-ink-soft">{d.phone}</span>}
+        {d.phone && <span className="num text-sm text-ink-soft">{d.phone}</span>}
         <span className="text-sm">{d.bills.length} บิล</span>
-        <strong>{formatTHB(d.total)}</strong>
+        <strong className="num">{formatTHB(d.total)}</strong>
         <span className="text-sm text-ink-soft">ค้าง {d.oldestDays} วัน</span>
         {d.lockedToday &&
           (releasedToday ? (
@@ -150,11 +150,11 @@ function DebtRow({
           <ul className="flex flex-col gap-1.5">
             {d.bills.map((b) => (
               <li key={b.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
-                <Link to={`/order/${b.id}`} className="font-medium underline">
+                <Link to={`/order/${b.id}`} className="num font-medium underline">
                   {b.makro_order_no}
                 </Link>
                 <span>ส่ง {formatDateTH(b.ship_date)}</span>
-                <span>{formatTHB(Number(b.outstanding_amount))}</span>
+                <span className="num">{formatTHB(Number(b.outstanding_amount))}</span>
                 <span className="text-ink-soft">{daysOwed(b.ship_date, today)} วัน</span>
                 <button
                   type="button"

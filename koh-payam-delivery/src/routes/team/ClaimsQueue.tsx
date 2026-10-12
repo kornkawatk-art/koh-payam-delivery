@@ -103,12 +103,12 @@ export default function ClaimsQueue() {
 
   return (
     <div className="flex flex-col gap-5">
-      <PageHeader title="คิวเคลม" icon={Flag} accent="rose" />
+      <PageHeader title="คิวเคลม" icon={Flag} />
 
       {outstandingFailed ? (
         <p className="alert alert-danger">โหลดจำนวนเคลมค้างอยู่ไม่สำเร็จ</p>
       ) : outstandingCount !== null ? (
-        <p className="inline-flex w-fit items-center gap-2 rounded-lg border border-accent-rose/25 bg-accent-rose-soft px-3 py-2 font-semibold text-accent-rose">
+        <p className="inline-flex w-fit items-center gap-2 rounded-lg border border-danger/25 bg-danger-soft px-3 py-2 font-semibold text-danger-ink">
           <Flag size={16} weight="fill" aria-hidden="true" />
           ค้างอยู่ {outstandingCount} รายการ
         </p>
@@ -152,9 +152,9 @@ export default function ClaimsQueue() {
                 const overdue =
                   c.status === 'open' && new Date(c.deadline_at).getTime() < now
                 return (
-                  <tr key={c.id} className={overdue ? 'bg-red-50' : undefined}>
+                  <tr key={c.id} className={overdue ? 'bg-danger-soft' : undefined}>
                     <td className="stack-lead whitespace-nowrap">
-                      <Link className="link" to={`/claims/${c.id}`}>
+                      <Link className="link num" to={`/claims/${c.id}`}>
                         {c.makro_order_no}
                       </Link>
                     </td>
@@ -202,7 +202,7 @@ export default function ClaimsQueue() {
                   const daysWaiting = Math.floor((now - new Date(b.createdAt).getTime()) / MS_PER_DAY)
                   const stale = daysWaiting > 7
                   return (
-                    <tr key={b.id} className={stale ? 'bg-red-50' : undefined}>
+                    <tr key={b.id} className={stale ? 'bg-danger-soft' : undefined}>
                       <td className="stack-lead">{b.customerName}</td>
                       <td data-label="สินค้า">
                         {b.productName} {backorderQty(b)}
