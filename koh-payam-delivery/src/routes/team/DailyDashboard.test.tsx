@@ -601,7 +601,7 @@ test('no popup when everyone was reached', async () => {
   expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
 })
 
-test('a Makro-returned order carries a red badge; a collected pickup counts as done', async () => {
+test('a Makro-returned order carries a red badge; a collected pickup shows on the pickup line, not the boat tiles', async () => {
   vi.mocked(listOrdersForDay).mockResolvedValueOnce([
     { id: '1', makro_order_no: 'PO-1', customer_name_en: 'RETURNED SHOP', island: 'payam', makro_order_status: 'Returned', status: 'imported', boat_id: null, paper_box_count: 0, foam_box_count: 0, piece_count: 0, outstanding_amount: 0, customer_phone: '01' },
     { id: '2', makro_order_no: 'PO-2', customer_name_en: 'PICKED SHOP', island: 'payam', is_pickup: true, status: 'picked_up', boat_id: null, paper_box_count: 0, foam_box_count: 0, piece_count: 0, outstanding_amount: 0, customer_phone: '02' },
@@ -609,8 +609,9 @@ test('a Makro-returned order carries a red badge; a collected pickup counts as d
   renderPage()
   const row = (await screen.findByText('RETURNED SHOP')).closest('tr') as HTMLElement
   expect(within(row).getByText('แม็คโคร: คืนสินค้า')).toHaveClass('badge-danger')
-  // packed tile: the picked-up order counts as done, the returned one doesn't
-  expect(screen.getByText('1/2')).toBeInTheDocument()
+  // boat tiles: only the returned (unpacked) boat order; the pickup is on its own line
+  expect(screen.getAllByText('0/1').length).toBeGreaterThan(0)
+  expect(screen.getByText('รับเองที่สาขา 1 (รับแล้ว 1)')).toBeInTheDocument()
 })
 
 test('"print all stickers" counts customers and stickers still due, and opens the batch dialog', async () => {
@@ -638,4 +639,31 @@ test('the sticker button explains a zero: nothing packed yet, or everything alre
   renderPage()
   expect(await screen.findByText('พิมพ์ครบทุกเจ้าแล้ว')).toBeInTheDocument()
   expect(screen.getByRole('button', { name: 'พิมพ์สติ๊กเกอร์ (0 เจ้า · 0 ดวง)' })).toBeEnabled() // still opens, for a reprint
+})
+
+test('store pickups stay out of the boat tiles: own line under them, own section at the end of the table', async () => {
+  const row = (id: string, name: string, status: string, is_pickup = false) => ({
+    id, makro_order_no: 'PO-' + id, customer_name_en: name, island: 'payam', status, is_pickup, boat_id: null,
+    paper_box_count: 1, foam_box_count: 0, piece_count: 0, outstanding_amount: 0, customer_phone: '0' + id,
+  })
+  vi.mocked(listOrdersForDay).mockResolvedValueOnce([
+    row('1', 'BOAT SHIPPED', 'shipped'),
+    row('2', 'BOAT PACKED', 'packed'),
+    row('3', 'PICKUP WAITING', 'imported', true),
+    row('4', 'PICKUP DONE', 'picked_up', true),
+  ])
+  renderPage()
+  await screen.findByText('BOAT SHIPPED')
+  // tiles count the 2 boat orders only
+  expect(screen.getByText('2/2')).toBeInTheDocument() // packed
+  expect(screen.getAllByText('1/2')).toHaveLength(2) // at pier, shipped
+  expect(screen.getByText('รับเองที่สาขา 2 (รับแล้ว 1)')).toBeInTheDocument()
+
+  const cells = Array.from(screen.getByRole('table').querySelectorAll('td')).map((c) => c.textContent ?? '')
+  const pickupHeader = cells.findIndex((t) => t === 'รับเองที่สาขา (2)')
+  expect(pickupHeader).toBeGreaterThan(cells.findIndex((t) => t.startsWith('BOAT PACKED')))
+  expect(cells.findIndex((t) => t.startsWith('PICKUP WAITING'))).toBeGreaterThan(pickupHeader)
+  expect(cells.findIndex((t) => t.startsWith('PICKUP DONE'))).toBeGreaterThan(pickupHeader)
+  // a waiting pickup is not part of the "ยังไม่แพ็ค" boat queue
+  expect(cells).not.toContain('ยังไม่แพ็ค (1)')
 })

@@ -124,14 +124,18 @@ export default function DailyDashboard() {
     }
   }, [date, load])
 
+  // The tiles track the boat run only; store pickups never reach the pier,
+  // so they get their own line instead of holding the tiles short forever.
   const counts = useMemo(() => {
-    const r = rows ?? []
+    const r = (rows ?? []).filter((o) => !o.is_pickup)
+    const pickups = (rows ?? []).filter((o) => o.is_pickup)
     return {
       total: r.length,
-      // a collected store pickup is done too
-      packed: r.filter((o) => ['packed', 'at_pier', 'shipped', 'picked_up'].includes(o.status)).length,
+      packed: r.filter((o) => ['packed', 'at_pier', 'shipped'].includes(o.status)).length,
       atPier: r.filter((o) => ['at_pier', 'shipped'].includes(o.status)).length,
       shipped: r.filter((o) => o.status === 'shipped').length,
+      pickups: pickups.length,
+      pickedUp: pickups.filter((o) => o.status === 'picked_up').length,
     }
   }, [rows])
 
@@ -168,8 +172,12 @@ export default function DailyDashboard() {
   // is obvious at a glance; everything past "packed" (packed/at_pier/shipped
   // -- same grouping as the counts.packed tile above) sinks below a divider.
   // A customer group stays on top while any of its POs is still just imported.
-  const notPacked = useMemo(() => filtered.filter((e) => entryHasUnpacked(e)), [filtered])
-  const packedOrAhead = useMemo(() => filtered.filter((e) => !entryHasUnpacked(e)), [filtered])
+  // A customer whose every PO is a store pickup gets its own section at the end.
+  const isPickupEntry = (e: DayEntry<any>) => entryOrders(e).every((o) => o.is_pickup)
+  const boatEntries = useMemo(() => filtered.filter((e) => !isPickupEntry(e)), [filtered])
+  const pickupEntries = useMemo(() => filtered.filter(isPickupEntry), [filtered])
+  const notPacked = useMemo(() => boatEntries.filter((e) => entryHasUnpacked(e)), [boatEntries])
+  const packedOrAhead = useMemo(() => boatEntries.filter((e) => !entryHasUnpacked(e)), [boatEntries])
 
   if (failed)
     return (
@@ -252,6 +260,11 @@ export default function DailyDashboard() {
           barClass="bg-ok"
         />
       </div>
+      {counts.pickups > 0 && (
+        <p className="-mt-2 text-sm text-ink-soft">
+          รับเองที่สาขา {counts.pickups} (รับแล้ว {counts.pickedUp})
+        </p>
+      )}
 
       {linksSentAt === null && rows.length > 0 && (
         <div className="alert alert-warn">
@@ -402,6 +415,16 @@ export default function DailyDashboard() {
                 </tr>
               )}
               {packedOrAhead.map((e) => (
+                <EntryRows key={entryKey(e)} entry={e} date={date} showIsland={showIslandFilter} />
+              ))}
+              {pickupEntries.length > 0 && (
+                <tr className="row-divider">
+                  <td colSpan={7} className="bg-paper text-xs font-semibold text-ink-soft">
+                    รับเองที่สาขา ({pickupEntries.length})
+                  </td>
+                </tr>
+              )}
+              {pickupEntries.map((e) => (
                 <EntryRows key={entryKey(e)} entry={e} date={date} showIsland={showIslandFilter} />
               ))}
             </tbody>
