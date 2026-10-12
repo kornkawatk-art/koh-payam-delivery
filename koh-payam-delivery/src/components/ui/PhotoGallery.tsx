@@ -71,7 +71,7 @@ export function PhotoGallery({ photos, labels = TH }: { photos: GalleryPhoto[]; 
 
       {current && (
         <div
-          className="fixed inset-0 z-50 flex touch-pan-y items-center justify-center bg-ink/85 p-4"
+          className="fixed inset-0 z-50 flex touch-pan-y items-center justify-center bg-black/85 p-4"
           role="dialog"
           aria-modal="true"
           aria-label={current.alt}

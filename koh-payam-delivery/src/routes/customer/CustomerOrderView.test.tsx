@@ -312,7 +312,7 @@ test('the foam box reminder names Makro in Thai too', async () => {
   renderAt()
   const box = await screen.findByText('คุณมีลังโฟมของแม็คโครค้างอยู่ 2 ใบ กรุณาคืนกับเรือ')
   // red background, white text -- meant to stand out on the page
-  expect(box).toHaveClass('bg-danger', 'text-white')
+  expect(box).toHaveClass('bg-danger', 'text-on') // text-on is white on (always-light) customer pages
 })
 
 test('a collected store pickup says so instead of the delivery timeline, and offers no claim', async () => {

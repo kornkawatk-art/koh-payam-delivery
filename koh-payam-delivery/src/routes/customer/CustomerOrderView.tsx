@@ -110,7 +110,7 @@ export default function CustomerOrderView() {
           onClick={() => switchLang('en')}
           className={
             'px-3 py-1.5 font-medium transition-colors ' +
-            (lang === 'en' ? 'bg-ink text-white' : 'text-ink-soft hover:bg-paper')
+            (lang === 'en' ? 'bg-ink text-surface' : 'text-ink-soft hover:bg-paper')
           }
         >
           EN
@@ -119,7 +119,7 @@ export default function CustomerOrderView() {
           onClick={() => switchLang('th')}
           className={
             'px-3 py-1.5 font-medium transition-colors ' +
-            (lang === 'th' ? 'bg-ink text-white' : 'text-ink-soft hover:bg-paper')
+            (lang === 'th' ? 'bg-ink text-surface' : 'text-ink-soft hover:bg-paper')
           }
         >
           ไทย
@@ -221,7 +221,7 @@ export default function CustomerOrderView() {
 
       <section className="flex flex-col gap-3" aria-label={t(lang, 'boxes')}>
         {(data.foamBoxesOutstanding ?? 0) > 0 && (
-          <p className="rounded-lg bg-danger px-3 py-2.5 text-sm font-semibold text-white">
+          <p className="rounded-lg bg-danger px-3 py-2.5 text-sm font-semibold text-on">
             {t(lang, 'foam_owed', { n: data.foamBoxesOutstanding! })}
           </p>
         )}

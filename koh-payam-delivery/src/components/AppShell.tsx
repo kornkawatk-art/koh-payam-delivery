@@ -61,7 +61,7 @@ export default function AppShell() {
       {/* Drawer scrim (mobile only) */}
       {open && (
         <div
-          className="fixed inset-0 z-30 bg-ink/30 lg:hidden"
+          className="fixed inset-0 z-30 bg-black/50 lg:hidden"
           aria-hidden="true"
           onClick={() => setOpen(false)}
         />
@@ -120,7 +120,7 @@ export default function AppShell() {
                             className={
                               'ml-auto min-w-[1.375rem] rounded-full px-1.5 py-0.5 text-center text-xs font-semibold tnum ' +
                               (URGENT_NAV_PATHS.includes(n.path)
-                                ? 'bg-danger text-white'
+                                ? 'bg-danger text-on'
                                 : 'bg-line text-ink-soft')
                             }
                             aria-label={`ค้าง ${counts[n.path]}`}

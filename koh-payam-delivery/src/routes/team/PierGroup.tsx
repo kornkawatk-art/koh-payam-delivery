@@ -277,7 +277,7 @@ export default function PierGroup({
                   className={
                     'min-h-[3.25rem] rounded-xl border px-5 text-lg font-medium transition-colors ' +
                     (boatId === b.id
-                      ? 'border-ink bg-ink text-white'
+                      ? 'border-ink bg-ink text-surface'
                       : 'border-line-strong bg-surface hover:bg-paper')
                   }
                 >

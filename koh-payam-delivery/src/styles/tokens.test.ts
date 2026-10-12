@@ -23,3 +23,12 @@ test('Tailwind colours come from the variables (no hex), and the per-menu accent
   expect(colors).not.toMatch(/#[0-9a-fA-F]{3,6}/)
   expect(colors).not.toMatch(/accent/)
 })
+
+test('printing puts every light value back, so stickers from dark mode print the same', () => {
+  const print = css.slice(css.indexOf('@media print'))
+  const body = print.slice(print.indexOf("html[data-theme='dark'] {"), print.indexOf('}'))
+  const lightBlock = css.slice(css.indexOf(':root {'), css.indexOf('}', css.indexOf(':root {')))
+  const pairs = (b: string) => [...b.matchAll(/(--c-[a-z-]+):\s*([\d ]+);/g)].map((m) => `${m[1]}=${m[2]}`).sort()
+  expect(pairs(body)).toEqual(pairs(lightBlock))
+  expect(pairs(body).length).toBeGreaterThan(20)
+})

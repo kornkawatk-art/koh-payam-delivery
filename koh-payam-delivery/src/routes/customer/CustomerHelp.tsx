@@ -66,7 +66,7 @@ export default function CustomerHelp() {
                 onClick={() => switchLang(l)}
                 className={
                   'px-3 py-1.5 font-medium transition-colors ' +
-                  (lang === l ? 'bg-ink text-white' : 'text-ink-soft hover:bg-paper')
+                  (lang === l ? 'bg-ink text-surface' : 'text-ink-soft hover:bg-paper')
                 }
               >
                 {l === 'en' ? 'EN' : 'ไทย'}
