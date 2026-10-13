@@ -11,12 +11,15 @@ export function StatTile({
   value,
   emphasis,
   danger,
+  warn,
 }: {
   label: string
   value: ReactNode
   emphasis?: boolean
   /** a figure that needs action now (e.g. claims past their reply time) */
   danger?: boolean
+  /** a figure worth attention but not urgent (e.g. names still missing) */
+  warn?: boolean
 }) {
   return (
     <div
@@ -24,14 +27,17 @@ export function StatTile({
         'flex flex-col gap-0.5 rounded-lg px-3 py-2.5 ' +
         (danger
           ? 'bg-danger-soft ring-1 ring-danger/25'
-          : emphasis
+          : warn
+            ? 'bg-warn-soft ring-1 ring-warn/25'
+            : emphasis
             ? 'bg-brand-soft ring-1 ring-brand/25'
             : 'bg-paper ring-1 ring-line')
       }
     >
       <dt
         className={
-          'text-xs font-medium ' + (danger ? 'text-danger-ink' : emphasis ? 'text-brand-ink' : 'text-ink-soft')
+          'text-xs font-medium ' +
+          (danger ? 'text-danger-ink' : warn ? 'text-warn-ink' : emphasis ? 'text-brand-ink' : 'text-ink-soft')
         }
       >
         {label}

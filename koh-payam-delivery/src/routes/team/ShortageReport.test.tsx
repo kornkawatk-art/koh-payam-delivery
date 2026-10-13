@@ -97,10 +97,53 @@ test('shows the three summary tiles', async () => {
   expect(value('สินค้าที่ขาด')).toHaveTextContent(/^3$/)
   expect(value('ขาดทั้งหมด (ครั้ง)')).toHaveTextContent(/^4$/)
   expect(value('ออเดอร์ที่ได้รับผลกระทบ')).toHaveTextContent(/^3$/)
+  expect(value('แผนกที่ขาดบ่อยสุด')).toHaveTextContent('FV')
 })
 
-test('renders one section per department, products in ranked order with item code and "ขาด N ครั้ง"', async () => {
+const byDept = async () => {
+  await screen.findByText('มะพร้าว')
+  await userEvent.click(within(screen.getByRole('group', { name: 'มุมมอง' })).getByRole('button', { name: 'แยกตามแผนก' }))
+}
+
+test('opens on one ranked list across departments, most often short first, each with its department', async () => {
   renderPage()
+  const list = await screen.findByRole('region', { name: 'อันดับสินค้าที่ขาด' })
+  const rows = within(list).getAllByRole('listitem')
+  expect(rows.map((r) => within(r).getByRole('button').textContent)).toEqual([
+    expect.stringContaining('มะพร้าว'),
+    expect.stringContaining('มะม่วง'), // tie on count with สบู่: more quantity first
+    expect.stringContaining('สบู่'),
+  ])
+  expect(rows[0]).toHaveTextContent('FV')
+  expect(rows[2]).toHaveTextContent('ไม่ทราบแผนก')
+  expect(within(screen.getByRole('group', { name: 'มุมมอง' })).getByRole('button', { name: 'รวมทุกแผนก' })).toHaveAttribute(
+    'aria-pressed',
+    'true',
+  )
+  expect(screen.queryByRole('region', { name: 'แผนก FV' })).not.toBeInTheDocument()
+})
+
+test('the ranked list shows the top 20 and can show all', async () => {
+  const many = Array.from({ length: 25 }, (_, i) => ({
+    key: `k${i}`,
+    itemId: `${i}`,
+    productName: `สินค้า ${String(i).padStart(2, '0')}`,
+    dept: 'FV' as const,
+    totalQty: 1,
+    orderCount: 30 - i,
+    details: [],
+  }))
+  getShortageReport.mockResolvedValue({ ...report, productCount: 25, groups: [{ code: 'FV', label: 'FV', occurrenceCount: 99, products: many }] })
+  renderPage()
+  const list = await screen.findByRole('region', { name: 'อันดับสินค้าที่ขาด' })
+  expect(within(list).getAllByRole('listitem')).toHaveLength(20)
+  await userEvent.click(within(list).getByRole('button', { name: 'แสดงทั้งหมด 25 รายการ' }))
+  expect(within(list).getAllByRole('listitem')).toHaveLength(25)
+})
+
+test('by department: one section per department, products in ranked order with item code and "ขาด N ครั้ง"', async () => {
+  renderPage()
+  await byDept()
   const fv = await screen.findByRole('region', { name: 'แผนก FV' })
   const names = within(fv)
     .getAllByText(/มะพร้าว|มะม่วง/)
@@ -115,13 +158,23 @@ test('renders one section per department, products in ranked order with item cod
 
 test('the unknown-department section explains how to fill in the department', async () => {
   renderPage()
+  await byDept()
   const unknown = await screen.findByRole('region', { name: 'แผนก ไม่ทราบแผนก' })
   expect(within(unknown).getByText(/นำเข้าไฟล์ของวันนั้นซ้ำ/)).toBeInTheDocument()
 })
 
-test('department filter chips narrow the page to one department', async () => {
+test('department filter chips narrow the ranked list to one department', async () => {
   renderPage()
-  await screen.findByText('มะพร้าว')
+  const list = await screen.findByRole('region', { name: 'อันดับสินค้าที่ขาด' })
+  const chips0 = screen.getByRole('group', { name: 'กรองตามแผนก' })
+  await userEvent.click(within(chips0).getByRole('button', { name: /^ไม่ทราบแผนก/ }))
+  expect(within(list).getAllByRole('listitem')).toHaveLength(1)
+  expect(within(list).getByText('สบู่')).toBeInTheDocument()
+})
+
+test('department filter chips narrow the by-department view to one department', async () => {
+  renderPage()
+  await byDept()
   const chips = screen.getByRole('group', { name: 'กรองตามแผนก' })
   await userEvent.click(within(chips).getByRole('button', { name: /^FV/ }))
   expect(screen.getByRole('region', { name: 'แผนก FV' })).toBeInTheDocument()
@@ -177,6 +230,8 @@ test('changing either date input re-fetches with the new range', async () => {
 test('"คัดลอกสรุป" copies that department as LINE-ready text and confirms', async () => {
   const user = userEvent.setup()
   renderPage()
+  await screen.findByText('มะพร้าว')
+  await user.click(within(screen.getByRole('group', { name: 'มุมมอง' })).getByRole('button', { name: 'แยกตามแผนก' }))
   const fv = await screen.findByRole('region', { name: 'แผนก FV' })
   await user.click(within(fv).getByRole('button', { name: 'คัดลอกสรุป' }))
   const text = await navigator.clipboard.readText()
@@ -207,14 +262,6 @@ test('shows a Thai error on a load failure', async () => {
   getShortageReport.mockReset().mockRejectedValueOnce(new Error('nope'))
   renderPage()
   expect(await screen.findByText('โหลดรายงานของขาดไม่สำเร็จ')).toBeInTheDocument()
-})
-
-test('tapping a department bar in the chart filters the list to that department', async () => {
-  renderPage()
-  await screen.findByText('มะพร้าว')
-  await userEvent.click(screen.getByRole('button', { name: /^FV: ขาด 3 ครั้ง/ }))
-  expect(screen.getByRole('region', { name: 'แผนก FV' })).toBeInTheDocument()
-  expect(screen.queryByRole('region', { name: 'แผนก ไม่ทราบแผนก' })).not.toBeInTheDocument()
 })
 
 test('changing the range keeps the previous report on screen (marked busy) until the new one arrives', async () => {

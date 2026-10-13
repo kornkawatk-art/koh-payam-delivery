@@ -1,33 +1,5 @@
 import { fireEvent, render, screen, within } from '@testing-library/react'
-import userEvent from '@testing-library/user-event'
-import { DeptBarChart, TrendColumnChart, rampClass } from './ShortageCharts'
-import { DEPT_COLORS } from '../../lib/departments'
-
-const bars = [
-  { code: 'FZ' as const, label: 'FZ', occurrences: 6, products: 3 },
-  { code: 'FV' as const, label: 'FV', occurrences: 2, products: 1 },
-]
-
-test('department bars: one labeled button per department with its count, in the given order', () => {
-  render(<DeptBarChart bars={bars} active="ALL" onSelect={() => {}} />)
-  const buttons = screen.getAllByRole('button')
-  expect(buttons.map((b) => b.getAttribute('aria-label'))).toEqual([
-    'FZ: ขาด 6 ครั้ง, 3 รายการ',
-    'FV: ขาด 2 ครั้ง, 1 รายการ',
-  ])
-})
-
-test('department bars: tapping selects that department; tapping the selected one clears the filter', async () => {
-  const onSelect = vi.fn()
-  const { rerender } = render(<DeptBarChart bars={bars} active="ALL" onSelect={onSelect} />)
-  await userEvent.click(screen.getByRole('button', { name: /^FV/ }))
-  expect(onSelect).toHaveBeenLastCalledWith('FV')
-
-  rerender(<DeptBarChart bars={bars} active="FV" onSelect={onSelect} />)
-  expect(screen.getByRole('button', { name: /^FV/ })).toHaveAttribute('aria-pressed', 'true')
-  await userEvent.click(screen.getByRole('button', { name: /^FV/ }))
-  expect(onSelect).toHaveBeenLastCalledWith('ALL')
-})
+import { TrendColumnChart, rampClass } from './ShortageCharts'
 
 const trend = {
   unit: 'day' as const,
@@ -78,22 +50,7 @@ test('rampClass: color follows magnitude -- chart-1 for the lowest third, chart-
   expect(rampClass(0, 0)).toBe('bg-chart-1')
 })
 
-test('department bars: each bar wears its own department color; once one is picked the others go gray', () => {
-  const { container, rerender } = render(<DeptBarChart bars={bars} active="ALL" onSelect={() => {}} />)
-  const fills = () => Array.from(container.querySelectorAll<HTMLElement>('li span.absolute'))
-  expect(fills()[0]).toHaveStyle({ backgroundColor: DEPT_COLORS.FZ })
-  expect(fills()[1]).toHaveStyle({ backgroundColor: DEPT_COLORS.FV })
-
-  rerender(<DeptBarChart bars={bars} active="FV" onSelect={() => {}} />)
-  expect(fills()[0]).toHaveClass('bg-line-strong') // FZ steps back to gray
-  expect(fills()[0].style.backgroundColor).toBe('')
-  expect(fills()[1]).toHaveStyle({ backgroundColor: DEPT_COLORS.FV }) // the picked one keeps its color
-})
-
-test('only the trend chart shows the น้อย-มาก color key (department colors are identity, not magnitude)', () => {
-  const { unmount } = render(<DeptBarChart bars={bars} active="ALL" onSelect={() => {}} />)
-  expect(screen.queryByText(/น้อย/)).not.toBeInTheDocument()
-  unmount()
+test('the trend chart shows the น้อย-มาก color key', () => {
   render(<TrendColumnChart trend={trend} />)
   expect(screen.getByText(/น้อย/)).toBeInTheDocument()
 })

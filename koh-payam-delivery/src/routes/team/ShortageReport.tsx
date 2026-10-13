@@ -22,8 +22,8 @@ import { EmptyState } from '../../components/ui/EmptyState'
 import { StatTile } from '../../components/ui/Stat'
 import { Notice, flash, type Flash } from '../../components/ui/Notice'
 import { formatDateTH } from '../../lib/format'
-import { deptBars, shortageTrend } from '../../lib/shortageCharts'
-import { DeptBarChart, TrendColumnChart } from '../../components/charts/ShortageCharts'
+import { deptBars, rankProducts, shortageTrend } from '../../lib/shortageCharts'
+import { TrendColumnChart } from '../../components/charts/ShortageCharts'
 
 // Calendar-local ISO date (not UTC) -- same convention as format.ts's
 // todayLocalISO.
@@ -42,6 +42,9 @@ type Preset = { id: string; label: string; range: () => [string, string] }
 // A cleared date field is ignored (keeps the last valid date); a "from" after
 // the "to" is swapped rather than silently returning an empty report.
 const ordered = (a: string, b: string): [string, string] => (a <= b ? [a, b] : [b, a])
+
+/** The ranked list shows this many first. */
+const TOP_N = 20
 
 const PRESETS: Preset[] = [
   { id: 'today', label: 'วันนี้', range: () => [daysAgo(0), daysAgo(0)] },
@@ -77,6 +80,9 @@ export default function ShortageReport() {
   const [deptFilter, setDeptFilter] = useState<DeptGroupCode | 'ALL'>('ALL')
   const [openKey, setOpenKey] = useState<string | null>(null)
   const [exportMsg, setExportMsg] = useState<Flash>()
+  // 'rank' = one list across departments (default); 'dept' = a section per department
+  const [view, setView] = useState<'rank' | 'dept'>('rank')
+  const [showAll, setShowAll] = useState(false)
 
   const [loading, setLoading] = useState(true)
   const latest = useRef(0)
@@ -94,6 +100,7 @@ export default function ShortageReport() {
     setFailed(false)
     setLoading(true)
     setOpenKey(null)
+    setShowAll(false)
     return getShortageReport(rangeFrom, rangeTo)
       .then((r) => {
         if (req === latest.current) setReport(r)
@@ -109,6 +116,9 @@ export default function ShortageReport() {
   useEffect(() => {
     void load()
   }, [load])
+
+  // a new department starts again from its top 20
+  useEffect(() => setShowAll(false), [deptFilter])
 
   const activePreset = PRESETS.find((p) => {
     const [f, t] = p.range()
@@ -128,7 +138,12 @@ export default function ShortageReport() {
     [report],
   )
 
-  const bars = useMemo(() => (report ? deptBars(report) : []), [report])
+  const topDept = useMemo(() => (report ? deptBars(report)[0] : undefined), [report])
+  const ranked = useMemo(() => (report ? rankProducts(report, deptFilter) : []), [report, deptFilter])
+  const deptLabel = useMemo(
+    () => new Map((report?.groups ?? []).map((g) => [g.code, g.label] as const)),
+    [report],
+  )
   const trend = useMemo(
     () => (report ? shortageTrend(report, rangeFrom, rangeTo) : null),
     [report, rangeFrom, rangeTo],
@@ -217,15 +232,50 @@ export default function ShortageReport() {
           className={'flex flex-col gap-5 transition-opacity ' + (loading ? 'opacity-60' : '')}
           aria-busy={loading}
         >
-          <dl className="grid grid-cols-3 gap-2 sm:gap-3">
+          <dl className="grid grid-cols-2 gap-2 sm:grid-cols-4 sm:gap-3">
             <StatTile label="สินค้าที่ขาด" value={report.productCount} />
             <StatTile label="ขาดทั้งหมด (ครั้ง)" value={report.occurrenceCount} emphasis />
             <StatTile label="ออเดอร์ที่ได้รับผลกระทบ" value={report.affectedOrderCount} />
+            <StatTile
+              label="แผนกที่ขาดบ่อยสุด"
+              value={
+                topDept ? (
+                  <span className="flex items-center gap-2 text-base">
+                    <span
+                      className="h-2.5 w-2.5 shrink-0 rounded-full"
+                      style={{ backgroundColor: DEPT_COLORS[topDept.code] }}
+                      aria-hidden="true"
+                    />
+                    <span className="truncate">{topDept.label}</span>
+                  </span>
+                ) : (
+                  '–'
+                )
+              }
+            />
           </dl>
 
-          <div className="grid gap-4 lg:grid-cols-2">
-            <DeptBarChart bars={bars} active={deptFilter} onSelect={setDeptFilter} />
-            {trend && <TrendColumnChart key={`${rangeFrom}_${rangeTo}`} trend={trend} />}
+          {trend && <TrendColumnChart key={`${rangeFrom}_${rangeTo}`} trend={trend} />}
+
+          <div role="group" aria-label="มุมมอง" className="inline-flex w-fit overflow-hidden rounded-lg border border-line-strong">
+            {(
+              [
+                ['rank', 'รวมทุกแผนก'],
+                ['dept', 'แยกตามแผนก'],
+              ] as const
+            ).map(([v, label]) => (
+              <button
+                key={v}
+                type="button"
+                aria-pressed={view === v}
+                onClick={() => setView(v)}
+                className={
+                  'min-h-[2.5rem] px-4 text-sm ' + (view === v ? 'bg-ink font-semibold text-surface' : 'bg-surface text-ink-soft')
+                }
+              >
+                {label}
+              </button>
+            ))}
           </div>
 
           <div
@@ -251,6 +301,32 @@ export default function ShortageReport() {
             ))}
           </div>
 
+          {view === 'rank' ? (
+            <section aria-label="อันดับสินค้าที่ขาด" className="table-wrap">
+              <ol>
+                {(showAll ? ranked : ranked.slice(0, TOP_N)).map((p, i) => (
+                  <ProductRow
+                    key={`${p.dept}:${p.key}`}
+                    rank={i + 1}
+                    product={p}
+                    maxCount={maxCount}
+                    deptName={deptLabel.get(p.dept)}
+                    open={openKey === `${p.dept}:${p.key}`}
+                    onToggle={() => setOpenKey((cur) => (cur === `${p.dept}:${p.key}` ? null : `${p.dept}:${p.key}`))}
+                  />
+                ))}
+              </ol>
+              {!showAll && ranked.length > TOP_N && (
+                <button
+                  type="button"
+                  className="w-full border-t border-line py-3 text-sm font-semibold text-brand-ink hover:bg-paper"
+                  onClick={() => setShowAll(true)}
+                >
+                  แสดงทั้งหมด {ranked.length} รายการ
+                </button>
+              )}
+            </section>
+          ) : (
           <div className="flex flex-col gap-4">
             {visibleGroups.map((g) => (
               <DeptSection
@@ -264,6 +340,7 @@ export default function ShortageReport() {
               />
             ))}
           </div>
+          )}
         </div>
       )}
     </div>
@@ -402,12 +479,15 @@ function ProductRow({
   maxCount,
   open,
   onToggle,
+  deptName,
 }: {
   rank: number
   product: ShortageProductRow
   maxCount: number
   open: boolean
   onToggle: () => void
+  /** shown in the across-departments list, where rows mix departments */
+  deptName?: string
 }) {
   return (
     <li className="border-b border-line last:border-b-0">
@@ -422,7 +502,19 @@ function ProductRow({
         </span>
         <span className="flex min-w-0 flex-1 flex-col gap-1">
           <span className="font-medium text-ink">{p.productName}</span>
-          {p.itemId && <span className="tnum text-xs text-ink-soft">{p.itemId}</span>}
+          <span className="flex flex-wrap items-center gap-x-2 text-xs text-ink-soft">
+            {p.itemId && <span className="tnum">{p.itemId}</span>}
+            {deptName && (
+              <span className="inline-flex items-center gap-1.5">
+                <span
+                  className="h-2 w-2 rounded-full"
+                  style={{ backgroundColor: DEPT_COLORS[p.dept] }}
+                  aria-hidden="true"
+                />
+                {deptName}
+              </span>
+            )}
+          </span>
           <span className="block h-1.5 max-w-xs overflow-hidden rounded-full bg-line" aria-hidden="true">
             <span
               className="block h-full rounded-full"
