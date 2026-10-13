@@ -13,6 +13,8 @@ export type ClaimRow = {
   status: string
   deadline_at: string
   created_at: string
+  resolution: string | null
+  refund_amount: number
 }
 
 export async function listClaims(
@@ -25,7 +27,7 @@ export async function listClaims(
       let q = supabase
         .from('claims')
         .select(
-          'id,order_id,type,status,deadline_at,created_at, orders(makro_order_no,customer_name_en), claim_items(id)',
+          'id,order_id,type,status,resolution,refund_amount,deadline_at,created_at, orders(makro_order_no,customer_name_en), claim_items(id)',
         )
       if (Array.isArray(filter.status)) q = q.in('status', filter.status)
       else if (filter.status) q = q.eq('status', filter.status)
@@ -42,21 +44,11 @@ export async function listClaims(
     status: c.status,
     deadline_at: c.deadline_at,
     created_at: c.created_at,
+    resolution: c.resolution ?? null,
+    refund_amount: Number(c.refund_amount ?? 0),
     makro_order_no: c.orders?.makro_order_no,
     customer_name_en: c.orders?.customer_name_en,
   }))
-}
-
-// "Outstanding" = still awaiting a decision, or approved-but-the-resend-
-// hasn't-shipped-yet. Used for the standing count on ClaimsQueue.tsx, shown
-// regardless of which filter tab is currently selected.
-export async function countOutstandingClaims(): Promise<number> {
-  const { count, error } = await supabase
-    .from('claims')
-    .select('id', { count: 'exact', head: true })
-    .in('status', ['open', 'approved'])
-  if (error) throw new Error('นับจำนวนเคลมค้างอยู่ไม่สำเร็จ: ' + error.message)
-  return count ?? 0
 }
 
 export async function getClaim(id: string) {
