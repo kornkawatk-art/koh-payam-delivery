@@ -1,4 +1,4 @@
-import { deptBars, niceTicks, shortageTrend } from './shortageCharts'
+import { deptBars, niceTicks, rankProducts, shortageTrend } from './shortageCharts'
 import type { ShortageReport } from './api/shortageReport'
 
 // Minimal report: detail rows are what the trend counts (one per item x order).
@@ -75,4 +75,17 @@ test('niceTicks: clean whole-number steps covering the max', () => {
   expect(niceTicks(7)).toEqual([0, 2, 4, 6, 8])
   expect(niceTicks(23)).toEqual([0, 10, 20, 30])
   expect(niceTicks(100)).toEqual([0, 50, 100])
+})
+
+test('rankProducts: one list across departments, most often short first, then by quantity', () => {
+  const r = report([
+    { code: 'FV', dates: [['2026-09-01'], ['2026-09-01', '2026-09-02', '2026-09-03']] },
+    { code: 'FZ', dates: [['2026-09-01', '2026-09-02']] },
+  ])
+  r.groups[0].products[0].totalQty = 9 // FV p0: short once, but a lot of it
+  expect(rankProducts(r).map((p) => `${p.dept}:${p.orderCount}`)).toEqual(['FV:3', 'FZ:2', 'FV:1'])
+  expect(rankProducts(r, 'FZ').map((p) => p.key)).toEqual(['FZ-0'])
+  r.groups[1].products[0].orderCount = 1
+  r.groups[1].products[0].totalQty = 2
+  expect(rankProducts(r).map((p) => p.key)).toEqual(['FV-1', 'FV-0', 'FZ-0']) // tie on count: more quantity first
 })

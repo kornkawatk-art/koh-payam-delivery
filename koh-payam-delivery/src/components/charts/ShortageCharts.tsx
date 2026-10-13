@@ -1,6 +1,5 @@
 import { useRef, useState, type PointerEvent, type ReactNode } from 'react'
-import { DEPT_COLORS, type DeptGroupCode } from '../../lib/departments'
-import { niceTicks, type DeptBar, type Trend, type TrendBucket } from '../../lib/shortageCharts'
+import { niceTicks, type Trend, type TrendBucket } from '../../lib/shortageCharts'
 
 /*
  * Both charts are plain HTML/CSS (no chart library): bars stay crisp at any
@@ -65,64 +64,6 @@ function ChartCard({
       </figcaption>
       {children}
     </figure>
-  )
-}
-
-/** Horizontal bars: short occurrences per department, most first. Tap a bar to filter the list. */
-export function DeptBarChart({
-  bars,
-  active,
-  onSelect,
-}: {
-  bars: DeptBar[]
-  active: DeptGroupCode | 'ALL'
-  onSelect: (code: DeptGroupCode | 'ALL') => void
-}) {
-  const max = Math.max(1, ...bars.map((b) => b.occurrences))
-  return (
-    <ChartCard title="ขาดตามแผนก (ครั้ง)" subtitle="กดที่แผนกเพื่อดูรายการด้านล่างเฉพาะแผนกนั้น">
-      <ul className="flex flex-col gap-1">
-        {bars.map((b) => {
-          const selected = active === b.code
-          // Each department keeps its own color (labels sit beside every bar,
-          // so identity never rests on color alone). Emphasis: once one
-          // department is picked, the rest step back to gray.
-          const lit = active === 'ALL' || selected
-          return (
-            <li key={b.code}>
-              <button
-                type="button"
-                aria-pressed={selected}
-                aria-label={`${b.label}: ขาด ${b.occurrences} ครั้ง, ${b.products} รายการ`}
-                onClick={() => onSelect(selected ? 'ALL' : b.code)}
-                className={
-                  'group grid min-h-[2.75rem] w-full grid-cols-[4.5rem_1fr_auto] items-center gap-3 rounded-lg px-2 text-left transition-colors hover:bg-paper ' +
-                  (selected ? 'bg-paper ring-1 ring-line-strong' : '')
-                }
-              >
-                <span className="truncate text-sm font-semibold text-ink">{b.label}</span>
-                <span className="relative h-5">
-                  <span
-                    className={
-                      'absolute inset-y-0 left-0 rounded-r-[4px] transition-[width,background-color] duration-300 group-hover:brightness-110 ' +
-                      (lit ? '' : 'bg-line-strong')
-                    }
-                    style={{
-                      width: `max(2px, ${(b.occurrences / max) * 100}%)`,
-                      backgroundColor: lit ? DEPT_COLORS[b.code] : undefined,
-                    }}
-                  />
-                </span>
-                <span className="text-sm text-ink-soft">
-                  <span className="tnum font-semibold text-ink">{b.occurrences}</span>
-                  <span className="ml-1 hidden text-xs sm:inline">· {b.products} รายการ</span>
-                </span>
-              </button>
-            </li>
-          )
-        })}
-      </ul>
-    </ChartCard>
   )
 }
 

@@ -15,6 +15,20 @@ export function deptBars(report: ShortageReport): DeptBar[] {
     .sort((a, b) => b.occurrences - a.occurrences)
 }
 
+/**
+ * Every short product in one list, across departments (or one department):
+ * most often short first, then the larger quantity, then by name.
+ */
+export function rankProducts(report: ShortageReport, dept: DeptGroupCode | 'ALL' = 'ALL') {
+  return report.groups
+    .filter((g) => dept === 'ALL' || g.code === dept)
+    .flatMap((g) => g.products)
+    .sort(
+      (a, b) =>
+        b.orderCount - a.orderCount || b.totalQty - a.totalQty || a.productName.localeCompare(b.productName, 'th'),
+    )
+}
+
 export type TrendBucket = {
   start: string // ISO date, inclusive
   end: string // ISO date, inclusive
