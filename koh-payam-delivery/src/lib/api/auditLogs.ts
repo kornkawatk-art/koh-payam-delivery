@@ -1,7 +1,47 @@
 import { supabase } from '../supabase'
 import { islandName } from '../islands'
 
-export type AuditLogRow = { id: number; createdAt: string; message: string }
+export type AuditCategory = 'order' | 'pack' | 'claim' | 'money' | 'foam' | 'line'
+
+export type AuditLogRow = {
+  id: number
+  createdAt: string
+  /** full sentence, ending "โดย {name}" when a team member did it */
+  message: string
+  /** the same sentence without the "โดย …" clause (the page shows who separately) */
+  text: string
+  action: string
+  category: AuditCategory
+  /** team member's name, 'ทีมงาน' if their profile is gone, 'ลูกค้า' or 'ระบบ' */
+  actor: string
+  /** the order or claim this row is about, when it still exists */
+  link: string | null
+}
+
+const CATEGORY: Record<string, AuditCategory> = {
+  import: 'order',
+  island_set: 'order',
+  order_deleted: 'order',
+  order_reopened: 'order',
+  regen_link: 'order',
+  picked_up: 'order',
+  status_change: 'pack',
+  boat_set: 'pack',
+  pier_name_set: 'pack',
+  pack_saved: 'pack',
+  pack_group_saved: 'pack',
+  claim_submitted: 'claim',
+  claim_resolved: 'claim',
+  claim_auto_closed: 'claim',
+  payment_marked: 'money',
+  payment_released: 'money',
+  foam_return: 'foam',
+  foam_set: 'foam',
+  line_contact_registered: 'line',
+  line_contact_pending_created: 'line',
+  line_contact_approved: 'line',
+  line_contact_rejected: 'line',
+}
 
 type RawAuditLogRow = {
   id: number
@@ -53,12 +93,13 @@ function buildMessage(
   claimOrderNoById: Map<string, string | undefined>,
   boatsByShipDay: Map<string, BoatEntry[]>,
   profileNameById: Map<string, string>,
+  withActor = true,
 ): string {
   const meta = r.meta ?? {}
   // "โดย {name}" clause -- omitted entirely when user_id is null (the 3
   // customer/system-initiated actions), falls back to "ทีมงาน" when the
   // profile row itself can't be resolved (deleted account).
-  const by = r.user_id ? ` โดย ${profileNameById.get(r.user_id) ?? 'ทีมงาน'}` : ''
+  const by = r.user_id && withActor ? ` โดย ${profileNameById.get(r.user_id) ?? 'ทีมงาน'}` : ''
 
   // A raw UUID is never an acceptable fallback here (unlike the profile-name
   // fallback above, which has a real "ทีมงาน" phrase to reach for) -- the
@@ -278,5 +319,19 @@ export async function listAuditLogs(): Promise<AuditLogRow[]> {
     id: r.id,
     createdAt: r.created_at,
     message: buildMessage(r, orderById, claimOrderNoById, boatsByShipDay, profileNameById),
+    text: buildMessage(r, orderById, claimOrderNoById, boatsByShipDay, profileNameById, false),
+    action: r.action,
+    category: CATEGORY[r.action] ?? 'order',
+    actor: r.user_id
+      ? profileNameById.get(r.user_id) ?? 'ทีมงาน'
+      : r.action === 'claim_auto_closed'
+        ? 'ระบบ'
+        : 'ลูกค้า',
+    link:
+      r.entity_type === 'order' && orderById.has(r.entity_id)
+        ? `/order/${r.entity_id}`
+        : r.entity_type === 'claim' && claimOrderNoById.get(r.entity_id)
+          ? `/claims/${r.entity_id}`
+          : null,
   }))
 }

@@ -728,3 +728,34 @@ test('actions: payment_marked and payment_released', async () => {
     'ปลดให้แพ็ค JJ Payam (รอบส่ง 2026-10-12) — โอนแล้ว โดย สมชาย',
   ])
 })
+
+test('each row also carries its category, who did it, a link, and the sentence without "โดย …"', async () => {
+  ordersData = [ORDER]
+  claimsData = [{ id: 'c1', orders: { makro_order_no: 'PO-1' } }]
+  profilesData = [PROFILE]
+  const base = { meta: null, created_at: '2026-09-10T00:00:00.000Z' }
+  auditRows = [
+    { ...base, id: 1, user_id: 'u1', action: 'regen_link', entity_type: 'order', entity_id: 'o1' },
+    { ...base, id: 2, user_id: null, action: 'claim_submitted', entity_type: 'claim', entity_id: 'c1' },
+    { ...base, id: 3, user_id: null, action: 'claim_auto_closed', entity_type: 'claim', entity_id: 'c1' },
+    { ...base, id: 4, user_id: 'u1', action: 'foam_return', entity_type: 'customer', entity_id: 'k', meta: { qty: 2, name: 'JJ' } },
+    { ...base, id: 5, user_id: 'gone', action: 'payment_marked', entity_type: 'order', entity_id: 'o1' },
+    { ...base, id: 6, user_id: null, action: 'line_contact_registered', entity_type: 'line_contact', entity_id: '0812345678' },
+    { ...base, id: 7, user_id: 'u1', action: 'pack_saved', entity_type: 'order', entity_id: 'o1', meta: { paperCount: 1, foamCount: 0, pieceCount: 0 } },
+  ]
+  const rows = await listAuditLogs()
+  const by = Object.fromEntries(rows.map((r) => [r.id, r]))
+  expect(by[1]).toMatchObject({
+    category: 'order',
+    actor: 'สมชาย',
+    link: '/order/o1',
+    text: 'สร้างลิงก์ลูกค้าใหม่ให้ออเดอร์ PO-1',
+    message: 'สร้างลิงก์ลูกค้าใหม่ให้ออเดอร์ PO-1 โดย สมชาย',
+  })
+  expect(by[2]).toMatchObject({ category: 'claim', actor: 'ลูกค้า', link: '/claims/c1' })
+  expect(by[3]).toMatchObject({ category: 'claim', actor: 'ระบบ' })
+  expect(by[4]).toMatchObject({ category: 'foam', actor: 'สมชาย', link: null })
+  expect(by[5]).toMatchObject({ category: 'money', actor: 'ทีมงาน' }) // profile no longer exists
+  expect(by[6]).toMatchObject({ category: 'line', actor: 'ลูกค้า' })
+  expect(by[7]).toMatchObject({ category: 'pack' })
+})
