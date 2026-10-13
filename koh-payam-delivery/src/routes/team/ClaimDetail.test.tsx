@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Routes, Route } from 'react-router-dom'
 import ClaimDetail from './ClaimDetail'
@@ -30,6 +30,11 @@ const claim = {
   orders: { makro_order_no: 'PO-1', customer_name_en: 'BLUE VIEW' },
   claim_items: [{ qty: 2, order_items: { product_name: 'rice' } }],
   claim_photos: [],
+  status: 'open',
+  resolution: null,
+  refund_amount: 0,
+  created_at: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
+  resolved_at: null,
 }
 
 beforeEach(() => {
@@ -59,7 +64,7 @@ test('leaves the refund amount empty for the team to type', async () => {
 test('renders every claim_items entry as product × qty', async () => {
   renderPage()
   await screen.findByLabelText('จำนวนเงินคืน')
-  expect(screen.getByText('rice × 2')).toBeInTheDocument()
+  expect(screen.getByRole('row', { name: /rice/ })).toHaveTextContent('× 2')
 })
 
 test('renders several claim_items entries for a multi-item missing_in_box claim', async () => {
@@ -73,8 +78,8 @@ test('renders several claim_items entries for a multi-item missing_in_box claim'
   })
   renderPage()
   await screen.findByLabelText('จำนวนเงินคืน')
-  expect(screen.getByText('rice × 2')).toBeInTheDocument()
-  expect(screen.getByText('fish sauce × 1')).toBeInTheDocument()
+  expect(screen.getByRole('row', { name: /rice/ })).toHaveTextContent('× 2')
+  expect(screen.getByRole('row', { name: /fish sauce/ })).toHaveTextContent('× 1')
 })
 
 test('shows the makro item code in front of each claimed product, and omits it when the order line has none', async () => {
@@ -88,16 +93,15 @@ test('shows the makro item code in front of each claimed product, and omits it w
   })
   renderPage()
   await screen.findByLabelText('จำนวนเงินคืน')
-  const rice = screen.getByText('rice × 2').closest('li')!
-  expect(rice).toHaveTextContent('100001 · rice × 2')
-  expect(screen.getByText('fish sauce × 1').closest('li')).toHaveTextContent(/^fish sauce × 1$/)
+  expect(screen.getByRole('row', { name: /rice/ })).toHaveTextContent('100001')
+  expect(screen.getByRole('row', { name: /fish sauce/ })).toHaveTextContent(/^fish sauce× 1$/)
 })
 
 test('renders no item list for a box_lost claim (zero claim_items)', async () => {
   getClaim.mockReset().mockResolvedValue({ ...claim, type: 'box_lost', claim_items: [] })
   renderPage()
   await screen.findByLabelText('จำนวนเงินคืน')
-  expect(screen.queryByText(/×/)).not.toBeInTheDocument()
+  expect(screen.queryByRole('table')).not.toBeInTheDocument()
 })
 
 test('disables "ส่งชดเชยวันถัดไป" when the claim has zero claim_items (box_lost)', async () => {
@@ -255,13 +259,55 @@ test('a broken-eggs claim reads in eggs: "แตก N ฟอง จาก M ฟ�
     ],
   })
   renderPage()
-  expect(await screen.findByText('ประเภท: ไข่แตก')).toBeInTheDocument()
-  expect(screen.getByText('7 ฟอง')).toBeInTheDocument()
-  expect(screen.getByText(/จาก 150 ฟอง/)).toBeInTheDocument()
+  expect(await screen.findByText('ไข่แตก')).toBeInTheDocument()
+  const row = screen.getByRole('row', { name: /ไข่ไก่/ })
+  expect(row).toHaveTextContent('แตก 7 ฟอง')
+  expect(row).toHaveTextContent('จาก 150 ฟอง')
   expect(screen.getByText(/ส่งเป็นฟองตามจำนวนที่แตก/)).toBeInTheDocument()
 })
 
 test('other claim types show their Thai name instead of the raw code', async () => {
   renderPage()
-  expect(await screen.findByText('ประเภท: สินค้าเสียหาย')).toBeInTheDocument()
+  expect(await screen.findByText('สินค้าเสียหาย')).toBeInTheDocument()
+})
+
+test('the header shows the Thai status and how long is left to decide', async () => {
+  renderPage()
+  await screen.findByLabelText('จำนวนเงินคืน')
+  expect(screen.getByText('รอตัดสิน')).toBeInTheDocument()
+  expect(screen.getByText(/เหลือ 21 ชม\./)).toBeInTheDocument()
+})
+
+test("the customer's words and earlier team notes are shown apart", async () => {
+  getClaim.mockReset().mockResolvedValue({ ...claim, description: 'ข้าวสารเปียก\n[ทีม] โทรถามแล้ว' })
+  renderPage()
+  await screen.findByLabelText('จำนวนเงินคืน')
+  expect(screen.getByText('ข้าวสารเปียก')).toBeInTheDocument()
+  expect(within(screen.getByRole('region', { name: 'โน้ตทีม' })).getByText('โทรถามแล้ว')).toBeInTheDocument()
+})
+
+test('says what will be saved before saving', async () => {
+  renderPage()
+  await userEvent.type(await screen.findByLabelText('จำนวนเงินคืน'), '120')
+  expect(screen.getByRole('status')).toHaveTextContent('จะบันทึก: อนุมัติ · คืนเงิน ฿120.00')
+  await userEvent.click(screen.getByLabelText('ส่งชดเชยวันถัดไป'))
+  expect(screen.getByRole('status')).toHaveTextContent('จะบันทึก: อนุมัติ · ส่งชดเชยวันถัดไป')
+  await userEvent.click(screen.getByLabelText('ปฏิเสธ'))
+  expect(screen.getByRole('status')).toHaveTextContent('จะบันทึก: ปฏิเสธ')
+})
+
+test('a decided claim shows the result instead of the form', async () => {
+  getClaim.mockReset().mockResolvedValue({
+    ...claim,
+    status: 'closed',
+    resolution: 'refund',
+    refund_amount: 120,
+    resolved_at: '2026-10-12T05:00:00Z',
+  })
+  renderPage()
+  const result = await screen.findByRole('region', { name: 'ผลการตัดสิน' })
+  expect(result).toHaveTextContent('อนุมัติ · คืนเงิน')
+  expect(result).toHaveTextContent('฿120.00')
+  expect(screen.queryByRole('button', { name: 'บันทึกผล' })).not.toBeInTheDocument()
+  expect(screen.queryByLabelText('จำนวนเงินคืน')).not.toBeInTheDocument()
 })

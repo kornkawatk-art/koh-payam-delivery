@@ -1,223 +1,255 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { listClaims, countOutstandingClaims, type ClaimRow } from '../../lib/api/claims'
+import { listClaims, type ClaimRow } from '../../lib/api/claims'
 import {
   backorderQty,
   listUnmatchedBackorders,
   type UnmatchedBackorderRow,
 } from '../../lib/api/backorders'
-import { Flag, CheckCircle } from '@phosphor-icons/react'
+import {
+  CaretRight,
+  CheckCircle,
+  Egg,
+  Flag,
+  Package,
+  Warning,
+  type Icon,
+} from '@phosphor-icons/react'
 import { SkeletonRows } from '../../components/ui/Skeleton'
 import { PageHeader } from '../../components/ui/PageHeader'
-import { formatDateTimeTH } from '../../lib/format'
 import { EmptyState } from '../../components/ui/EmptyState'
+import { StatTile } from '../../components/ui/Stat'
+import { formatDateTimeTH } from '../../lib/format'
 import { claimTypeTH } from '../../lib/claimTypes'
+import { claimStatusTH, respondBy, timeLeft } from '../../lib/claimSla'
 
-type Filter = 'all' | 'open' | 'approved' | 'rejected'
+type Tab = 'open' | 'approved' | 'rejected' | 'backorders' | 'all'
 
-const FILTERS: { key: Filter; label: string }[] = [
-  { key: 'all', label: 'ทั้งหมด' },
-  { key: 'open', label: 'เปิด' },
-  { key: 'approved', label: 'อนุมัติ' },
-  { key: 'rejected', label: 'ปฏิเสธ' },
-]
-
-const STATUS_TONE: Record<string, string> = {
-  open: 'badge-warn',
-  approved: 'badge-ok',
-  rejected: 'badge-neutral',
-  closed: 'badge-neutral',
+const TYPE_ICON: Record<string, Icon> = {
+  missing_in_box: Package,
+  damaged: Warning,
+  broken_eggs: Egg,
+  box_lost: Package,
 }
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000
+const inTab = (c: ClaimRow, tab: Tab) =>
+  tab === 'all' ||
+  (tab === 'open' && c.status === 'open') ||
+  (tab === 'approved' && (c.status === 'approved' || c.status === 'closed')) ||
+  (tab === 'rejected' && c.status === 'rejected')
 
+/**
+ * คิวเคลม: opens on the claims waiting for a decision, the most urgent first
+ * (a manager has 24h from the customer's report -- lib/claimSla.ts). Other
+ * tabs show decided claims and the resends still waiting to be matched.
+ */
 export default function ClaimsQueue() {
-  const [filter, setFilter] = useState<Filter>('all')
-  const [rows, setRows] = useState<ClaimRow[] | null>(null)
+  const [tab, setTab] = useState<Tab>('open')
+  const [claims, setClaims] = useState<ClaimRow[] | null>(null)
   const [failed, setFailed] = useState(false)
-
-  useEffect(() => {
-    let active = true
-    setRows(null)
-    setFailed(false)
-    // "อนุมัติ" also matches claims that have since auto-closed (refund closed
-    // instantly, or a resend_next_day claim's compensating shipment was fully
-    // delivered) -- a manager browsing this tab still sees the claim's full
-    // history in one place. "เปิด"/"ปฏิเสธ"/"ทั้งหมด" are unaffected.
-    const params =
-      filter === 'all' ? {} : { status: filter === 'approved' ? ['approved', 'closed'] : filter }
-    listClaims(params)
-      .then((r) => {
-        if (active) setRows(r)
-      })
-      .catch(() => {
-        if (active) setFailed(true)
-      })
-    return () => {
-      active = false
-    }
-  }, [filter])
-
-  // Outstanding-claims count loads independently of the claims queue and the
-  // unmatched-backorders section: a failure here must not blank either of
-  // those (same cross-section failure isolation as the two effects above).
-  const [outstandingCount, setOutstandingCount] = useState<number | null>(null)
-  const [outstandingFailed, setOutstandingFailed] = useState(false)
-
-  useEffect(() => {
-    let active = true
-    countOutstandingClaims()
-      .then((n) => {
-        if (active) setOutstandingCount(n)
-      })
-      .catch(() => {
-        if (active) setOutstandingFailed(true)
-      })
-    return () => {
-      active = false
-    }
-  }, [])
-
-  // Unmatched backorders load independently of the claims queue above: a
-  // failure here must never blank the already-loaded claims table (and vice
-  // versa), same as ClaimDetail.tsx keeps its claim and evidence-photos
-  // fetches from stepping on each other.
+  // Backorders load independently: a failure on either side never blanks the other.
   const [backorders, setBackorders] = useState<UnmatchedBackorderRow[] | null>(null)
   const [backordersFailed, setBackordersFailed] = useState(false)
 
   useEffect(() => {
     let active = true
+    listClaims()
+      .then((r) => active && setClaims(r))
+      .catch(() => active && setFailed(true))
     listUnmatchedBackorders()
-      .then((r) => {
-        if (active) setBackorders(r)
-      })
-      .catch(() => {
-        if (active) setBackordersFailed(true)
-      })
+      .then((r) => active && setBackorders(r))
+      .catch(() => active && setBackordersFailed(true))
     return () => {
       active = false
     }
   }, [])
 
   const now = Date.now()
+  const open = useMemo(
+    () => (claims ?? []).filter((c) => c.status === 'open').sort((a, b) => respondBy(a.created_at) - respondBy(b.created_at)),
+    [claims],
+  )
+  const late = open.filter((c) => timeLeft(c.created_at, now).late).length
+  const shown = useMemo(
+    () =>
+      tab === 'open'
+        ? open
+        : (claims ?? []).filter((c) => inTab(c, tab)).sort((a, b) => b.created_at.localeCompare(a.created_at)),
+    [claims, open, tab],
+  )
+
+  const count = (t: Tab) =>
+    t === 'backorders' ? backorders?.length : claims ? claims.filter((c) => inTab(c, t)).length : undefined
+  const TABS: [Tab, string][] = [
+    ['open', 'รอตัดสิน'],
+    ['approved', 'อนุมัติแล้ว'],
+    ['rejected', 'ปฏิเสธ'],
+    ['backorders', 'ค้างส่งชดเชย'],
+    ['all', 'ทั้งหมด'],
+  ]
 
   return (
-    <div className="flex flex-col gap-5">
+    <div className="flex flex-col gap-4">
       <PageHeader title="คิวเคลม" icon={Flag} />
 
-      {outstandingFailed ? (
-        <p className="alert alert-danger">โหลดจำนวนเคลมค้างอยู่ไม่สำเร็จ</p>
-      ) : outstandingCount !== null ? (
-        <p className="inline-flex w-fit items-center gap-2 rounded-lg border border-danger/25 bg-danger-soft px-3 py-2 font-semibold text-danger-ink">
-          <Flag size={16} weight="fill" aria-hidden="true" />
-          ค้างอยู่ {outstandingCount} รายการ
-        </p>
-      ) : null}
+      <section aria-label="สรุปคิวเคลม">
+        <dl className="grid grid-cols-3 gap-3">
+          <StatTile label="รอตัดสิน" value={claims ? open.length : '–'} emphasis={open.length > 0} />
+          <StatTile label="เกินเวลาตอบ" value={claims ? late : '–'} danger={late > 0} />
+          <StatTile label="ค้างส่งชดเชย" value={backorders ? backorders.length : '–'} />
+        </dl>
+      </section>
 
-      <div className="flex flex-wrap gap-2">
-        {FILTERS.map((f) => (
-          <button
-            key={f.key}
-            onClick={() => setFilter(f.key)}
-            className={
-              'btn btn-sm ' + (filter === f.key ? 'btn-primary' : 'btn-secondary')
-            }
-          >
-            {f.label}
-          </button>
-        ))}
+      <div role="tablist" aria-label="สถานะเคลม" className="flex gap-1 overflow-x-auto border-b border-line">
+        {TABS.map(([t, label]) => {
+          const n = count(t)
+          const on = tab === t
+          return (
+            <button
+              key={t}
+              type="button"
+              role="tab"
+              aria-selected={on}
+              onClick={() => setTab(t)}
+              className={
+                'flex min-h-[2.75rem] shrink-0 items-center gap-1.5 border-b-2 px-3 text-sm ' +
+                (on ? 'border-ink font-semibold text-ink' : 'border-transparent text-ink-soft hover:text-ink')
+              }
+            >
+              {label}
+              {n !== undefined && t !== 'all' && (
+                <span
+                  className={
+                    'num rounded-full px-1.5 text-xs ' +
+                    (t === 'open' && n > 0 ? 'bg-danger text-on' : 'bg-line text-ink-soft')
+                  }
+                >
+                  {n}
+                </span>
+              )}
+            </button>
+          )
+        })}
       </div>
 
-      {failed ? (
-        <p className="alert alert-danger">โหลดคิวเคลมไม่สำเร็จ</p>
-      ) : !rows ? (
-        <SkeletonRows rows={3} />
-      ) : rows.length === 0 ? (
-        <EmptyState icon={CheckCircle} title="ไม่มีเคลม" hint="ไม่มีเคลมในสถานะที่เลือก" />
-      ) : (
-        <div className="table-wrap">
-          <table className="data-table stack-table">
-            <thead>
-              <tr>
-                <th>เลขออเดอร์</th>
-                <th>ลูกค้า</th>
-                <th>ประเภท</th>
-                <th>จำนวนรายการ</th>
-                <th>สถานะ</th>
-                <th>กำหนดเส้นตาย</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((c) => {
-                const overdue =
-                  c.status === 'open' && new Date(c.deadline_at).getTime() < now
-                return (
-                  <tr key={c.id} className={overdue ? 'bg-danger-soft' : undefined}>
-                    <td className="stack-lead whitespace-nowrap">
-                      <Link className="link num" to={`/claims/${c.id}`}>
-                        {c.makro_order_no}
-                      </Link>
-                    </td>
-                    <td data-label="ลูกค้า">{c.customer_name_en}</td>
-                    <td data-label="ประเภท">{claimTypeTH(c.type)}</td>
-                    <td data-label="จำนวนรายการ" className="tnum">
-                      {c.itemCount} รายการ
-                    </td>
-                    <td data-label="สถานะ">
-                      <span className={'badge ' + (STATUS_TONE[c.status] ?? 'badge-neutral')}>
-                        {c.status}
-                      </span>
-                    </td>
-                    <td data-label="กำหนดเส้นตาย" className="whitespace-nowrap">
-                      {formatDateTimeTH(c.deadline_at)}
-                    </td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
-        </div>
-      )}
-
-      <section className="flex flex-col gap-2">
-        <p className="section-title">ค้างส่งจากเคลมที่ยังจับคู่ไม่สำเร็จ</p>
-        {backordersFailed ? (
-          <p className="alert alert-danger">โหลดรายการค้างส่งที่ยังจับคู่ไม่สำเร็จ</p>
-        ) : !backorders ? (
+      <div role="tabpanel">
+        {tab === 'backorders' ? (
+          <BackordersPanel rows={backorders} failed={backordersFailed} now={now} />
+        ) : failed ? (
+          <p className="alert alert-danger">โหลดคิวเคลมไม่สำเร็จ</p>
+        ) : !claims ? (
           <SkeletonRows rows={3} />
-        ) : backorders.length === 0 ? (
-          <EmptyState compact icon={CheckCircle} title="ไม่มีรายการค้างส่งที่ยังจับคู่ไม่สำเร็จ" />
+        ) : shown.length === 0 ? (
+          <EmptyState
+            icon={CheckCircle}
+            title={tab === 'open' ? 'ไม่มีเคลมรอตัดสิน' : 'ไม่มีเคลมในแท็บนี้'}
+          />
         ) : (
-          <div className="table-wrap">
-            <table className="data-table stack-table">
-              <thead>
-                <tr>
-                  <th>ลูกค้า</th>
-                  <th>สินค้า</th>
-                  <th>ค้างมาแล้ว</th>
-                </tr>
-              </thead>
-              <tbody>
-                {backorders.map((b) => {
-                  const daysWaiting = Math.floor((now - new Date(b.createdAt).getTime()) / MS_PER_DAY)
-                  const stale = daysWaiting > 7
-                  return (
-                    <tr key={b.id} className={stale ? 'bg-danger-soft' : undefined}>
-                      <td className="stack-lead">{b.customerName}</td>
-                      <td data-label="สินค้า">
-                        {b.productName} {backorderQty(b)}
-                      </td>
-                      <td data-label="ค้างมาแล้ว" className="tnum">
-                        {daysWaiting} วัน
-                      </td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-          </div>
+          <ul className="table-wrap divide-y divide-line">
+            {shown.map((c) => (
+              <ClaimItem key={c.id} c={c} now={now} />
+            ))}
+          </ul>
         )}
-      </section>
+      </div>
+    </div>
+  )
+}
+
+function ClaimItem({ c, now }: { c: ClaimRow; now: number }) {
+  const TypeIcon = TYPE_ICON[c.type] ?? Flag
+  const status = claimStatusTH(c.status, c.resolution)
+  const left = c.status === 'open' ? timeLeft(c.created_at, now) : null
+  return (
+    <li>
+      <Link
+        to={`/claims/${c.id}`}
+        className={
+          'grid grid-cols-[minmax(0,1fr)_auto] gap-x-3 gap-y-1.5 px-4 py-3 hover:bg-paper ' +
+          'sm:grid-cols-[minmax(0,1fr)_10rem_10rem_8.5rem_1rem] sm:items-center sm:gap-x-4 ' +
+          (left?.late ? 'border-l-4 border-l-danger' : 'border-l-4 border-l-transparent')
+        }
+      >
+        <span className="col-start-1 row-start-1 min-w-0">
+          <span className="block truncate font-semibold">{c.customer_name_en}</span>
+          <span className="block text-xs text-ink-soft">
+            <span className="num">{c.makro_order_no}</span> · <span className="num">{c.itemCount}</span> รายการ
+          </span>
+        </span>
+        <span className="col-start-1 row-start-2 flex flex-wrap items-center gap-2 sm:contents">
+          <span>
+            <span className="badge badge-neutral">
+              <TypeIcon size={13} aria-hidden="true" />
+              {claimTypeTH(c.type)}
+            </span>
+          </span>
+          <span>
+            <span className={`badge ${status.tone}`}>{status.label}</span>
+          </span>
+        </span>
+        <span
+          className={
+            'col-start-2 row-start-1 text-right text-xs sm:col-start-auto sm:row-start-auto sm:text-left sm:text-sm ' +
+            (left?.late ? 'font-semibold text-danger-ink' : 'text-ink-soft')
+          }
+        >
+          {left ? left.label : `แจ้ง ${formatDateTimeTH(c.created_at)}`}
+          {left && (
+            <span className="block text-[11px] font-normal text-ink-faint">
+              แจ้ง {formatDateTimeTH(c.created_at)}
+            </span>
+          )}
+        </span>
+        <CaretRight size={16} className="hidden text-ink-faint sm:block" aria-hidden="true" />
+      </Link>
+    </li>
+  )
+}
+
+function BackordersPanel({
+  rows,
+  failed,
+  now,
+}: {
+  rows: UnmatchedBackorderRow[] | null
+  failed: boolean
+  now: number
+}) {
+  if (failed) return <p className="alert alert-danger">โหลดรายการค้างส่งที่ยังจับคู่ไม่สำเร็จ</p>
+  if (!rows) return <SkeletonRows rows={3} />
+  if (rows.length === 0)
+    return <EmptyState icon={CheckCircle} title="ไม่มีรายการค้างส่งที่ยังจับคู่ไม่สำเร็จ" />
+  return (
+    <div className="flex flex-col gap-2">
+      <p className="muted">ของที่อนุมัติให้ส่งชดเชย แต่ยังหาออเดอร์รอบถัดไปของลูกค้าไม่เจอ — ค้างเกิน 7 วันเป็นแถบแดง</p>
+      <div className="table-wrap">
+        <table className="data-table stack-table">
+          <thead>
+            <tr>
+              <th>ลูกค้า</th>
+              <th>สินค้า</th>
+              <th>ค้างมาแล้ว</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((b) => {
+              const days = Math.floor((now - new Date(b.createdAt).getTime()) / MS_PER_DAY)
+              return (
+                <tr key={b.id} className={days > 7 ? 'bg-danger-soft' : undefined}>
+                  <td className="stack-lead">{b.customerName}</td>
+                  <td data-label="สินค้า">
+                    {b.productName} {backorderQty(b)}
+                  </td>
+                  <td data-label="ค้างมาแล้ว" className="num">
+                    {days} วัน
+                  </td>
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
+      </div>
     </div>
   )
 }

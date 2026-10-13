@@ -1,4 +1,4 @@
-import { listClaims, getClaim, resolveClaim, countOutstandingClaims } from './claims'
+import { listClaims, getClaim, resolveClaim } from './claims'
 
 const createResendBackorder = vi.fn().mockResolvedValue(undefined)
 const logAction = vi.fn().mockResolvedValue(undefined)
@@ -86,6 +86,8 @@ test('listClaims flattens the order join, counts claim_items, and sorts by deadl
       status: 'open',
       deadline_at: '2026-09-01T00:00:00Z',
       created_at: '2026-08-30T00:00:00Z',
+      resolution: null,
+      refund_amount: 0,
       orders: { makro_order_no: 'PO-1', customer_name_en: 'BLUE VIEW' },
       claim_items: [{ id: 'ci1' }],
     },
@@ -101,6 +103,8 @@ test('listClaims flattens the order join, counts claim_items, and sorts by deadl
     status: 'open',
     deadline_at: '2026-09-01T00:00:00Z',
     created_at: '2026-08-30T00:00:00Z',
+    resolution: null,
+    refund_amount: 0,
     makro_order_no: 'PO-1',
     customer_name_en: 'BLUE VIEW',
   })
@@ -252,21 +256,4 @@ test('listClaims with a plain string status still uses .eq(), not .in() (regress
   await listClaims({ status: 'open' })
   expect(state.eqArgs).toContainEqual(['status', 'open'])
   expect(state.inArgs).toHaveLength(0)
-})
-
-test('countOutstandingClaims filters status IN (open, approved) and returns the count', async () => {
-  state.countValue = 7
-  const n = await countOutstandingClaims()
-  expect(n).toBe(7)
-  expect(state.inArgs).toContainEqual(['status', ['open', 'approved']])
-  expect(state.selectArgs).toContain('id')
-  expect(state.selectOpts[state.selectOpts.length - 1]).toMatchObject({
-    count: 'exact',
-    head: true,
-  })
-})
-
-test('countOutstandingClaims throws a Thai error on query failure', async () => {
-  state.error = { message: 'boom' }
-  await expect(countOutstandingClaims()).rejects.toThrow('นับจำนวนเคลมค้างอยู่ไม่สำเร็จ')
 })
