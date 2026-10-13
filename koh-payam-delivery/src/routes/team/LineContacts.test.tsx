@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import LineContacts from './LineContacts'
 
@@ -167,4 +167,27 @@ test('a failed decision shows a Thai error and keeps the row in the pending sect
 
   expect(await screen.findByText('บันทึกผลคำขอไม่สำเร็จ: boom')).toBeInTheDocument()
   expect(screen.getByText('0888888888')).toBeInTheDocument()
+})
+
+test('summary: registered, waiting for approval (red when any), new in the last 7 days', async () => {
+  const recent = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString()
+  listLineContacts.mockResolvedValue([...rows, { phone: '0800000000', displayName: 'New One', createdAt: recent }])
+  listPendingLineContactRequests.mockResolvedValue(pendingRows)
+  render(<LineContacts />)
+  const summary = await screen.findByRole('region', { name: 'สรุป LINE' })
+  expect(within(summary).getByText('ลงทะเบียนแล้ว').closest('div')).toHaveTextContent('3')
+  const waiting = within(summary).getByText('รออนุมัติ').closest('div')!
+  expect(waiting).toHaveTextContent('1')
+  expect(waiting).toHaveClass('bg-danger-soft')
+  expect(within(summary).getByText('ใหม่ 7 วันล่าสุด').closest('div')).toHaveTextContent('1')
+})
+
+test('a pending request is a card comparing the old and the new LINE account', async () => {
+  listPendingLineContactRequests.mockResolvedValue(pendingRows)
+  render(<LineContacts />)
+  const card = (await screen.findByText('Somsri (new)')).closest('article') as HTMLElement
+  expect(within(card).getByText('บัญชีเดิม')).toBeInTheDocument()
+  expect(within(card).getByText('บัญชีใหม่')).toBeInTheDocument()
+  expect(within(card).getByText('Somsri (old)')).toBeInTheDocument()
+  expect(within(card).getByRole('button', { name: 'อนุมัติ' })).toBeInTheDocument()
 })
