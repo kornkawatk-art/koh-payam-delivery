@@ -216,7 +216,7 @@ beforeEach(() => {
 
 test('fresh import inserts orders + items and counts created', async () => {
   const r = await commitImport('2026-10-01', parsedOrders as any)
-  expect(r).toEqual({ created: 1, synced: 0, skipped: [], refreshed: 0 })
+  expect(r).toEqual({ created: 1, synced: 0, moved: 0, skipped: [], refreshed: 0 })
   const ordIns = state.inserted.find((i) => i.table === 'orders')
   expect(ordIns.rows).toMatchObject({
     makro_order_no: 'PO-1',
@@ -251,7 +251,7 @@ test('fresh import inserts orders + items and counts created', async () => {
 test('re-import of an existing order syncs without touching protected columns', async () => {
   state.existing = [{ id: 'old1', makro_order_no: 'PO-1' }]
   const r = await commitImport('2026-10-01', parsedOrders as any)
-  expect(r).toEqual({ created: 0, synced: 1, skipped: [], refreshed: 0 })
+  expect(r).toEqual({ created: 0, synced: 1, moved: 0, skipped: [], refreshed: 0 })
 
   // orders row is not inserted again
   expect(state.inserted.some((i) => i.table === 'orders')).toBe(false)
@@ -518,6 +518,7 @@ test('a PO already imported on ANOTHER day is skipped: nothing is created, synce
   expect(r).toEqual({
     created: 0,
     synced: 0,
+    moved: 0,
     skipped: [{ makroOrderNo: 'PO-1', shipDate: '2026-09-19' }],
     refreshed: 0, // payment facts refresh is stubbed here (paymentRefresh.test)
   })
@@ -528,15 +529,41 @@ test('a PO already imported on ANOTHER day is skipped: nothing is created, synce
     shipDate: '2026-10-01',
     created: 0,
     synced: 0,
+    moved: 0,
     skipped: 1,
   })
+})
+
+test('a postponed PO the importer ticked moves to this day (boat cleared, back from the pier) and syncs in place', async () => {
+  state.elsewhere = [{ id: 'old9', makro_order_no: 'PO-1', ship_date: '2026-09-30', status: 'at_pier' }]
+  const r = await commitImport('2026-10-01', parsedOrders as any, [], ['PO-1'])
+  expect(r).toMatchObject({ created: 0, synced: 1, moved: 1, skipped: [] })
+  expect(state.updated[0]).toEqual({
+    table: 'orders',
+    patch: { ship_day_id: 'sd1', ship_date: '2026-10-01', boat_id: null, status: 'packed' },
+  })
+  // the same order (its photos, boxes, link and packed ticks) -- never a new one
+  expect(state.inserted.some((i) => i.table === 'orders')).toBe(false)
+  expect(syncShortageBackorders).toHaveBeenCalledWith('old9')
+  expect(logAction).toHaveBeenCalledWith('move_ship_day', 'order', 'old9', {
+    makroOrderNo: 'PO-1',
+    from: '2026-09-30',
+    to: '2026-10-01',
+  })
+})
+
+test('a delivered PO is never moved, even when ticked -- it is only re-listed by Makro', async () => {
+  state.elsewhere = [{ id: 'old9', makro_order_no: 'PO-1', ship_date: '2026-09-30', status: 'shipped' }]
+  const r = await commitImport('2026-10-01', parsedOrders as any, [], ['PO-1'])
+  expect(r).toMatchObject({ moved: 0, synced: 0, skipped: [{ makroOrderNo: 'PO-1', shipDate: '2026-09-30' }] })
+  expect(state.updated.some((u) => u.table === 'orders')).toBe(false)
 })
 
 test('a PO that exists on THIS day (and also on another) still syncs in place -- same day wins', async () => {
   state.existing = [{ id: 'old1', makro_order_no: 'PO-1' }]
   state.elsewhere = [{ makro_order_no: 'PO-1', ship_date: '2026-09-19', status: 'shipped' }]
   const r = await commitImport('2026-10-01', parsedOrders as any)
-  expect(r).toEqual({ created: 0, synced: 1, skipped: [], refreshed: 0 })
+  expect(r).toEqual({ created: 0, synced: 1, moved: 0, skipped: [], refreshed: 0 })
 })
 
 test('in a mixed file only the already-imported POs are skipped; the new ones are created', async () => {

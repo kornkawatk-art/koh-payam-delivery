@@ -12,6 +12,7 @@ import {
   type BuildResult,
 } from '../../lib/import/buildImport'
 import { commitImport, listOrdersOnOtherDays, type OtherDayOrder } from '../../lib/api/orders'
+import { movableNos } from '../../lib/postponed'
 import { UploadSimple, Warning } from '@phosphor-icons/react'
 import { PageHeader } from '../../components/ui/PageHeader'
 import { todayLocalISO } from '../../lib/format'
@@ -58,6 +59,8 @@ export default function ImportOrders() {
   const [error, setError] = useState<string>()
   // POs in this file that already exist on another ship day (they'll be skipped)
   const [alreadyImported, setAlreadyImported] = useState<OtherDayOrder[]>([])
+  // postponed POs (still on an earlier day, not delivered) the importer ticked to move here
+  const [moveNos, setMoveNos] = useState<Set<string>>(new Set())
 
   useEffect(() => {
     if (!result || result.orders.length === 0) {
@@ -72,10 +75,19 @@ export default function ImportOrders() {
       active = false
     }
   }, [result, shipDate])
+  const movable = useMemo(() => movableNos(alreadyImported), [alreadyImported])
+  useEffect(() => setMoveNos(new Set()), [alreadyImported])
   const skipNos = useMemo(
-    () => new Set(alreadyImported.map((r) => r.makro_order_no)),
-    [alreadyImported],
+    () => new Set(alreadyImported.map((r) => r.makro_order_no).filter((no) => !moveNos.has(no))),
+    [alreadyImported, moveNos],
   )
+  const toggleMove = (no: string, on: boolean) =>
+    setMoveNos((cur) => {
+      const next = new Set(cur)
+      if (on) next.add(no)
+      else next.delete(no)
+      return next
+    })
   const toImport = result ? result.orders.filter((o) => !skipNos.has(o.makroOrderNo)) : []
 
   const detailProblems = useMemo(
@@ -145,9 +157,10 @@ export default function ImportOrders() {
     setError(undefined)
     setImportMsg(undefined)
     try {
-      const r = await commitImport(shipDate, result.orders, result.skippedVoid ?? [])
+      const r = await commitImport(shipDate, result.orders, result.skippedVoid ?? [], [...moveNos])
       setImportMsg(
         `นำเข้า ${r.created} ใหม่ · sync ${r.synced}` +
+          (r.moved > 0 ? ` · ย้ายมาวันนี้ ${r.moved} (เลื่อนส่ง)` : '') +
           (r.skipped.length > 0 ? ` · ข้าม ${r.skipped.length} ที่เคยนำเข้าแล้ว` : '') +
           (r.refreshed ? ` · อัปเดตการจ่ายเงิน ${r.refreshed}` : ''),
       )
@@ -343,13 +356,47 @@ export default function ImportOrders() {
             </table>
           </div>
 
-          {alreadyImported.length > 0 && (
-            <div className="alert alert-warn">
+          {movable.size > 0 && (
+            <fieldset className="alert alert-info flex flex-col gap-2">
+              <legend className="sr-only">ออเดอร์เลื่อนส่ง</legend>
               <p className="font-semibold">
-                จะข้าม {new Set(alreadyImported.map((r) => r.makro_order_no)).size} ออเดอร์ที่เคยนำเข้าแล้วในวันอื่น
+                {movable.size} ออเดอร์ยังไม่ได้ส่งในวันก่อน — ถ้าแม็คโครเลื่อนมาส่งวันนี้ ให้ติ๊กเพื่อย้ายมา
               </p>
+              <p className="text-sm">
+                ย้ายพร้อมสถานะแพ็ค รูป ลัง และลิงก์ลูกค้าเดิม (ล้างเรือที่เลือกไว้) · ที่ไม่ติ๊กจะข้ามเหมือนเดิม
+              </p>
+              <ul className="flex flex-col gap-1">
+                {alreadyImported
+                  .filter((r) => movable.has(r.makro_order_no))
+                  .map((r) => (
+                    <li key={r.id}>
+                      <label className="flex min-h-[2.75rem] cursor-pointer items-center gap-3">
+                        <input
+                          type="checkbox"
+                          checked={moveNos.has(r.makro_order_no)}
+                          onChange={(e) => toggleMove(r.makro_order_no, e.target.checked)}
+                          aria-label={`ย้าย ${r.makro_order_no} มาวันส่งนี้`}
+                        />
+                        <span>
+                          <span className="num font-medium">{r.makro_order_no}</span>
+                          <span className="text-sm text-ink-soft">
+                            {' '}
+                            · เดิมส่ง {r.ship_date} · {r.status === 'imported' ? 'ยังไม่แพ็ค' : r.status === 'at_pier' ? 'อยู่ท่าเรือ ยังไม่ขึ้นเรือ' : 'แพ็คแล้ว'}
+                          </span>
+                        </span>
+                      </label>
+                    </li>
+                  ))}
+              </ul>
+            </fieldset>
+          )}
+
+          {skipNos.size > 0 && (
+            <div className="alert alert-warn">
+              <p className="font-semibold">จะข้าม {skipNos.size} ออเดอร์ที่เคยนำเข้าแล้วในวันอื่น</p>
               <p className="mt-1 text-xs">
                 {alreadyImported
+                  .filter((r) => skipNos.has(r.makro_order_no))
                   .map((r) => `${r.makro_order_no} (${r.ship_date})`)
                   .join(', ')}
               </p>

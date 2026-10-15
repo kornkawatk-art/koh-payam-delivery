@@ -13,7 +13,8 @@ import { isMakroPickedUp } from '../makroStatus'
 import { paymentPatch } from '../payments'
 import { refreshPayments } from './paymentRefresh'
 
-export type OtherDayOrder = { makro_order_no: string; ship_date: string; status: string }
+export type { OtherDayOrder } from '../postponed'
+import { movableNos, type OtherDayOrder } from '../postponed'
 
 // POs from `nos` that already exist on a ship date OTHER than `shipDate`. The
 // same Makro export routinely re-lists POs imported (and often already
@@ -27,7 +28,7 @@ export async function listOrdersOnOtherDays(
   if (nos.length === 0) return []
   const { data, error } = await supabase
     .from('orders')
-    .select('makro_order_no,ship_date,status')
+    .select('id,makro_order_no,ship_date,status')
     .neq('ship_date', shipDate)
     .in('makro_order_no', nos)
   if (error) throw new Error('ตรวจออเดอร์ที่เคยนำเข้าแล้วไม่สำเร็จ: ' + error.message)
@@ -46,7 +47,11 @@ export async function listOrdersOnOtherDays(
 // shipped/shortage number from Makro must be reflected in the backorder list
 // too, not just on the order's own item table.
 // A PO that already exists on a DIFFERENT ship day is skipped, never re-created
-// (listOrdersOnOtherDays); the skipped list is returned so the UI can say so.
+// (listOrdersOnOtherDays); the skipped list is returned so the UI can say so --
+// unless the importer ticked it as postponed (`move`, movableNos): then that order
+// moves to this day with its packing, photos, boxes and link, and syncs like any
+// order already here. Its boat is cleared (boats belong to a day) and an order
+// left at the pier goes back to packed.
 // Store pickups Makro marks "Picked up" arrive (or, on a re-import, become)
 // picked_up; `voided` -- POs Makro returned/canceled, which buildImport does
 // not import -- only has its Makro status recorded on POs already here, so
@@ -55,9 +60,12 @@ export async function commitImport(
   shipDate: string,
   incoming: ParsedOrder[],
   voided: { makroOrderNo: string; status: string }[] = [],
+  move: string[] = [],
 ): Promise<{
   created: number
   synced: number
+  // postponed POs moved here from another day
+  moved: number
   skipped: { makroOrderNo: string; shipDate: string }[]
   // POs on another day whose payment facts were refreshed (payment lock)
   refreshed: number
@@ -79,10 +87,30 @@ export async function commitImport(
 
   // A PO already imported on another day is skipped, never duplicated. (One
   // that also exists on THIS day still syncs in place -- same-day wins.)
+  const otherDays = await listOrdersOnOtherDays(nos, shipDate)
   const elsewhere = new Map<string, string>()
-  for (const r of await listOrdersOnOtherDays(nos, shipDate))
+  for (const r of otherDays)
     if (!idByNo.has(r.makro_order_no) && !elsewhere.has(r.makro_order_no))
       elsewhere.set(r.makro_order_no, r.ship_date)
+
+  // Postponed POs the importer ticked: move them here, then they sync as orders of this day.
+  const movable = movableNos(otherDays)
+  let moved = 0
+  for (const no of new Set(move)) {
+    if (!elsewhere.has(no) || !movable.has(no)) continue
+    const old = otherDays.find((r) => r.makro_order_no === no)!
+    const status = old.status === 'at_pier' ? 'packed' : old.status
+    const { error: eM } = await supabase
+      .from('orders')
+      .update({ ship_day_id: day.id, ship_date: shipDate, boat_id: null, status })
+      .eq('id', old.id)
+    if (eM) throw new Error(`ย้ายออเดอร์ ${no} มาวันส่งนี้ไม่สำเร็จ: ${eM.message}`)
+    await logAction('move_ship_day', 'order', old.id, { makroOrderNo: no, from: old.ship_date, to: shipDate })
+    elsewhere.delete(no)
+    idByNo.set(no, old.id)
+    statusByNo.set(no, status)
+    moved++
+  }
   const orders = incoming.filter((o) => !elsewhere.has(o.makroOrderNo))
   const skipped = Array.from(elsewhere, ([makroOrderNo, d]) => ({ makroOrderNo, shipDate: d }))
   // A PO already imported on another day isn't re-created, but its payment
@@ -205,9 +233,10 @@ export async function commitImport(
     shipDate,
     created,
     synced,
+    moved,
     skipped: skipped.length,
   })
-  return { created, synced, skipped, refreshed }
+  return { created, synced, moved, skipped, refreshed }
 }
 
 // Lookup by the Makro shipping-label QR code (plain text = makro_order_no).

@@ -127,7 +127,7 @@ test('import calls commitImport(shipDate, orders) and reports created/synced', a
   await userEvent.click(await screen.findByRole('button', { name: /ดูตัวอย่าง/i }))
   await userEvent.click(await screen.findByRole('button', { name: /นำเข้า 1 ออเดอร์/i }))
 
-  expect(commitImport).toHaveBeenCalledWith('2026-09-11', baseResult.orders, [])
+  expect(commitImport).toHaveBeenCalledWith('2026-09-11', baseResult.orders, [], [])
   expect(await screen.findByText(/นำเข้า 3 ใหม่ · sync 2/i)).toBeInTheDocument()
 })
 
@@ -186,5 +186,23 @@ test('Makro returned / canceled POs are listed as skipped and passed on so exist
   await userEvent.click(await screen.findByRole('button', { name: /ดูตัวอย่าง/i }))
   expect(await screen.findByText(/ข้าม 2 ออเดอร์ \(แม็คโครคืน\/ยกเลิก\): P-8, P-9/)).toBeInTheDocument()
   await userEvent.click(screen.getByRole('button', { name: /นำเข้า 1 ออเดอร์/i }))
-  expect(commitImport).toHaveBeenCalledWith('2026-09-11', baseResult.orders, voided)
+  expect(commitImport).toHaveBeenCalledWith('2026-09-11', baseResult.orders, voided, [])
+})
+
+test('a postponed PO (on an earlier day, not delivered) can be ticked to move to this day', async () => {
+  listOrdersOnOtherDays.mockResolvedValue([
+    { id: 'o9', makro_order_no: 'P-1', ship_date: '2026-09-10', status: 'packed' },
+  ])
+  commitImport.mockResolvedValue({ created: 0, synced: 1, moved: 1, skipped: [], refreshed: 0 })
+  await uploadBoth()
+  await userEvent.click(await screen.findByRole('button', { name: /ดูตัวอย่าง/i }))
+  const tick = await screen.findByRole('checkbox', { name: 'ย้าย P-1 มาวันส่งนี้' })
+  expect(tick).not.toBeChecked()
+  expect(screen.getByText('จะข้าม 1 ออเดอร์ที่เคยนำเข้าแล้วในวันอื่น')).toBeInTheDocument()
+
+  await userEvent.click(tick)
+  expect(screen.queryByText(/^จะข้าม \d+ ออเดอร์/)).not.toBeInTheDocument()
+  await userEvent.click(screen.getByRole('button', { name: /นำเข้า 1 ออเดอร์/i }))
+  expect(commitImport).toHaveBeenCalledWith('2026-09-11', baseResult.orders, [], ['P-1'])
+  expect(await screen.findByText(/ย้ายมาวันนี้ 1 \(เลื่อนส่ง\)/)).toBeInTheDocument()
 })
