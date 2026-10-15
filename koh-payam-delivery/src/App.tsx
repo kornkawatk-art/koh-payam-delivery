@@ -165,9 +165,31 @@ export default function App() {
                 </RequireRole>
               }
             />
-            <Route path="/order/:id" element={<OrderDetail />} />
-            <Route path="/order/:id/pack" element={<PackOrder />} />
-            <Route path="/customer/:date/:phone/pack" element={<PackGroup />} />
+            <Route
+              path="/order/:id"
+              element={
+                <RequireRole path="/order">
+                  <OrderDetail />
+                </RequireRole>
+              }
+            />
+            {/* pack pages write: closed to read-only roles (sale) */}
+            <Route
+              path="/order/:id/pack"
+              element={
+                <RequireRole path="/pack">
+                  <PackOrder />
+                </RequireRole>
+              }
+            />
+            <Route
+              path="/customer/:date/:phone/pack"
+              element={
+                <RequireRole path="/pack">
+                  <PackGroup />
+                </RequireRole>
+              }
+            />
           </Route>
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>

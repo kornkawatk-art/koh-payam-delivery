@@ -22,6 +22,7 @@ import { InfoItem, StatTile } from '../../components/ui/Stat'
 import { PhotoGallery } from '../../components/ui/PhotoGallery'
 import { splitFreshDry } from '../../lib/freshDry'
 import { useAuth } from '../../lib/auth'
+import { canEdit } from '../../lib/roles'
 import { Notice, flash, type Flash } from '../../components/ui/Notice'
 import { AmountDue } from '../../components/ui/AmountDue'
 import { groupedItemRows } from '../../components/ui/ItemGroupHeader'
@@ -37,6 +38,8 @@ export default function OrderDetail() {
   const { id } = useParams()
   const nav = useNavigate()
   const { profile } = useAuth()
+  // sale reads only: status, address, photos and the customer link to share, no buttons that write
+  const editable = canEdit(profile?.role ?? 'packer')
   const [order, setOrder] = useState<any>(null)
   const [backorders, setBackorders] = useState<BackorderRow[]>([])
   const [failed, setFailed] = useState(false)
@@ -164,7 +167,8 @@ export default function OrderDetail() {
           <p>
             ออเดอร์นี้ลูกค้า<strong>มารับเองที่สาขา</strong> (Pick up at store) — ไม่ต้องส่งลงเรือ
           </p>
-          {['imported', 'packed'].includes(order.status) &&
+          {editable &&
+            ['imported', 'packed'].includes(order.status) &&
             (!closeOpen ? (
               <button
                 type="button"
@@ -333,25 +337,27 @@ export default function OrderDetail() {
         </p>
       )}
 
-      <div className="flex flex-col gap-2 sm:flex-row">
-        <Link
-          className="btn btn-ok min-h-[3.25rem] flex-1 text-lg"
-          to={`/order/${id}/pack`}
-        >
-          แพ็คของ
-        </Link>
-        <StickerPrintButton
-          className="btn btn-warn min-h-[3.25rem] flex-1 text-lg"
-          customer={order}
-          island={order.island}
-          printedOrders={[order]}
-          counts={{
-            paper: order.paper_box_count ?? 0,
-            foam: order.foam_box_count ?? 0,
-            piece: order.piece_count ?? 0,
-          }}
-        />
-      </div>
+      {editable && (
+        <div className="flex flex-col gap-2 sm:flex-row">
+          <Link
+            className="btn btn-ok min-h-[3.25rem] flex-1 text-lg"
+            to={`/order/${id}/pack`}
+          >
+            แพ็คของ
+          </Link>
+          <StickerPrintButton
+            className="btn btn-warn min-h-[3.25rem] flex-1 text-lg"
+            customer={order}
+            island={order.island}
+            printedOrders={[order]}
+            counts={{
+              paper: order.paper_box_count ?? 0,
+              foam: order.foam_box_count ?? 0,
+              piece: order.piece_count ?? 0,
+            }}
+          />
+        </div>
+      )}
 
       <div className="card flex flex-col gap-2 text-sm">
         <p className="section-title">ลิงก์ลูกค้า</p>
@@ -363,9 +369,11 @@ export default function OrderDetail() {
           >
             คัดลอก
           </button>
-          <button className="btn btn-secondary btn-sm" onClick={regen} disabled={busy}>
-            สร้างลิงก์ใหม่
-          </button>
+          {editable && (
+            <button className="btn btn-secondary btn-sm" onClick={regen} disabled={busy}>
+              สร้างลิงก์ใหม่
+            </button>
+          )}
         </div>
       </div>
 
@@ -399,22 +407,25 @@ export default function OrderDetail() {
         </div>
       </section>
 
-      <section className="text-sm">
-        <p className="section-title">เคลมของออเดอร์นี้</p>
-        {claims.length === 0 ? (
-          <p className="muted mt-1">ไม่มีเคลม</p>
-        ) : (
-          <ul className="mt-1 flex flex-col gap-1">
-            {claims.map((c) => (
-              <li key={c.id}>
-                <Link className="link" to={`/claims/${c.id}`}>
-                  เคลม #{c.id} · {c.status}
-                </Link>
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
+      {/* sale cannot read the island's claims (they report in the claim app), so "ไม่มีเคลม" would be wrong */}
+      {editable && (
+        <section className="text-sm">
+          <p className="section-title">เคลมของออเดอร์นี้</p>
+          {claims.length === 0 ? (
+            <p className="muted mt-1">ไม่มีเคลม</p>
+          ) : (
+            <ul className="mt-1 flex flex-col gap-1">
+              {claims.map((c) => (
+                <li key={c.id}>
+                  <Link className="link" to={`/claims/${c.id}`}>
+                    เคลม #{c.id} · {c.status}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+      )}
 
       <section className="text-sm">
         <p className="section-title">รูปตอนแพ็ค</p>

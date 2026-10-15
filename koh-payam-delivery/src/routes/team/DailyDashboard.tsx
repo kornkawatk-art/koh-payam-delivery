@@ -39,6 +39,7 @@ import { MakroVoidBadge } from '../../components/ui/MakroVoidBadge'
 import { BulkStickerDialog } from '../../components/BulkStickerPrint'
 import { buildStickerJobs } from '../../lib/bulkStickers'
 import { useAuth } from '../../lib/auth'
+import { canEdit } from '../../lib/roles'
 import { getDayLocks, releaseCustomer } from '../../lib/api/payments'
 import type { Lock } from '../../lib/payments'
 import { customerKey } from '../../../supabase/functions/_shared/customerKey'
@@ -46,6 +47,8 @@ import { customerKey } from '../../../supabase/functions/_shared/customerKey'
 export default function DailyDashboard() {
   const { profile } = useAuth()
   const isManager = profile?.role === 'manager'
+  // sale reads only: no LINE links, sticker printing or packing from here
+  const editable = canEdit(profile?.role ?? 'packer')
   const navigate = useNavigate()
   const [date, setDate] = useState(todayLocalISO())
   const [rows, setRows] = useState<any[] | null>(null)
@@ -291,7 +294,7 @@ export default function DailyDashboard() {
         </p>
       )}
 
-      {linksSentAt === null && rows.length > 0 && (
+      {editable && linksSentAt === null && rows.length > 0 && (
         <div className="alert alert-warn">
           <p className="flex flex-wrap items-center gap-1.5 font-semibold">
             <Warning size={16} weight="fill" aria-hidden="true" />
@@ -360,27 +363,29 @@ export default function DailyDashboard() {
         />
       )}
 
-      <div className="flex flex-wrap items-center gap-2">
-        <button
-          type="button"
-          className="btn btn-warn btn-sm"
-          disabled={stickerJobs.length === 0}
-          onClick={() => {
-            setBulkMsg(undefined)
-            setBulkOpen(true)
-          }}
-        >
-          <Printer size={16} aria-hidden="true" />
-          พิมพ์สติ๊กเกอร์ ({due.length} เจ้า · {dueStickers} ดวง)
-        </button>
-        {bulkMsg ? (
-          <span className="text-xs text-ink-soft">{bulkMsg}</span>
-        ) : stickerJobs.length === 0 ? (
-          <span className="text-xs text-ink-soft">ยังไม่มีออเดอร์ที่แพ็คเสร็จรอพิมพ์</span>
-        ) : (
-          due.length === 0 && <span className="text-xs text-ink-soft">พิมพ์ครบทุกเจ้าแล้ว</span>
-        )}
-      </div>
+      {editable && (
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            className="btn btn-warn btn-sm"
+            disabled={stickerJobs.length === 0}
+            onClick={() => {
+              setBulkMsg(undefined)
+              setBulkOpen(true)
+            }}
+          >
+            <Printer size={16} aria-hidden="true" />
+            พิมพ์สติ๊กเกอร์ ({due.length} เจ้า · {dueStickers} ดวง)
+          </button>
+          {bulkMsg ? (
+            <span className="text-xs text-ink-soft">{bulkMsg}</span>
+          ) : stickerJobs.length === 0 ? (
+            <span className="text-xs text-ink-soft">ยังไม่มีออเดอร์ที่แพ็คเสร็จรอพิมพ์</span>
+          ) : (
+            due.length === 0 && <span className="text-xs text-ink-soft">พิมพ์ครบทุกเจ้าแล้ว</span>
+          )}
+        </div>
+      )}
       {bulkOpen && (
         <BulkStickerDialog
           jobs={stickerJobs}
@@ -655,6 +660,8 @@ function GroupRows({
   showIsland: boolean
   released?: boolean
 }) {
+  const { profile } = useAuth()
+  const editable = canEdit(profile?.role ?? 'packer')
   const [open, setOpen] = useState(false)
   const os = group.orders
   const packed = os.filter((o) => o.status !== 'imported').length
@@ -681,12 +688,14 @@ function GroupRows({
             uniq(os.map((o) => o.island ?? 'none')).map((i) => (
               <IslandBadge key={i} island={i} className="ml-1.5" />
             ))}
-          <Link
-            className="btn btn-ok btn-sm ml-2"
-            to={`/customer/${date}/${encodeURIComponent(group.phone)}/pack?name=${encodeURIComponent(group.name)}`}
-          >
-            แพ็ครวม
-          </Link>
+          {editable && (
+            <Link
+              className="btn btn-ok btn-sm ml-2"
+              to={`/customer/${date}/${encodeURIComponent(group.phone)}/pack?name=${encodeURIComponent(group.name)}`}
+            >
+              แพ็ครวม
+            </Link>
+          )}
         </td>
         <td data-label="สถานะ">
           <span className={`badge ${packed === os.length ? 'badge-ok' : 'badge-neutral'}`}>

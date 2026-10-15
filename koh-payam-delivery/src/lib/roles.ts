@@ -13,11 +13,22 @@ import {
   type Icon,
 } from '@phosphor-icons/react'
 
-export type Role = 'packer' | 'pier' | 'manager'
+export type Role = 'packer' | 'pier' | 'manager' | 'sale'
+
+/** The claim app (same accounts): linked from the menu for the roles that use both apps */
+export const CLAIM_APP_URL = 'https://makro-claim.vercel.app'
+export const usesBothApps = (role: Role) => role === 'sale' || role === 'manager'
+
+/**
+ * sale (the claim app's reporter) only reads here: today's work and an order's page, to tell a
+ * customer where their order is. The database allows them reads only (migration 0036).
+ */
+export const canEdit = (role: Role) => role !== 'sale'
+const SALE_PATHS = ['/', '/order']
 
 export const NAV: { path: string; label: string; roles: Role[]; icon: Icon }[] =
   [
-    { path: '/', label: 'งานวันนี้', roles: ['packer', 'pier', 'manager'], icon: House },
+    { path: '/', label: 'งานวันนี้', roles: ['packer', 'pier', 'manager', 'sale'], icon: House },
     {
       path: '/import',
       label: 'นำเข้าออเดอร์',
@@ -61,6 +72,8 @@ export const NAV: { path: string; label: string; roles: Role[]; icon: Icon }[] =
   ]
 
 export function canAccess(path: string, role: Role): boolean {
+  // sale: today's work and the order page only -- no pack pages, no other detail pages
+  if (role === 'sale') return SALE_PATHS.includes(path)
   const item = NAV.find((n) => n.path === path)
   if (!item) return true // หน้ารายละเอียด (เช่น /order/:id) เปิดให้ทุกบทบาทที่ล็อกอิน
   return item.roles.includes(role)

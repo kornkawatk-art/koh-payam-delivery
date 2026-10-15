@@ -720,3 +720,20 @@ test('a released customer is back in the normal queue with a "ปลดแล้
   expect(screen.queryByText(/ค้างชำระ — ห้ามแพ็ค/)).not.toBeInTheDocument()
   expect(screen.getByText('ยังไม่แพ็ค (2)')).toBeInTheDocument()
 })
+
+test('sale reads the day (orders, progress, links to each order) without the buttons that write', async () => {
+  authRole.current = 'sale'
+  try {
+    vi.mocked(getShipDayLinksSentAt).mockResolvedValueOnce(null)
+    vi.mocked(listOrdersForDay).mockResolvedValueOnce(groupOrders())
+    renderPage()
+    await screen.findByText('SUNSET')
+    expect(screen.getByRole('link', { name: 'PO-3' })).toBeInTheDocument()
+    expect(screen.queryByText('ยังไม่ได้ส่งลิงก์ไลน์ให้ลูกค้าวันนี้')).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'ส่งลิงก์ไลน์เลย' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /พิมพ์สติ๊กเกอร์/ })).not.toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'แพ็ครวม' })).not.toBeInTheDocument()
+  } finally {
+    authRole.current = 'packer'
+  }
+})

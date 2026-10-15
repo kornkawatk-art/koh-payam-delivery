@@ -1,8 +1,8 @@
 import { Suspense, useEffect, useState } from 'react'
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
-import { List, Moon, SignOut, Sun } from '@phosphor-icons/react'
+import { ArrowSquareOut, List, Moon, SignOut, Sun } from '@phosphor-icons/react'
 import { useAuth } from '../lib/auth'
-import { NAV, canAccess } from '../lib/roles'
+import { CLAIM_APP_URL, NAV, canAccess, usesBothApps } from '../lib/roles'
 import { applyTheme, getTheme, setTheme, type Theme } from '../lib/theme'
 import { useAppUpdate } from '../lib/useAppUpdate'
 import { PageSkeleton } from './ui/Skeleton'
@@ -144,6 +144,16 @@ export default function AppShell() {
           <p className="truncate px-1 pb-2 text-xs text-ink-faint">
             {profile?.name} · {role}
           </p>
+          {/* same account works in the claim app */}
+          {usesBothApps(role) && (
+            <a
+              href={CLAIM_APP_URL}
+              className="btn btn-ghost btn-sm mb-1.5 w-full justify-start gap-1.5 text-ink-soft"
+            >
+              <ArrowSquareOut size={16} weight="bold" aria-hidden="true" />
+              แอปเคลมสินค้า
+            </a>
+          )}
           <button
             type="button"
             className="btn btn-ghost btn-sm mb-1.5 w-full justify-start gap-1.5 text-ink-soft"

@@ -1,8 +1,9 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react'
 import type { Session } from '@supabase/supabase-js'
 import { supabase } from './supabase'
+import type { Role } from './roles'
 
-type Profile = { id: string; name: string; role: 'packer' | 'pier' | 'manager' }
+type Profile = { id: string; name: string; role: Role }
 type Aal = 'aal1' | 'aal2' | null
 type AuthValue = {
   session: Session | null

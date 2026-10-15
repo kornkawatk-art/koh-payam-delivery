@@ -1,4 +1,4 @@
-import { canAccess } from './roles'
+import { canAccess, canEdit } from './roles'
 
 test('packer cannot access pier', () => {
   expect(canAccess('/pier', 'packer')).toBe(false)
@@ -38,4 +38,18 @@ test('non-managers are denied the shortage report page', () => {
 })
 test('manager can access the shortage report page', () => {
   expect(canAccess('/shortage-report', 'manager')).toBe(true)
+})
+
+test('sale only reads: today and the order page, never pack pages or manager pages', () => {
+  expect(canAccess('/', 'sale')).toBe(true)
+  expect(canAccess('/order', 'sale')).toBe(true)
+  for (const path of ['/pack', '/import', '/boats', '/pier', '/foam', '/claims', '/debts', '/line-contacts', '/audit-log', '/shortage-report', '/customer-aliases'])
+    expect(canAccess(path, 'sale')).toBe(false)
+  expect(canEdit('sale')).toBe(false)
+  expect(canEdit('packer')).toBe(true)
+})
+
+test('a pack page stays open to the packing team', () => {
+  expect(canAccess('/pack', 'packer')).toBe(true)
+  expect(canAccess('/pack', 'manager')).toBe(true)
 })

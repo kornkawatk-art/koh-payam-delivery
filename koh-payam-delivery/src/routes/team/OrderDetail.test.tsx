@@ -396,3 +396,19 @@ test('a bill the team marked paid says so and offers no button', async () => {
   expect(await screen.findByText('ทีมบันทึกรับเงินแล้ว — รอแม็คโครอัปเดต')).toBeInTheDocument()
   expect(screen.queryByRole('button', { name: 'รับเงินแล้ว' })).not.toBeInTheDocument()
 })
+
+test('sale reads the order (status, money due, customer link to copy) but gets no button that writes', async () => {
+  useAuthMock.mockReset().mockReturnValue({ profile: { id: 's1', name: 'เซล', role: 'sale' } })
+  getOrder.mockReset().mockResolvedValue({ ...order, is_pickup: true, outstanding_amount: 500, payment_method: 'Pay On Delivery' })
+  renderPage()
+  expect(await screen.findByText('฿500.00')).toBeInTheDocument()
+  expect(screen.getByRole('button', { name: 'คัดลอก' })).toBeInTheDocument()
+
+  expect(screen.queryByRole('link', { name: 'แพ็คของ' })).not.toBeInTheDocument()
+  expect(screen.queryByRole('button', { name: /พิมพ์สติ๊กเกอร์/ })).not.toBeInTheDocument()
+  expect(screen.queryByRole('button', { name: 'สร้างลิงก์ใหม่' })).not.toBeInTheDocument()
+  expect(screen.queryByRole('button', { name: /ลูกค้ารับแล้ว|ปิดออเดอร์/ })).not.toBeInTheDocument()
+  expect(screen.queryByRole('button', { name: /ลบออเดอร์/ })).not.toBeInTheDocument()
+  // sale cannot read the island's claims, so the section would wrongly say "ไม่มีเคลม"
+  expect(screen.queryByText('เคลมของออเดอร์นี้')).not.toBeInTheDocument()
+})
