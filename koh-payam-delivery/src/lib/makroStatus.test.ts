@@ -1,5 +1,5 @@
 import { canTransition } from './status'
-import { isMakroPickedUp, makroVoid } from './makroStatus'
+import { makroPickStage, isMakroPickedUp, makroVoid } from './makroStatus'
 
 test('makroVoid: Makro returned / canceled orders (any case, US or UK spelling); others are null', () => {
   expect(makroVoid('Returned')).toBe('returned')
@@ -23,4 +23,14 @@ test('a store pickup can be closed from imported or packed, and only reopened ba
   expect(canTransition('shipped', 'picked_up')).toBe(false)
   expect(canTransition('picked_up', 'imported')).toBe(true)
   expect(canTransition('picked_up', 'shipped')).toBe(false)
+})
+
+test("Makro's picking stage is read from its Order Status", () => {
+  expect(makroPickStage('Placed')).toBe('waiting')
+  expect(makroPickStage('Picking and packing')).toBe('picking')
+  for (const s of ['Ready for ship', 'Ready for pickup', 'Shipped', 'Out for delivery', 'Delivered', 'Picked up'])
+    expect(makroPickStage(s)).toBe('ready')
+  expect(makroPickStage(' delivered ')).toBe('ready')
+  expect(makroPickStage('Canceled')).toBeNull()
+  expect(makroPickStage(null)).toBeNull()
 })

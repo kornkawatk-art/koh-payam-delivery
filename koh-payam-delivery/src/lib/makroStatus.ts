@@ -16,3 +16,30 @@ export const MAKRO_VOID_TH: Record<'returned' | 'canceled', string> = {
   returned: 'แม็คโคร: คืนสินค้า',
   canceled: 'แม็คโคร: ยกเลิก',
 }
+
+/**
+ * How far Makro's own picking has got, from its Order Status column (refreshed on every import):
+ * waiting = not started (Placed), picking = "Picking and packing", ready = picked and handed on
+ * (Ready for ship / for pickup, Shipped, Out for delivery, Delivered, Picked up). null when the
+ * order is void or the status is unknown.
+ */
+export type MakroPickStage = 'waiting' | 'picking' | 'ready'
+const PICK_STAGE: Record<string, MakroPickStage> = {
+  placed: 'waiting',
+  pending: 'waiting',
+  'picking and packing': 'picking',
+  'ready for ship': 'ready',
+  'ready for pickup': 'ready',
+  shipped: 'ready',
+  'out for delivery': 'ready',
+  delivered: 'ready',
+  'picked up': 'ready',
+}
+export function makroPickStage(status: string | null | undefined): MakroPickStage | null {
+  return PICK_STAGE[(status ?? '').trim().toLowerCase()] ?? null
+}
+export const MAKRO_PICK_TH: Record<MakroPickStage, string> = {
+  waiting: 'แม็คโครยังไม่เริ่มจัด',
+  picking: 'แม็คโครกำลังจัด',
+  ready: 'แม็คโครจัดเสร็จ',
+}

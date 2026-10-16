@@ -737,3 +737,33 @@ test('sale reads the day (orders, progress, links to each order) without the but
     authRole.current = 'packer'
   }
 })
+
+test("Makro's picking shows on orders not packed yet, with a summary for the day", async () => {
+  const o = (id: string, name: string, status: string, makro: string) => ({
+    id, makro_order_no: `PO-${id}`, customer_name_en: name, island: 'payam', makro_order_status: makro, status,
+    boat_id: null, paper_box_count: 0, foam_box_count: 0, piece_count: 0, outstanding_amount: 0, customer_phone: `0${id}`,
+  })
+  vi.mocked(listOrdersForDay).mockResolvedValueOnce([
+    o('1', 'READY SHOP', 'imported', 'Ready for ship'),
+    o('2', 'PICKING SHOP', 'imported', 'Picking and packing'),
+    o('3', 'PACKED SHOP', 'packed', 'Delivered'),
+  ])
+  renderPage()
+  const ready = (await screen.findByText('READY SHOP')).closest('tr') as HTMLElement
+  expect(within(ready).getByText('แม็คโครจัดเสร็จ')).toHaveClass('badge-ok')
+  const picking = screen.getByText('PICKING SHOP').closest('tr') as HTMLElement
+  expect(within(picking).getByText('แม็คโครกำลังจัด')).toHaveClass('badge-warn')
+  // once packed by the island team, Makro's picking no longer shows
+  const packed = screen.getByText('PACKED SHOP').closest('tr') as HTMLElement
+  expect(within(packed).queryByText(/แม็คโครจัดเสร็จ/)).not.toBeInTheDocument()
+  expect(screen.getByLabelText('การจัดสินค้าของแม็คโคร')).toHaveTextContent(/ยังไม่แพ็ค 2 ออเดอร์ · แม็คโครจัดเสร็จ 1 · กำลังจัด 1/)
+})
+
+test("a customer's POs show how many Makro finished picking", async () => {
+  vi.mocked(listOrdersForDay).mockResolvedValueOnce(
+    groupOrders().map((x: any) => ({ ...x, status: 'imported', makro_order_status: x.id === '1' ? 'Ready for ship' : 'Picking and packing' })),
+  )
+  renderPage()
+  const row = (await screen.findByText('2 PO')).closest('tr') as HTMLElement
+  expect(within(row).getByText('แม็คโครจัดเสร็จ 1/2')).toHaveClass('badge-warn')
+})

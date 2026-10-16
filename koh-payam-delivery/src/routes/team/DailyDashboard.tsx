@@ -36,6 +36,8 @@ import {
 import { PickupBadge } from '../../components/ui/PickupBadge'
 import { LinkSendReport } from '../../components/LinkSendReport'
 import { MakroVoidBadge } from '../../components/ui/MakroVoidBadge'
+import { MakroPickBadge } from '../../components/ui/MakroPickBadge'
+import { makroPickStage } from '../../lib/makroStatus'
 import { BulkStickerDialog } from '../../components/BulkStickerPrint'
 import { buildStickerJobs } from '../../lib/bulkStickers'
 import { useAuth } from '../../lib/auth'
@@ -289,6 +291,7 @@ export default function DailyDashboard() {
           barClass="bg-ok"
         />
       </div>
+      <MakroPickSummary rows={rows} />
       {counts.pickups > 0 && (
         <p className="-mt-2 text-sm text-ink-soft">
           รับเองที่สาขา {counts.pickups} (รับแล้ว {counts.pickedUp})
@@ -508,6 +511,54 @@ export default function DailyDashboard() {
  * the tile's icon so each stage reads as its own track. The value stays the
  * tile's direct child (the tests and screen readers find it there).
  */
+/**
+ * Makro's picking, for the orders the island team has not packed yet: how many Makro has finished, is
+ * picking, or has not started (from the last import of Makro's file).
+ */
+function MakroPickSummary({ rows }: { rows: any[] }) {
+  const open = rows.filter((o) => o.status === 'imported')
+  if (open.length === 0) return null
+  const n = { ready: 0, picking: 0, waiting: 0 }
+  for (const o of open) {
+    const s = makroPickStage(o.makro_order_status)
+    if (s) n[s]++
+  }
+  if (n.ready + n.picking + n.waiting === 0) return null
+  return (
+    <p className="-mt-2 text-sm text-ink-soft" aria-label="การจัดสินค้าของแม็คโคร">
+      ยังไม่แพ็ค <span className="num">{open.length}</span> ออเดอร์ ·{' '}
+      <span className="font-semibold text-ok-ink">
+        แม็คโครจัดเสร็จ <span className="num">{n.ready}</span>
+      </span>
+      {n.picking > 0 && (
+        <>
+          {' '}
+          · <span className="text-warn-ink">กำลังจัด <span className="num">{n.picking}</span></span>
+        </>
+      )}
+      {n.waiting > 0 && (
+        <>
+          {' '}
+          · ยังไม่เริ่ม <span className="num">{n.waiting}</span>
+        </>
+      )}
+      <span className="block text-xs">ตามไฟล์แม็คโครที่นำเข้าล่าสุด นำเข้าซ้ำเพื่ออัปเดต</span>
+    </p>
+  )
+}
+
+/** A customer's POs not packed yet: how many Makro finished picking, e.g. "แม็คโครจัดเสร็จ 1/2" */
+function GroupPickBadge({ orders }: { orders: any[] }) {
+  const open = orders.filter((o) => o.status === 'imported' && makroPickStage(o.makro_order_status))
+  if (open.length === 0) return null
+  const ready = open.filter((o) => makroPickStage(o.makro_order_status) === 'ready').length
+  return (
+    <span className={`badge ml-1.5 ${ready === open.length ? 'badge-ok' : 'badge-warn'}`}>
+      แม็คโครจัดเสร็จ {ready}/{open.length}
+    </span>
+  )
+}
+
 function ProgressTile({
   icon,
   label,
@@ -706,6 +757,7 @@ function GroupRows({
           {os.map((o) => (
             <MakroVoidBadge key={o.id} status={o.makro_order_status} className="ml-1.5" />
           ))}
+          <GroupPickBadge orders={os} />
           <ShortBadge count={os.reduce((n, o) => n + shortCount(o), 0)} />
           {os.some((o) => o.outstanding_amount > 0) && (
             <span className="badge badge-warn ml-1.5">เก็บเงิน</span>
@@ -766,6 +818,7 @@ function OrderRow({
         <StatusBadge status={o.status} />
         <PickupBadge show={o.is_pickup} className="ml-1.5" />
         <MakroVoidBadge status={o.makro_order_status} className="ml-1.5" />
+        <MakroPickBadge status={o.makro_order_status} packStatus={o.status} className="ml-1.5" />
         <ShortBadge count={shortCount(o)} />
         {o.outstanding_amount > 0 && <span className="badge badge-warn ml-1.5">เก็บเงิน</span>}
       </td>

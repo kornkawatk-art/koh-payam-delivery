@@ -30,6 +30,7 @@ import { StickerPrintButton } from '../../components/StickerPrint'
 import { ShippingAddress } from '../../components/ui/ShippingAddress'
 import { PickupBadge } from '../../components/ui/PickupBadge'
 import { MakroVoidBadge } from '../../components/ui/MakroVoidBadge'
+import { MakroPickBadge } from '../../components/ui/MakroPickBadge'
 import { makroVoid } from '../../lib/makroStatus'
 import { markBillPaid } from '../../lib/api/payments'
 import { isUnpaidBill, type Bill } from '../../lib/payments'
@@ -150,6 +151,7 @@ export default function OrderDetail() {
           <StatusBadge status={order.status} />
           <PickupBadge show={order.is_pickup} />
           <MakroVoidBadge status={order.makro_order_status} />
+          <MakroPickBadge status={order.makro_order_status} packStatus={order.status} />
         </div>
       </header>
 
