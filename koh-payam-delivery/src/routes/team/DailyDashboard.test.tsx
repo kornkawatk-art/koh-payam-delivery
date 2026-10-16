@@ -767,3 +767,14 @@ test("a customer's POs show how many Makro finished picking", async () => {
   const row = (await screen.findByText('2 PO')).closest('tr') as HTMLElement
   expect(within(row).getByText('จัดเสร็จแล้ว 1/2')).toHaveClass('badge-warn')
 })
+
+test('an order not packed yet carries no "นำเข้าแล้ว" badge (it is already under ยังไม่แพ็ค)', async () => {
+  vi.mocked(listOrdersForDay).mockResolvedValueOnce([
+    { id: '1', makro_order_no: 'PO-1', customer_name_en: 'NEW SHOP', island: 'payam', status: 'imported', boat_id: null, paper_box_count: 0, foam_box_count: 0, piece_count: 0, outstanding_amount: 0, customer_phone: '01' },
+    { id: '2', makro_order_no: 'PO-2', customer_name_en: 'DONE SHOP', island: 'payam', status: 'packed', boat_id: null, paper_box_count: 1, foam_box_count: 0, piece_count: 0, outstanding_amount: 0, customer_phone: '02' },
+  ])
+  renderPage()
+  const row = (await screen.findByText('NEW SHOP')).closest('tr') as HTMLElement
+  expect(within(row).queryByText('นำเข้าแล้ว')).not.toBeInTheDocument()
+  expect(within(screen.getByText('DONE SHOP').closest('tr') as HTMLElement).getByText('แพ็คแล้ว')).toBeInTheDocument()
+})

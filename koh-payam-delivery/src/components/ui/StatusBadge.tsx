@@ -29,6 +29,9 @@ const STATUS_ICON: Record<string, Icon> = {
 }
 
 export function StatusBadge({ status }: { status: string }) {
+  // "นำเข้าแล้ว" said nothing useful (every order is imported): a not-yet-packed order shows no status
+  // badge -- the dashboard already sections it under ยังไม่แพ็ค, and Makro's picking badge sits there
+  if (status === 'imported') return null
   const Icon = STATUS_ICON[status]
   return (
     <span className={`badge ${TONE[status] ?? 'badge-neutral'}`}>
