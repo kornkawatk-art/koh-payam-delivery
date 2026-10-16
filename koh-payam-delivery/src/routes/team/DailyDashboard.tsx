@@ -39,14 +39,15 @@ import { MakroVoidBadge } from '../../components/ui/MakroVoidBadge'
 import { BulkStickerDialog } from '../../components/BulkStickerPrint'
 import { buildStickerJobs } from '../../lib/bulkStickers'
 import { useAuth } from '../../lib/auth'
-import { canEdit } from '../../lib/roles'
+import { canEdit, isLead } from '../../lib/roles'
 import { getDayLocks, releaseCustomer } from '../../lib/api/payments'
 import type { Lock } from '../../lib/payments'
 import { customerKey } from '../../../supabase/functions/_shared/customerKey'
 
 export default function DailyDashboard() {
   const { profile } = useAuth()
-  const isManager = profile?.role === 'manager'
+  // releasing a payment lock: the manager or the online team
+  const isManager = isLead(profile?.role)
   // sale reads only: no LINE links, sticker printing or packing from here
   const editable = canEdit(profile?.role ?? 'packer')
   const navigate = useNavigate()

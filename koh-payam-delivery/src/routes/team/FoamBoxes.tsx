@@ -6,6 +6,7 @@ import { EmptyState } from '../../components/ui/EmptyState'
 import { Notice, flash, type Flash } from '../../components/ui/Notice'
 import { StatTile } from '../../components/ui/Stat'
 import { useAuth } from '../../lib/auth'
+import { isLead } from '../../lib/roles'
 import { formatDateTH, formatDateTimeTH } from '../../lib/format'
 import {
   LONG_HELD_DAYS,
@@ -44,7 +45,8 @@ const COLS = 'sm:grid sm:grid-cols-[minmax(0,1fr)_5rem_8rem_9.5rem_auto] sm:item
  */
 export default function FoamBoxes() {
   const { profile } = useAuth()
-  const isManager = profile?.role === 'manager'
+  // setting the count: the manager or the online team
+  const isManager = isLead(profile?.role)
   // undefined = loading, null = tracking not enabled yet (migration 0031 not run)
   const [customers, setCustomers] = useState<FoamCustomer[] | null | undefined>(undefined)
   const [q, setQ] = useState('')

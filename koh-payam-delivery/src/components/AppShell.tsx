@@ -151,7 +151,7 @@ export default function AppShell() {
               className="btn btn-ghost btn-sm mb-1.5 w-full justify-start gap-1.5 text-ink-soft"
             >
               <ArrowSquareOut size={16} weight="bold" aria-hidden="true" />
-              แอปเคลมสินค้า
+              O2O Desk
             </a>
           )}
           <button

@@ -27,9 +27,9 @@ export async function getNavCounts(role: Role, today: string): Promise<NavCounts
       .eq('is_pickup', false)
 
   const jobs: [string, Promise<number>][] = [['/', count(todays().eq('status', 'imported'))]]
-  if (role === 'pier' || role === 'manager')
+  if (role === 'pier' || role === 'manager' || role === 'online')
     jobs.push(['/pier', count(todays().in('status', ['packed', 'at_pier']))])
-  if (role === 'manager') {
+  if (role === 'manager' || role === 'online') {
     // customers locked for unpaid bills who have an order today
     jobs.push(['/debts', countLockedToday(today)])
     jobs.push([

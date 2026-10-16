@@ -412,3 +412,13 @@ test('sale reads the order (status, money due, customer link to copy) but gets n
   // sale cannot read the island's claims, so the section would wrongly say "ไม่มีเคลม"
   expect(screen.queryByText('เคลมของออเดอร์นี้')).not.toBeInTheDocument()
 })
+
+test('the online team picks the island and marks a bill paid, but only the manager deletes an order', async () => {
+  useAuthMock.mockReset().mockReturnValue({ profile: { id: 'o1', name: 'ออนไลน์', role: 'online' } })
+  getOrder.mockReset().mockResolvedValue({ ...order, island: null })
+  renderPage()
+  expect(await screen.findByText('เกาะที่ส่ง')).toBeInTheDocument()
+  expect(screen.getByRole('combobox')).toBeInTheDocument()
+  expect(screen.queryByRole('button', { name: /ลบออเดอร์/ })).not.toBeInTheDocument()
+  expect(screen.queryByText(/ลบออเดอร์ได้ที่ท้ายหน้า/)).not.toBeInTheDocument()
+})

@@ -22,7 +22,7 @@ import { InfoItem, StatTile } from '../../components/ui/Stat'
 import { PhotoGallery } from '../../components/ui/PhotoGallery'
 import { splitFreshDry } from '../../lib/freshDry'
 import { useAuth } from '../../lib/auth'
-import { canEdit } from '../../lib/roles'
+import { canEdit, isLead } from '../../lib/roles'
 import { Notice, flash, type Flash } from '../../components/ui/Notice'
 import { AmountDue } from '../../components/ui/AmountDue'
 import { groupedItemRows } from '../../components/ui/ItemGroupHeader'
@@ -195,7 +195,7 @@ export default function OrderDetail() {
                 </button>
               </div>
             ))}
-          {order.status === 'picked_up' && profile?.role === 'manager' && (
+          {order.status === 'picked_up' && isLead(profile?.role) && (
             <button
               type="button"
               className="btn btn-secondary btn-sm self-start"
@@ -219,7 +219,7 @@ export default function OrderDetail() {
       {order.paid_marked_at ? (
         <p className="muted text-sm">ทีมบันทึกรับเงินแล้ว — รอแม็คโครอัปเดต</p>
       ) : (
-        profile?.role === 'manager' &&
+        isLead(profile?.role) &&
         isUnpaidBill(order as Bill) &&
         (!payOpen ? (
           <button
@@ -271,7 +271,7 @@ export default function OrderDetail() {
           <InfoItem icon={Anchor} label="คนลงเรือ" value={order.pier_name} />
         </dl>
       </section>
-      {(!isIsland(order.island) || profile?.role === 'manager') && (
+      {(!isIsland(order.island) || isLead(profile?.role)) && (
         <section
           className={`flex flex-col gap-2 text-sm ${isIsland(order.island) ? '' : 'alert alert-warn'}`}
           aria-label="เกาะที่ส่ง"
@@ -282,10 +282,12 @@ export default function OrderDetail() {
               ยังไม่ระบุเกาะ — ที่อยู่มีแค่ท่าเรือเทศบาลปากน้ำ
               {profile?.role === 'manager'
                 ? ' เลือกเกาะด้านล่าง (ถ้าเป็นลูกค้าบนฝั่ง ลบออเดอร์ได้ที่ท้ายหน้า)'
-                : ' ให้หัวหน้าเลือกเกาะก่อนส่งขึ้นเรือ'}
+                : isLead(profile?.role)
+                  ? ' เลือกเกาะด้านล่าง (ถ้าเป็นลูกค้าบนฝั่ง ให้หัวหน้าลบออเดอร์)'
+                  : ' ให้หัวหน้าเลือกเกาะก่อนส่งขึ้นเรือ'}
             </p>
           )}
-          {profile?.role === 'manager' && (
+          {isLead(profile?.role) && (
             <label className="flex flex-wrap items-center gap-2">
               <span className="field-label">เกาะที่ส่ง</span>
               <select

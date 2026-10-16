@@ -1,4 +1,4 @@
-import { canAccess, canEdit } from './roles'
+import { canAccess, canEdit, isLead, usesBothApps } from './roles'
 
 test('packer cannot access pier', () => {
   expect(canAccess('/pier', 'packer')).toBe(false)
@@ -52,4 +52,14 @@ test('sale only reads: today and the order page, never pack pages or manager pag
 test('a pack page stays open to the packing team', () => {
   expect(canAccess('/pack', 'packer')).toBe(true)
   expect(canAccess('/pack', 'manager')).toBe(true)
+})
+
+test('the online team runs the day like the manager, except the audit log', () => {
+  for (const path of ['/', '/import', '/boats', '/pier', '/foam', '/claims', '/debts', '/line-contacts', '/shortage-report', '/customer-aliases'])
+    expect(canAccess(path, 'online')).toBe(true)
+  expect(canAccess('/audit-log', 'online')).toBe(false)
+  expect(canAccess('/pack', 'online')).toBe(true)
+  expect(isLead('online')).toBe(true)
+  expect(isLead('packer')).toBe(false)
+  expect(usesBothApps('online')).toBe(true)
 })
