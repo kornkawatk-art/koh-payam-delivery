@@ -171,7 +171,8 @@ export default function DailyDashboard() {
 
   const filtered = useMemo(() => {
     const s = q.trim().toLowerCase()
-    return entries.filter(
+    return entries
+      .filter(
       (e) =>
         entryOrders(e).some((o) => matchesIsland(o.island, island)) &&
         (!s ||
@@ -180,7 +181,10 @@ export default function DailyDashboard() {
               o.customer_name_en.toLowerCase().includes(s) ||
               o.makro_order_no.toLowerCase().includes(s),
           )),
-    )
+      )
+      // combined orders (one customer, several POs) first in every section, then the single POs;
+      // the sort is stable, so each keeps its order from the file
+      .sort((a, b) => Number(b.kind === 'group') - Number(a.kind === 'group'))
   }, [entries, q, island])
 
   // Not-yet-packed entries float to the top so the packing queue for the day

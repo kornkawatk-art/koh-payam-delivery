@@ -778,3 +778,21 @@ test('an order not packed yet carries no "นำเข้าแล้ว" badge 
   expect(within(row).queryByText('นำเข้าแล้ว')).not.toBeInTheDocument()
   expect(within(screen.getByText('DONE SHOP').closest('tr') as HTMLElement).getByText('แพ็คแล้ว')).toBeInTheDocument()
 })
+
+test('combined orders (one customer, several POs) come first, then the single POs', async () => {
+  const single = (id: string, name: string, phone: string) => ({
+    id, makro_order_no: `PO-${id}`, customer_name_en: name, island: 'payam', status: 'imported',
+    boat_id: null, paper_box_count: 0, foam_box_count: 0, piece_count: 0, outstanding_amount: 0, customer_phone: phone,
+  })
+  vi.mocked(listOrdersForDay).mockResolvedValueOnce([
+    single('1', 'ALONE FIRST', '01'),
+    single('2', 'TWIN SHOP', '09'),
+    single('3', 'ALONE SECOND', '02'),
+    single('4', 'TWIN SHOP', '09'),
+  ])
+  renderPage()
+  await screen.findByText('2 PO')
+  const order = ['2 PO', 'ALONE FIRST', 'ALONE SECOND'].map((t) => screen.getByText(t).closest('tr')!)
+  expect(order[0].compareDocumentPosition(order[1]) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  expect(order[1].compareDocumentPosition(order[2]) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+})
