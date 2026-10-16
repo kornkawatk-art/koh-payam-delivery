@@ -41,5 +41,5 @@ export function makroPickStage(status: string | null | undefined): MakroPickStag
 export const MAKRO_PICK_TH: Record<MakroPickStage, string> = {
   waiting: 'แม็คโครยังไม่เริ่มจัด',
   picking: 'แม็คโครกำลังจัด',
-  ready: 'แม็คโครจัดเสร็จ',
+  ready: 'จัดเสร็จแล้ว',
 }

@@ -750,13 +750,13 @@ test("Makro's picking shows on orders not packed yet, with a summary for the day
   ])
   renderPage()
   const ready = (await screen.findByText('READY SHOP')).closest('tr') as HTMLElement
-  expect(within(ready).getByText('แม็คโครจัดเสร็จ')).toHaveClass('badge-ok')
+  expect(within(ready).getByText('จัดเสร็จแล้ว')).toHaveClass('badge-ok')
   const picking = screen.getByText('PICKING SHOP').closest('tr') as HTMLElement
   expect(within(picking).getByText('แม็คโครกำลังจัด')).toHaveClass('badge-warn')
   // once packed by the island team, Makro's picking no longer shows
   const packed = screen.getByText('PACKED SHOP').closest('tr') as HTMLElement
-  expect(within(packed).queryByText(/แม็คโครจัดเสร็จ/)).not.toBeInTheDocument()
-  expect(screen.getByLabelText('การจัดสินค้าของแม็คโคร')).toHaveTextContent(/ยังไม่แพ็ค 2 ออเดอร์ · แม็คโครจัดเสร็จ 1 · กำลังจัด 1/)
+  expect(within(packed).queryByText(/จัดเสร็จแล้ว/)).not.toBeInTheDocument()
+  expect(screen.getByLabelText('การจัดสินค้าของแม็คโคร')).toHaveTextContent(/ยังไม่แพ็ค 2 ออเดอร์ · จัดเสร็จแล้ว 1 · กำลังจัด 1/)
 })
 
 test("a customer's POs show how many Makro finished picking", async () => {
@@ -765,5 +765,5 @@ test("a customer's POs show how many Makro finished picking", async () => {
   )
   renderPage()
   const row = (await screen.findByText('2 PO')).closest('tr') as HTMLElement
-  expect(within(row).getByText('แม็คโครจัดเสร็จ 1/2')).toHaveClass('badge-warn')
+  expect(within(row).getByText('จัดเสร็จแล้ว 1/2')).toHaveClass('badge-warn')
 })

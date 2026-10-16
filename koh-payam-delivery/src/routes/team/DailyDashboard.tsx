@@ -528,7 +528,7 @@ function MakroPickSummary({ rows }: { rows: any[] }) {
     <p className="-mt-2 text-sm text-ink-soft" aria-label="การจัดสินค้าของแม็คโคร">
       ยังไม่แพ็ค <span className="num">{open.length}</span> ออเดอร์ ·{' '}
       <span className="font-semibold text-ok-ink">
-        แม็คโครจัดเสร็จ <span className="num">{n.ready}</span>
+        จัดเสร็จแล้ว <span className="num">{n.ready}</span>
       </span>
       {n.picking > 0 && (
         <>
@@ -547,14 +547,14 @@ function MakroPickSummary({ rows }: { rows: any[] }) {
   )
 }
 
-/** A customer's POs not packed yet: how many Makro finished picking, e.g. "แม็คโครจัดเสร็จ 1/2" */
+/** A customer's POs not packed yet: how many Makro finished picking, e.g. "จัดเสร็จแล้ว 1/2" */
 function GroupPickBadge({ orders }: { orders: any[] }) {
   const open = orders.filter((o) => o.status === 'imported' && makroPickStage(o.makro_order_status))
   if (open.length === 0) return null
   const ready = open.filter((o) => makroPickStage(o.makro_order_status) === 'ready').length
   return (
     <span className={`badge ml-1.5 ${ready === open.length ? 'badge-ok' : 'badge-warn'}`}>
-      แม็คโครจัดเสร็จ {ready}/{open.length}
+      จัดเสร็จแล้ว {ready}/{open.length}
     </span>
   )
 }
