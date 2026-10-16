@@ -7,6 +7,7 @@ import AppShell from './components/AppShell'
 import Login from './routes/team/Login'
 import TwoFactorSetup from './routes/team/TwoFactorSetup'
 import TwoFactorChallenge from './routes/team/TwoFactorChallenge'
+import ChangePassword from './routes/team/ChangePassword'
 
 // Every page except login/2FA loads on demand: one 1.6 MB bundle made a
 // customer opening a LINE link download the Excel reader, the QR scanner and
@@ -37,12 +38,14 @@ const LOADING = (
 )
 
 function RequireAuth({ children }: { children: JSX.Element }) {
-  const { loading, session, mfaLoaded, needsMfaSetup, needsMfaChallenge } = useAuth()
+  const { loading, session, mfaLoaded, needsMfaSetup, needsMfaChallenge, profile } = useAuth()
   if (loading) return LOADING
   if (!session) return <Navigate to="/login" replace />
   if (!mfaLoaded) return LOADING // MFA state not yet decided — don't redirect or render content
   if (needsMfaSetup) return <Navigate to="/2fa/setup" replace />
   if (needsMfaChallenge) return <Navigate to="/2fa" replace />
+  // a temporary password from a manager: the person sets their own first
+  if (profile?.must_change_password) return <ChangePassword />
   return children
 }
 

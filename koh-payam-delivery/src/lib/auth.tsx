@@ -3,7 +3,8 @@ import type { Session } from '@supabase/supabase-js'
 import { supabase } from './supabase'
 import type { Role } from './roles'
 
-type Profile = { id: string; name: string; role: Role }
+// must_change_password: a temporary password from a manager (O2O Desk › ผู้ใช้, migration 0117)
+type Profile = { id: string; name: string; role: Role; must_change_password?: boolean }
 type Aal = 'aal1' | 'aal2' | null
 type AuthValue = {
   session: Session | null
@@ -16,6 +17,8 @@ type AuthValue = {
   needsMfaChallenge: boolean
   signIn: (email: string, password: string) => Promise<{ error?: string }>
   signOut: () => Promise<void>
+  /** the new password is set: forget the temporary-password flag */
+  passwordChanged: () => void
 }
 
 const Ctx = createContext<AuthValue | null>(null)
@@ -33,7 +36,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       const { data } = await supabase
         .from('profiles')
-        .select('id,name,role')
+        .select('id,name,role,must_change_password')
         .eq('id', userId)
         .single()
       setProfile((data as Profile) ?? null)
@@ -106,6 +109,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   return (
     <Ctx.Provider
       value={{
+        passwordChanged: () => setProfile((p) => (p ? { ...p, must_change_password: false } : p)),
         session,
         profile,
         profileLoaded,

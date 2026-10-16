@@ -1,6 +1,6 @@
 import { Suspense, useEffect, useState } from 'react'
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
-import { ArrowSquareOut, List, Moon, SignOut, Sun } from '@phosphor-icons/react'
+import { ArrowSquareOut, List, Moon, SignOut, Sun, UsersThree } from '@phosphor-icons/react'
 import { useAuth } from '../lib/auth'
 import { CLAIM_APP_URL, NAV, canAccess, usesBothApps } from '../lib/roles'
 import { applyTheme, getTheme, setTheme, type Theme } from '../lib/theme'
@@ -152,6 +152,16 @@ export default function AppShell() {
             >
               <ArrowSquareOut size={16} weight="bold" aria-hidden="true" />
               O2O Desk
+            </a>
+          )}
+          {/* the accounts of both apps are managed in one place */}
+          {role === 'manager' && (
+            <a
+              href={`${CLAIM_APP_URL}/users`}
+              className="btn btn-ghost btn-sm mb-1.5 w-full justify-start gap-1.5 text-ink-soft"
+            >
+              <UsersThree size={16} weight="bold" aria-hidden="true" />
+              จัดการผู้ใช้
             </a>
           )}
           <button
