@@ -752,7 +752,7 @@ test("Makro's picking shows on orders not packed yet, with a summary for the day
   const ready = (await screen.findByText('READY SHOP')).closest('tr') as HTMLElement
   expect(within(ready).getByText('จัดเสร็จแล้ว')).toHaveClass('badge-ok')
   const picking = screen.getByText('PICKING SHOP').closest('tr') as HTMLElement
-  expect(within(picking).getByText('แม็คโครกำลังจัด')).toHaveClass('badge-warn')
+  expect(within(picking).getByText('กำลังจัด')).toHaveClass('badge-warn')
   // once packed by the island team, Makro's picking no longer shows
   const packed = screen.getByText('PACKED SHOP').closest('tr') as HTMLElement
   expect(within(packed).queryByText(/จัดเสร็จแล้ว/)).not.toBeInTheDocument()

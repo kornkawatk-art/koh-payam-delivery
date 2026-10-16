@@ -39,7 +39,7 @@ export function makroPickStage(status: string | null | undefined): MakroPickStag
   return PICK_STAGE[(status ?? '').trim().toLowerCase()] ?? null
 }
 export const MAKRO_PICK_TH: Record<MakroPickStage, string> = {
-  waiting: 'แม็คโครยังไม่เริ่มจัด',
-  picking: 'แม็คโครกำลังจัด',
+  waiting: 'ยังไม่เริ่มจัด',
+  picking: 'กำลังจัด',
   ready: 'จัดเสร็จแล้ว',
 }
