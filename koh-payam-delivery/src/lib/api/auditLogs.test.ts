@@ -729,6 +729,25 @@ test('actions: payment_marked and payment_released', async () => {
   ])
 })
 
+test('action: move_ship_day, from the team with a reason or ticked at import', async () => {
+  profilesData = [PROFILE]
+  ordersData = [{ id: 'o1', makro_order_no: 'PO-7', ship_day_id: null }]
+  const row = (id: number, meta: object) => ({
+    id, user_id: 'u1', action: 'move_ship_day', entity_type: 'order', entity_id: 'o1', meta,
+    created_at: '2026-10-26T00:00:00.000Z',
+  })
+  auditRows = [
+    row(60, { makroOrderNo: 'PO-7', from: '2026-10-26', to: '2026-10-28', reason: 'รอลูกค้าโอน' }),
+    row(61, { makroOrderNo: 'PO-7', from: '2026-10-25', to: '2026-10-26' }),
+  ]
+  const rows = await listAuditLogs()
+  expect(rows.map((r) => r.message)).toEqual([
+    'เลื่อนวันส่งออเดอร์ PO-7 จาก 2026-10-26 เป็น 2026-10-28 — รอลูกค้าโอน โดย สมชาย',
+    'เลื่อนวันส่งออเดอร์ PO-7 จาก 2026-10-25 เป็น 2026-10-26 (ตอนนำเข้า) โดย สมชาย',
+  ])
+  expect(rows[0].category).toBe('order')
+})
+
 test('each row also carries its category, who did it, a link, and the sentence without "โดย …"', async () => {
   ordersData = [ORDER]
   claimsData = [{ id: 'c1', orders: { makro_order_no: 'PO-1' } }]

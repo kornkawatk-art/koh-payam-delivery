@@ -75,7 +75,7 @@ export default function ImportOrders() {
       active = false
     }
   }, [result, shipDate])
-  const movable = useMemo(() => movableNos(alreadyImported), [alreadyImported])
+  const movable = useMemo(() => movableNos(alreadyImported, shipDate), [alreadyImported, shipDate])
   useEffect(() => setMoveNos(new Set()), [alreadyImported])
   const skipNos = useMemo(
     () => new Set(alreadyImported.map((r) => r.makro_order_no).filter((no) => !moveNos.has(no))),

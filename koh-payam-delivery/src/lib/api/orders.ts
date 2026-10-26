@@ -94,7 +94,7 @@ export async function commitImport(
       elsewhere.set(r.makro_order_no, r.ship_date)
 
   // Postponed POs the importer ticked: move them here, then they sync as orders of this day.
-  const movable = movableNos(otherDays)
+  const movable = movableNos(otherDays, shipDate)
   let moved = 0
   for (const no of new Set(move)) {
     if (!elsewhere.has(no) || !movable.has(no)) continue

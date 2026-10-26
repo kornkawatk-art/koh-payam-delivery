@@ -34,6 +34,9 @@ import { MakroPickBadge } from '../../components/ui/MakroPickBadge'
 import { makroVoid } from '../../lib/makroStatus'
 import { markBillPaid } from '../../lib/api/payments'
 import { isUnpaidBill, type Bill } from '../../lib/payments'
+import { MoveShipDay } from '../../components/MoveShipDay'
+import { canMoveShipDay } from '../../lib/postponed'
+import { formatDateTH } from '../../lib/format'
 
 export default function OrderDetail() {
   const { id } = useParams()
@@ -154,6 +157,23 @@ export default function OrderDetail() {
           <MakroPickBadge status={order.makro_order_status} packStatus={order.status} />
         </div>
       </header>
+
+      {isLead(profile?.role) && canMoveShipDay(order.status) && (
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-sm text-ink-soft">
+            วันส่ง <span className="font-semibold text-ink">{formatDateTH(order.ship_date)}</span>
+          </span>
+          <MoveShipDay
+            orders={[
+              { id: order.id, makro_order_no: order.makro_order_no, ship_date: order.ship_date, status: order.status },
+            ]}
+            onMoved={(day) => {
+              load()
+              setMsg(flash.ok(`เลื่อนไปส่งวันที่ ${formatDateTH(day)} แล้ว`))
+            }}
+          />
+        </div>
+      )}
 
       {makroVoid(order.makro_order_status) && (
         <p className="alert alert-danger">

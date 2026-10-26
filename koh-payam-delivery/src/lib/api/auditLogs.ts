@@ -23,6 +23,7 @@ const CATEGORY: Record<string, AuditCategory> = {
   island_set: 'order',
   order_deleted: 'order',
   order_reopened: 'order',
+  move_ship_day: 'order',
   regen_link: 'order',
   picked_up: 'order',
   status_change: 'pack',
@@ -138,6 +139,10 @@ function buildMessage(
 
     case 'picked_up':
       return `ปิดออเดอร์ ${orderNo(r.entity_id)} — ลูกค้ามารับที่สาขาแล้ว${by}`
+
+    case 'move_ship_day':
+      // from the order page / งานวันนี้ (with a reason), or a postponed PO ticked at import
+      return `เลื่อนวันส่งออเดอร์ ${orderNo(r.entity_id)} จาก ${meta.from} เป็น ${meta.to}${meta.reason ? ` — ${meta.reason}` : ' (ตอนนำเข้า)'}${by}`
 
     case 'order_reopened':
       return `เปิดออเดอร์ ${orderNo(r.entity_id)} อีกครั้ง (กลับเป็น "นำเข้าแล้ว")${by}`

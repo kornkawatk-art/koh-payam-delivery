@@ -85,6 +85,8 @@ const authRole = { current: 'packer' }
 vi.mock('../../lib/auth', () => ({ useAuth: () => ({ profile: { id: 'u1', name: 'x', role: authRole.current } }) }))
 const getDayLocks = vi.fn().mockResolvedValue(new Map())
 const releaseCustomer = vi.fn().mockResolvedValue(undefined)
+const moveOrdersToDay = vi.fn().mockResolvedValue(1)
+vi.mock('../../lib/api/moveShipDay', () => ({ moveOrdersToDay: (...a: unknown[]) => moveOrdersToDay(...a) }))
 vi.mock('../../lib/api/payments', () => ({
   getDayLocks: (...a: unknown[]) => getDayLocks(...a),
   releaseCustomer: (...a: unknown[]) => releaseCustomer(...a),
@@ -709,6 +711,32 @@ test('a manager releases a locked customer for this delivery with a reason', asy
     'โอนแล้ว',
   )
   getDayLocks.mockResolvedValue(new Map())
+})
+
+test('the online team postpones a locked customer to tomorrow until they pay', async () => {
+  authRole.current = 'online'
+  vi.mocked(listOrdersForDay).mockResolvedValueOnce(lockedRows())
+  getDayLocks.mockResolvedValue(new Map([[OWES_KEY, lockOf({ locked: true, priorBills: [{}], total: 500, oldestDays: 2 })]]))
+  renderPage()
+  await userEvent.click(await screen.findByRole('button', { name: 'เลื่อนวันส่ง' }))
+  await userEvent.type(screen.getByLabelText('เหตุผลที่เลื่อน'), 'รอลูกค้าโอน')
+  await userEvent.click(screen.getByRole('button', { name: 'ยืนยันเลื่อน' }))
+  expect(moveOrdersToDay).toHaveBeenCalledWith(
+    [{ id: '1', makro_order_no: 'PO-1', ship_date: todayLocalISO(), status: 'imported' }],
+    expect.any(String),
+    'รอลูกค้าโอน',
+    todayLocalISO(),
+  )
+  getDayLocks.mockResolvedValue(new Map())
+})
+
+test('a packer cannot postpone a locked customer', async () => {
+  authRole.current = 'packer'
+  vi.mocked(listOrdersForDay).mockResolvedValueOnce(lockedRows())
+  getDayLocks.mockResolvedValueOnce(new Map([[OWES_KEY, lockOf({ locked: true, priorBills: [{}], total: 500, oldestDays: 2 })]]))
+  renderPage()
+  await screen.findByText('ค้างชำระ — ห้ามแพ็ค (1)')
+  expect(screen.queryByRole('button', { name: 'เลื่อนวันส่ง' })).not.toBeInTheDocument()
 })
 
 test('a released customer is back in the normal queue with a "ปลดแล้ว" badge', async () => {

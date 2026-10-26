@@ -43,6 +43,7 @@ import { buildStickerJobs } from '../../lib/bulkStickers'
 import { useAuth } from '../../lib/auth'
 import { canEdit, isLead } from '../../lib/roles'
 import { getDayLocks, releaseCustomer } from '../../lib/api/payments'
+import { MoveShipDay } from '../../components/MoveShipDay'
 import type { Lock } from '../../lib/payments'
 import { customerKey } from '../../../supabase/functions/_shared/customerKey'
 
@@ -450,6 +451,7 @@ export default function DailyDashboard() {
                     date={date}
                     canRelease={isManager}
                     onReleased={() => setLockTick((n) => n + 1)}
+                    onMoved={() => void load()}
                   />
                   <EntryRows entry={e} date={date} showIsland={showIslandFilter} />
                 </Fragment>
@@ -631,19 +633,24 @@ function EntryRows({
 
 const ReleasedBadge = () => <span className="badge badge-warn ml-1.5">ปลดแล้ว</span>
 
-/** Red line above a locked customer: what they owe, and (manager) the release. */
+/**
+ * Red line above a locked customer: what they owe, and (manager / online team) the release, or
+ * moving all their orders that day to a later one until they pay (เลื่อนวันส่ง).
+ */
 function LockedRow({
   entry,
   lock,
   date,
   canRelease,
   onReleased,
+  onMoved,
 }: {
   entry: DayEntry<any>
   lock: Lock
   date: string
   canRelease: boolean
   onReleased: () => void
+  onMoved: () => void
 }) {
   const [open, setOpen] = useState(false)
   const [reason, setReason] = useState('')
@@ -698,6 +705,17 @@ function LockedRow({
                 </button>
               </>
             ))}
+          {canRelease && !open && (
+            <MoveShipDay
+              orders={entryOrders(entry).map((o: any) => ({
+                id: o.id,
+                makro_order_no: o.makro_order_no,
+                ship_date: date,
+                status: o.status,
+              }))}
+              onMoved={onMoved}
+            />
+          )}
           {err && <span className="text-danger-ink">{err}</span>}
         </div>
       </td>

@@ -1,4 +1,4 @@
-import { render, screen, within } from '@testing-library/react'
+import { cleanup, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Routes, Route } from 'react-router-dom'
 import OrderDetail from './OrderDetail'
@@ -421,4 +421,27 @@ test('the online team picks the island and marks a bill paid, but only the manag
   expect(screen.getByRole('combobox')).toBeInTheDocument()
   expect(screen.queryByRole('button', { name: /ลบออเดอร์/ })).not.toBeInTheDocument()
   expect(screen.queryByText(/ลบออเดอร์ได้ที่ท้ายหน้า/)).not.toBeInTheDocument()
+})
+
+test('the manager and the online team can postpone an order that has not gone out; packers cannot', async () => {
+  renderPage()
+  expect(await screen.findByRole('button', { name: 'เลื่อนวันส่ง' })).toBeInTheDocument()
+  cleanup()
+
+  useAuthMock.mockReturnValue({ profile: { id: 'u3', name: 'ออนไลน์', role: 'online' } })
+  renderPage()
+  expect(await screen.findByRole('button', { name: 'เลื่อนวันส่ง' })).toBeInTheDocument()
+  cleanup()
+
+  useAuthMock.mockReturnValue({ profile: { id: 'u2', name: 'แพ็ค', role: 'packer' } })
+  renderPage()
+  await screen.findByText(/PO-1/)
+  expect(screen.queryByRole('button', { name: 'เลื่อนวันส่ง' })).not.toBeInTheDocument()
+  cleanup()
+
+  useAuthMock.mockReturnValue({ profile: { id: 'u1', name: 'ผจก', role: 'manager' } })
+  getOrder.mockResolvedValue({ ...order, status: 'shipped' })
+  renderPage()
+  await screen.findByText(/PO-1/)
+  expect(screen.queryByRole('button', { name: 'เลื่อนวันส่ง' })).not.toBeInTheDocument()
 })
