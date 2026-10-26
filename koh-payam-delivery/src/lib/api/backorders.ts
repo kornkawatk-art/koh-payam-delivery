@@ -23,9 +23,7 @@ export const backorderQty = (b: { qty: number; unit?: string | null }) =>
 // on the manager's ClaimsQueue.tsx page so a claim's compensating shipment
 // doesn't stay invisible until (or unless) a matching order ever shows up.
 // Shortage backorders (from a short-shipped Makro import) are deliberately
-// excluded -- this section is claims-only; unmatched shortage carry-over
-// isn't surfaced anywhere in this app today, by design (it stays invisible
-// until a future import happens to match it by phone/name).
+// excluded -- they are never carried over or shown (see linkBackordersToDay).
 export type UnmatchedBackorderRow = {
   id: string
   customerName: string | undefined
@@ -107,9 +105,11 @@ export async function createResendBackorder(claimId: string): Promise<void> {
   if (error) throw new Error('สร้างรายการส่งชดเชยไม่สำเร็จ: ' + error.message)
 }
 
-// After a ship day's orders are imported, attach any pending backorder whose
+// After a ship day's orders are imported, attach any pending claim resend whose
 // source customer has a fresh order that day (and which is not already tied to
-// a different day). Returns how many rows were linked.
+// a different day). Returns how many rows were linked. A shortage backorder (Makro
+// picked the order short) is never carried over: Makro does not send the missing
+// goods later, so warning the packers about it on the next order was noise.
 export async function linkBackordersToDay(shipDate: string): Promise<number> {
   const { data: orders, error: ordErr } = await supabase
     .from('orders')
@@ -122,6 +122,7 @@ export async function linkBackordersToDay(shipDate: string): Promise<number> {
       'id,source_order_id,target_ship_date, orders!backorders_source_order_id_fkey(customer_name_en,customer_phone)',
     )
     .eq('status', 'pending')
+    .eq('reason', 'claim_resend')
   if (pendErr) throw new Error('โหลดรายการค้างส่งไม่สำเร็จ: ' + pendErr.message)
   let linked = 0
   for (const b of pend ?? []) {
@@ -187,12 +188,14 @@ export async function listBackordersForDay(shipDate: string): Promise<BackorderR
     )
     .eq('target_ship_date', shipDate)
     .eq('status', 'pending')
+    .eq('reason', 'claim_resend')
   if (error) throw new Error('โหลดรายการค้างส่งไม่สำเร็จ: ' + error.message)
   return (data ?? []) as BackorderRow[]
 }
 
-// Pending backorders that have been tied to a specific destination order —
+// Pending claim resends that have been tied to a specific destination order —
 // shown on that order's pack screen as "carry-over from a previous order".
+// Shortage rows linked before claims-only carry-over are left out as well.
 export async function listPendingBackordersForOrder(orderId: string): Promise<BackorderRow[]> {
   const { data, error } = await supabase
     .from('backorders')
@@ -201,13 +204,15 @@ export async function listPendingBackordersForOrder(orderId: string): Promise<Ba
     )
     .eq('target_order_id', orderId)
     .eq('status', 'pending')
+    .eq('reason', 'claim_resend')
   if (error) throw new Error('โหลดรายการค้างส่งไม่สำเร็จ: ' + error.message)
   return (data ?? []) as BackorderRow[]
 }
 
-// Every backorder that touches this order — whether it originated here
+// Every claim resend that touches this order — whether it originated here
 // (source_order_id) or is being delivered here (target_order_id). Shown on the
-// order detail page regardless of pending/fulfilled status.
+// order detail page regardless of pending/fulfilled status. Short-picks show on
+// the order's own items, not here.
 export async function listRelatedBackordersForOrder(orderId: string): Promise<BackorderRow[]> {
   const { data, error } = await supabase
     .from('backorders')
@@ -215,6 +220,7 @@ export async function listRelatedBackordersForOrder(orderId: string): Promise<Ba
       'id,source_order_id,reason,product_name,qty,unit,target_ship_date,target_order_id,status',
     )
     .or(`source_order_id.eq.${orderId},target_order_id.eq.${orderId}`)
+    .eq('reason', 'claim_resend')
   if (error) throw new Error('โหลดรายการค้างส่งไม่สำเร็จ: ' + error.message)
   return (data ?? []) as BackorderRow[]
 }

@@ -38,7 +38,11 @@ const rpcCalls: any[] = []
 vi.mock('../supabase', () => {
   const res = (data: any) => {
     const p: any = Promise.resolve({ data, error: null })
-    p.eq = () => p
+    // chained filters after the first .eq() / .or() (e.g. .eq('reason','claim_resend'))
+    p.eq = (col: string, val: any) => {
+      calls.push(['chain', col, val])
+      return p
+    }
     return p
   }
   return {
@@ -62,7 +66,7 @@ vi.mock('../supabase', () => {
           return {
             or: (arg: string) => {
               calls.push(['or', t, sel, arg])
-              return Promise.resolve({ data: relatedList, error: null })
+              return res(relatedList)
             },
             eq: (col: string, val: any) => {
               calls.push(['select', t, sel, col, val])
@@ -210,6 +214,26 @@ test('linkBackordersToDay binds only matching customers not already tied to anot
   expect(updates.map((u) => u[4]).sort()).toEqual(['b1', 'b4'])
   expect(updates[0][2]).toMatchObject({ target_ship_date: '2026-10-01' })
   expect(updates.find((u) => u[4] === 'b1')[2].target_order_id).toBe('o-blue')
+})
+
+// Only a claim's resend is carried onto the customer's next order and shown when packing;
+// a Makro short-pick (reason 'shortage') is not sent later, so it must not warn.
+const claimsOnly = () => calls.some((c) => c[0] === 'chain' && c[1] === 'reason' && c[2] === 'claim_resend')
+
+test('linkBackordersToDay links only claim resends, never a short-pick', async () => {
+  await linkBackordersToDay('2026-10-01')
+  expect(claimsOnly()).toBe(true)
+})
+
+test('the pack-screen and order lists show only claim resends', async () => {
+  await listBackordersForDay('2026-10-01')
+  expect(claimsOnly()).toBe(true)
+  calls.length = 0
+  await listPendingBackordersForOrder('ord9')
+  expect(claimsOnly()).toBe(true)
+  calls.length = 0
+  await listRelatedBackordersForOrder('ord-x')
+  expect(claimsOnly()).toBe(true)
 })
 
 test('linkBackordersToDay matches by phone first, even when an available order has a different name', async () => {
