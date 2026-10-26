@@ -13,8 +13,8 @@ export const isMakroPickedUp = (status: string | null | undefined) =>
   (status ?? '').trim().toLowerCase() === 'picked up'
 
 export const MAKRO_VOID_TH: Record<'returned' | 'canceled', string> = {
-  returned: 'แม็คโคร: คืนสินค้า',
-  canceled: 'แม็คโคร: ยกเลิก',
+  returned: 'คืนสินค้า',
+  canceled: 'ยกเลิก',
 }
 
 /**

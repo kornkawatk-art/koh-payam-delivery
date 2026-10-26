@@ -617,7 +617,7 @@ test('a Makro-returned order carries a red badge; a collected pickup shows on th
   ])
   renderPage()
   const row = (await screen.findByText('RETURNED SHOP')).closest('tr') as HTMLElement
-  expect(within(row).getByText('แม็คโคร: คืนสินค้า')).toHaveClass('badge-danger')
+  expect(within(row).getByText('คืนสินค้า')).toHaveClass('badge-danger')
   // boat tiles: only the returned (unpacked) boat order; the pickup is on its own line
   expect(screen.getAllByText('0/1').length).toBeGreaterThan(0)
   expect(screen.getByText('รับเองที่สาขา 1 (รับแล้ว 1)')).toBeInTheDocument()

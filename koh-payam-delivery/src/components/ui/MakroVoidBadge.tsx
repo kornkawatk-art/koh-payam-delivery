@@ -1,6 +1,6 @@
 import { MAKRO_VOID_TH, makroVoid } from '../../lib/makroStatus'
 
-/** Red "แม็คโคร: คืนสินค้า / ยกเลิก" when Makro returned or canceled the order. */
+/** Red "คืนสินค้า / ยกเลิก" when Makro returned or canceled the order. */
 export function MakroVoidBadge({ status, className = '' }: { status: unknown; className?: string }) {
   const v = makroVoid(typeof status === 'string' ? status : null)
   if (!v) return null
