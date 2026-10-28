@@ -248,6 +248,16 @@ test('fresh import inserts orders + items and counts created', async () => {
   expect(syncShortageBackorders).toHaveBeenCalledWith('new-1')
 })
 
+test('a finished import notes both Makro files for the "last imported" time', async () => {
+  await commitImport('2026-10-01', parsedOrders as any)
+  const rec = state.inserted.filter((i) => i.table === 'makro_data_imports')
+  expect(rec).toHaveLength(1)
+  expect(rec[0].rows).toEqual([
+    { app: 'island', file_kind: 'order', row_count: parsedOrders.length },
+    { app: 'island', file_kind: 'detail', row_count: parsedOrders.reduce((n: number, o: any) => n + o.items.length, 0) },
+  ])
+})
+
 test('re-import of an existing order syncs without touching protected columns', async () => {
   state.existing = [{ id: 'old1', makro_order_no: 'PO-1' }]
   const r = await commitImport('2026-10-01', parsedOrders as any)

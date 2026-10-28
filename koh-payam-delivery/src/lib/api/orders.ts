@@ -12,6 +12,7 @@ import { daysAgoISO, fetchAll } from './fetchAll'
 import { isMakroPickedUp } from '../makroStatus'
 import { paymentPatch } from '../payments'
 import { refreshPayments } from './paymentRefresh'
+import { recordImport } from './dataImports'
 
 export type { OtherDayOrder } from '../postponed'
 import { movableNos, type OtherDayOrder } from '../postponed'
@@ -236,6 +237,10 @@ export async function commitImport(
     moved,
     skipped: skipped.length,
   })
+  await recordImport(
+    incoming.length,
+    incoming.reduce((n, o) => n + o.items.length, 0),
+  )
   return { created, synced, moved, skipped, refreshed }
 }
 

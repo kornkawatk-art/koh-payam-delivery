@@ -86,6 +86,7 @@ vi.mock('../../lib/auth', () => ({ useAuth: () => ({ profile: { id: 'u1', name: 
 const getDayLocks = vi.fn().mockResolvedValue(new Map())
 const releaseCustomer = vi.fn().mockResolvedValue(undefined)
 const moveOrdersToDay = vi.fn().mockResolvedValue(1)
+vi.mock('../../lib/api/dataImports', () => ({ getLastImport: () => Promise.resolve(null) }))
 vi.mock('../../lib/api/moveShipDay', () => ({ moveOrdersToDay: (...a: unknown[]) => moveOrdersToDay(...a) }))
 vi.mock('../../lib/api/payments', () => ({
   getDayLocks: (...a: unknown[]) => getDayLocks(...a),

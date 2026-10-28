@@ -44,6 +44,7 @@ import { useAuth } from '../../lib/auth'
 import { canEdit, isLead } from '../../lib/roles'
 import { getDayLocks, releaseCustomer } from '../../lib/api/payments'
 import { MoveShipDay } from '../../components/MoveShipDay'
+import { LastImportNote } from '../../components/LastImportNote'
 import type { Lock } from '../../lib/payments'
 import { customerKey } from '../../../supabase/functions/_shared/customerKey'
 
@@ -262,6 +263,8 @@ export default function DailyDashboard() {
           />
         }
       />
+
+      {isManager && <LastImportNote />}
 
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         <div className="card flex flex-col gap-1 p-3 sm:p-4">
