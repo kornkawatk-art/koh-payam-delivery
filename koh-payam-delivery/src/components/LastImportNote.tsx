@@ -9,7 +9,7 @@ const HOUR_MS = 3_600_000
 
 /**
  * When the Makro files were last imported, for the people who import them (งานวันนี้).
- * Red once 2 h late within work hours; O2O Desk reminds the team on the same rule.
+ * Red once the data is 2 h old, at any hour; O2O Desk reminds the team on the same rule.
  * A failed load just hides it.
  */
 export function LastImportNote() {
