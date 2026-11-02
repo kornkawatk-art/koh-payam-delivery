@@ -17,6 +17,7 @@ import { MapPin, Anchor } from '@phosphor-icons/react'
 import { PageHeader } from '../../components/ui/PageHeader'
 import PierGroup from './PierGroup'
 import { groupByPhone } from '../../lib/groupOrders'
+import { listPackMerges } from '../../lib/api/packMerges'
 import { Spinner } from '../../components/ui/Spinner'
 import { todayLocalISO } from '../../lib/format'
 import { EmptyState } from '../../components/ui/EmptyState'
@@ -64,14 +65,16 @@ const ACTIVE = ['packed', 'at_pier']
 // One pier-list row: a single PO, or a customer's ready POs shipped together.
 type PierEntry =
   | { kind: 'single'; order: PierOrder; waiting: number }
-  | { kind: 'group'; phone: string; name: string; ready: PierOrder[]; waiting: number }
+  | { kind: 'group'; phone: string; name: string; merged: boolean; ready: PierOrder[]; waiting: number }
 
 export default function PierLoad() {
   const [date, setDate] = useState(todayLocalISO())
   const [boats, setBoats] = useState<Boat[]>([])
   const [all, setAll] = useState<PierOrder[]>([])
   const [island, setIsland] = useState<IslandFilterValue>('all')
-  const [selGroup, setSelGroup] = useState<{ phone: string; name: string } | null>(null)
+  // name null: a phone packed as one today (0038) -- the pier page loads every shop name of it
+  const [selGroup, setSelGroup] = useState<{ phone: string; name: string | null } | null>(null)
+  const [merges, setMerges] = useState<Set<string>>(new Set())
   const [sel, setSel] = useState<PierOrder | null>(null)
   const [photoCount, setPhotoCount] = useState(0)
   // Photos already attached to `sel` from an earlier visit (e.g. the app was
@@ -91,9 +94,10 @@ export default function PierLoad() {
     // (or create a ship day) for a blank date; keep what's on screen.
     if (!date) return
     setFailed(false)
-    Promise.all([getOrCreateShipDay(date), listOrdersForDay(date)])
-      .then(([day, list]) => {
+    Promise.all([getOrCreateShipDay(date), listOrdersForDay(date), listPackMerges(date).catch(() => new Set<string>())])
+      .then(([day, list, m]) => {
         setBoats(day.boats)
+        setMerges(m)
         setAll(list as PierOrder[])
       })
       .catch(() => setFailed(true))
@@ -151,7 +155,7 @@ export default function PierLoad() {
   // them are ready; POs still waiting to be packed are counted, not listed.
   const entries = useMemo<PierEntry[]>(() => {
     const out: PierEntry[] = []
-    for (const e of groupByPhone(all)) {
+    for (const e of groupByPhone(all, merges)) {
       if (e.kind === 'single') {
         if (ACTIVE.includes(e.order.status)) out.push({ kind: 'single', order: e.order, waiting: 0 })
         continue
@@ -160,12 +164,12 @@ export default function PierLoad() {
       const waiting = e.orders.filter((o) => o.status === 'imported').length
       if (ready.length === 0) continue
       if (ready.length === 1) out.push({ kind: 'single', order: ready[0], waiting })
-      else out.push({ kind: 'group', phone: e.phone, name: e.name, ready, waiting })
+      else out.push({ kind: 'group', phone: e.phone, name: e.name, merged: e.merged, ready, waiting })
     }
     return out.filter((e) =>
       (e.kind === 'single' ? [e.order] : e.ready).some((o) => matchesIsland(o.island, island)),
     )
-  }, [all, island])
+  }, [all, island, merges])
   const showIslandFilter = useMemo(() => needsIslandFilter(all.map((o) => o.island)), [all])
 
   const lock = usePaymentLock(sel, sel ? date : null)
@@ -230,7 +234,7 @@ export default function PierLoad() {
                 className="card card-interactive flex items-center justify-between gap-3 text-left"
                 onClick={() => {
                   setMsg(undefined)
-                  setSelGroup({ phone: e.phone, name: e.name })
+                  setSelGroup({ phone: e.phone, name: e.merged ? null : e.name })
                 }}
               >
                 <span className="flex flex-col items-start">

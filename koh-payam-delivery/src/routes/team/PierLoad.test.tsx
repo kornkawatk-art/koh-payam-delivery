@@ -40,6 +40,8 @@ vi.mock('../../lib/api/orders', () => ({
   updateOrderStatus: (...a: unknown[]) => updateOrderStatus(...a),
   listDistinctPierNames: (...a: unknown[]) => listDistinctPierNames(...a),
 }))
+let merges = new Set<string>()
+vi.mock('../../lib/api/packMerges', () => ({ listPackMerges: () => Promise.resolve(merges) }))
 vi.mock('../../lib/api/photos', () => ({
   attachEvidencePhoto: (...a: unknown[]) => attachEvidencePhoto(...a),
   removeEvidencePhoto: (...a: unknown[]) => removeEvidencePhoto(...a),
@@ -471,4 +473,14 @@ test('a customer owing an earlier bill can’t be shipped', async () => {
   expect(screen.getByRole('alert')).toHaveTextContent('ค้างชำระ')
   expect(screen.getByRole('button', { name: 'ส่งขึ้นเรือแล้ว' })).toBeDisabled()
   lockState.current = null
+})
+
+test("a phone packed as one today loads as one group, and its pier page loads every shop name of the phone", async () => {
+  const shop = (id: string, no: string, name: string) => ({ ...orders[0], id, makro_order_no: no, customer_name_en: name, customer_phone: '0812223333', status: 'packed' })
+  listOrdersForDay.mockResolvedValue([shop('a', 'PO-A', 'SHOP A'), shop('b', 'PO-B', 'SHOP B')])
+  merges = new Set(['0812223333'])
+  render(<PierLoad />)
+  await userEvent.click(await screen.findByRole('button', { name: /SHOP A \+ SHOP B/ }))
+  await waitFor(() => expect(listOrdersForCustomerDay).toHaveBeenCalledWith(expect.any(String), '0812223333', null))
+  merges = new Set()
 })
