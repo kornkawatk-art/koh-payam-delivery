@@ -53,3 +53,10 @@ test("a manager's paid mark on a still-unpaid PO counts as a change (the import 
   await refreshPayments([row('P-1', 'Unpaid', 300)])
   expect(updates.map((u) => u.no)).toEqual(['P-1'])
 })
+
+test("with keepPaidMark, a marked PO Makro still calls unpaid is left as it is", async () => {
+  existing = [{ makro_order_no: 'P-1', ...current, paid_marked_at: '2026-11-02T03:00:00Z' }]
+  const r = await refreshPayments([row('P-1', 'Unpaid', 300)], { keepPaidMark: true })
+  expect(updates).toEqual([])
+  expect(r).toEqual({ refreshed: 0, unchanged: 1, notInApp: [] })
+})

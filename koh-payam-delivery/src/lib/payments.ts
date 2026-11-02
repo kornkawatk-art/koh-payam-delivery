@@ -109,19 +109,25 @@ export function customerDebts(bills: Bill[], today: string): CustomerDebt[] {
 }
 
 /** Makro's payment facts for an order row; Makro "not paid" clears a manager mark. */
+export type PaymentPatchOptions = {
+  /** the hourly auto-import: Makro often records a cash payment hours after the manager took it, so its
+   *  "not paid" must not undo the manager's paid mark (only a person importing by hand clears it) */
+  keepPaidMark?: boolean
+}
+
 export function paymentPatch(p: {
   paymentMethod: string | null
   paymentStatus: string | null
   outstandingAmount: number
   makroOrderStatus: string | null
-}): Record<string, unknown> {
+}, opts: PaymentPatchOptions = {}): Record<string, unknown> {
   const patch: Record<string, unknown> = {
     payment_method: p.paymentMethod,
     payment_status: p.paymentStatus,
     outstanding_amount: p.outstandingAmount,
     makro_order_status: p.makroOrderStatus,
   }
-  if (!isPaid(p.paymentStatus) && p.outstandingAmount > 0) {
+  if (!opts.keepPaidMark && !isPaid(p.paymentStatus) && p.outstandingAmount > 0) {
     patch.paid_marked_at = null
     patch.paid_marked_by = null
   }

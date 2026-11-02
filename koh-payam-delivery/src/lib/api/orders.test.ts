@@ -665,6 +665,6 @@ test('commitImport refreshes payment facts of POs that live on another day, with
   const paid = { ...parsedOrders[0], paymentStatus: 'Paid', outstandingAmount: 0 }
   const r = await commitImport('2026-10-01', [paid] as any)
   expect(state.inserted.filter((i) => i.table === 'orders')).toEqual([])
-  expect(refreshPayments).toHaveBeenCalledWith([paid])
+  expect(refreshPayments).toHaveBeenCalledWith([paid], {}) // an import by hand: Makro "not paid" still clears a paid mark
   expect(r.refreshed).toBe(1)
 })

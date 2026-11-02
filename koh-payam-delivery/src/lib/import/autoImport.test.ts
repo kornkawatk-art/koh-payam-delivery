@@ -112,3 +112,9 @@ test('the payment refresh runs even when nothing is due today or tomorrow', asyn
   expect(commitImport).not.toHaveBeenCalled()
   expect(refreshPayments.mock.calls[0][0].map((p: { makroOrderNo: string }) => p.makroOrderNo)).toEqual(['P1'])
 })
+
+test("the automatic import never clears a manager's paid mark: both its own sync and the refresh keep it", async () => {
+  await autoImport(['P1', 'P2'].map(item), [order('P1', '27-Oct-2026'), order('P2', '29-Oct-2026')], TODAY)
+  expect(commitImport.mock.calls[0][4]).toEqual({ keepPaidMark: true })
+  expect(refreshPayments.mock.calls[0][1]).toEqual({ keepPaidMark: true })
+})

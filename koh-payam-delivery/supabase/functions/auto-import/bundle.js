@@ -410,14 +410,14 @@ function planItemSync(orderId, existing, incoming) {
 
 // src/lib/payments.ts
 var isPaid = (s) => (s ?? "").trim().toLowerCase() === "paid";
-function paymentPatch(p) {
+function paymentPatch(p, opts = {}) {
   const patch = {
     payment_method: p.paymentMethod,
     payment_status: p.paymentStatus,
     outstanding_amount: p.outstandingAmount,
     makro_order_status: p.makroOrderStatus
   };
-  if (!isPaid(p.paymentStatus) && p.outstandingAmount > 0) {
+  if (!opts.keepPaidMark && !isPaid(p.paymentStatus) && p.outstandingAmount > 0) {
     patch.paid_marked_at = null;
     patch.paid_marked_by = null;
   }
@@ -426,7 +426,7 @@ function paymentPatch(p) {
 
 // src/lib/api/paymentRefresh.ts
 var CHUNK = 200;
-async function refreshPayments(rows) {
+async function refreshPayments(rows, opts = {}) {
   const nos = [...new Set(rows.map((r) => r.makroOrderNo))];
   const have = /* @__PURE__ */ new Map();
   for (let i = 0; i < nos.length; i += CHUNK) {
@@ -439,7 +439,7 @@ async function refreshPayments(rows) {
   for (const r of rows) {
     const now = have.get(r.makroOrderNo);
     if (!now) continue;
-    const patch = paymentPatch(r);
+    const patch = paymentPatch(r, opts);
     if (Object.entries(patch).every(([k, v]) => k === "paid_marked_by" || String(now[k] ?? "") === String(v ?? "") || k === "outstanding_amount" && Number(now[k]) === Number(v))) {
       unchanged++;
       continue;
@@ -487,7 +487,7 @@ async function listOrdersOnOtherDays(nos, shipDate) {
   if (error) throw new Error("\u0E15\u0E23\u0E27\u0E08\u0E2D\u0E2D\u0E40\u0E14\u0E2D\u0E23\u0E4C\u0E17\u0E35\u0E48\u0E40\u0E04\u0E22\u0E19\u0E33\u0E40\u0E02\u0E49\u0E32\u0E41\u0E25\u0E49\u0E27\u0E44\u0E21\u0E48\u0E2A\u0E33\u0E40\u0E23\u0E47\u0E08: " + error.message);
   return data ?? [];
 }
-async function commitImport(shipDate, incoming, voided = [], move = []) {
+async function commitImport(shipDate, incoming, voided = [], move = [], payment = {}) {
   const day = await getOrCreateShipDay(shipDate);
   const nos = incoming.map((o) => o.makroOrderNo);
   const { data: existing } = await supabase.from("orders").select("id,makro_order_no,status").eq("ship_day_id", day.id).in("makro_order_no", nos);
@@ -519,7 +519,7 @@ async function commitImport(shipDate, incoming, voided = [], move = []) {
   }
   const orders = incoming.filter((o) => !elsewhere.has(o.makroOrderNo));
   const skipped = Array.from(elsewhere, ([makroOrderNo, d]) => ({ makroOrderNo, shipDate: d }));
-  const { refreshed } = await refreshPayments(incoming.filter((o) => elsewhere.has(o.makroOrderNo)));
+  const { refreshed } = await refreshPayments(incoming.filter((o) => elsewhere.has(o.makroOrderNo)), payment);
   let created = 0;
   let synced = 0;
   for (const o of orders) {
@@ -555,7 +555,7 @@ async function commitImport(shipDate, incoming, voided = [], move = []) {
         sub_district: o.subDistrict,
         shipping_address: o.shippingAddress || null,
         // payment facts; Makro "not paid" also clears a manager's paid mark
-        ...paymentPatch(o),
+        ...paymentPatch(o, payment),
         customer_phone: o.customerPhone,
         // Makro's own fact -- a re-import keeps it current (unlike island,
         // which a manager may have picked by hand)
@@ -637,7 +637,7 @@ async function autoImport(detailRows, orderRows, today) {
       orders.map((o) => o.makroOrderNo),
       shipDate
     );
-    const c = await commitImport(shipDate, orders, voided, []);
+    const c = await commitImport(shipDate, orders, voided, [], { keepPaidMark: true });
     voided = [];
     days.push({
       shipDate,
@@ -651,7 +651,7 @@ async function autoImport(detailRows, orderRows, today) {
   if (days.length === 0) await recordImport(0, 0);
   const imported = new Set(r.orders.filter((o) => [today, nextDayISO(today)].includes(deliveryDate(o) ?? "")).map((o) => o.makroOrderNo));
   const rest = buildPaymentRefresh(orderRows, DEFAULT_ORDER_MAPPING).filter((p) => !imported.has(p.makroOrderNo));
-  const { refreshed } = rest.length ? await refreshPayments(rest) : { refreshed: 0 };
+  const { refreshed } = rest.length ? await refreshPayments(rest, { keepPaidMark: true }) : { refreshed: 0 };
   return { days, notIsland: r.skippedNotIsland, paymentsRefreshed: refreshed };
 }
 export {

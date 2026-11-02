@@ -10,7 +10,7 @@ import { canTransition, type OrderStatus } from '../status'
 import { normCustomerName } from '../groupOrders'
 import { daysAgoISO, fetchAll } from './fetchAll'
 import { isMakroPickedUp } from '../makroStatus'
-import { paymentPatch } from '../payments'
+import { paymentPatch, type PaymentPatchOptions } from '../payments'
 import { refreshPayments } from './paymentRefresh'
 import { recordImport } from './dataImports'
 
@@ -62,6 +62,7 @@ export async function commitImport(
   incoming: ParsedOrder[],
   voided: { makroOrderNo: string; status: string }[] = [],
   move: string[] = [],
+  payment: PaymentPatchOptions = {},
 ): Promise<{
   created: number
   synced: number
@@ -116,7 +117,7 @@ export async function commitImport(
   const skipped = Array.from(elsewhere, ([makroOrderNo, d]) => ({ makroOrderNo, shipDate: d }))
   // A PO already imported on another day isn't re-created, but its payment
   // facts must stay current -- the payment lock reads them.
-  const { refreshed } = await refreshPayments(incoming.filter((o) => elsewhere.has(o.makroOrderNo)))
+  const { refreshed } = await refreshPayments(incoming.filter((o) => elsewhere.has(o.makroOrderNo)), payment)
 
   let created = 0
   let synced = 0
@@ -161,7 +162,7 @@ export async function commitImport(
           sub_district: o.subDistrict,
           shipping_address: o.shippingAddress || null,
           // payment facts; Makro "not paid" also clears a manager's paid mark
-          ...paymentPatch(o),
+          ...paymentPatch(o, payment),
           customer_phone: o.customerPhone,
           // Makro's own fact -- a re-import keeps it current (unlike island,
           // which a manager may have picked by hand)
