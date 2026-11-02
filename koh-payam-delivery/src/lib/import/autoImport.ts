@@ -8,7 +8,9 @@
 // - postponed orders are never moved (that stays a manager's tick); they are only counted;
 // - every other order in the export (the earlier days) still gets Makro's latest payment facts, the same
 //   refresh as the "อัปเดตสถานะการจ่ายเงินอย่างเดียว" card: a bill paid after its delivery must stop
-//   locking the customer without anyone re-importing by hand.
+//   locking the customer without anyone re-importing by hand;
+// - a manager's paid mark is never cleared here (Makro records cash payments late): only a Makro "Paid"
+//   or the manager takes it off; a person importing by hand still clears it, as before.
 import type { RawRow } from './parseMakroFile'
 import {
   buildImport,
@@ -53,7 +55,7 @@ export async function autoImport(detailRows: RawRow[], orderRows: RawRow[], toda
       shipDate,
     )
     // void labels go on whatever day the PO sits; once is enough
-    const c = await commitImport(shipDate, orders, voided, [])
+    const c = await commitImport(shipDate, orders, voided, [], { keepPaidMark: true })
     voided = []
     days.push({
       shipDate,
@@ -70,6 +72,6 @@ export async function autoImport(detailRows: RawRow[], orderRows: RawRow[], toda
   // the earlier (and later) days' POs already in the app: payment facts only (today's and tomorrow's were synced above)
   const imported = new Set(r.orders.filter((o) => [today, nextDayISO(today)].includes(deliveryDate(o) ?? '')).map((o) => o.makroOrderNo))
   const rest = buildPaymentRefresh(orderRows, DEFAULT_ORDER_MAPPING).filter((p) => !imported.has(p.makroOrderNo))
-  const { refreshed } = rest.length ? await refreshPayments(rest) : { refreshed: 0 }
+  const { refreshed } = rest.length ? await refreshPayments(rest, { keepPaidMark: true }) : { refreshed: 0 }
   return { days, notIsland: r.skippedNotIsland, paymentsRefreshed: refreshed }
 }

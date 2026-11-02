@@ -1,5 +1,5 @@
 import { supabase } from '../supabase'
-import { paymentPatch } from '../payments'
+import { paymentPatch, type PaymentPatchOptions } from '../payments'
 import type { PaymentRow } from '../import/buildImport'
 
 const CHUNK = 200 // keep each .in() under PostgREST's URL limit
@@ -12,6 +12,7 @@ const CHUNK = 200 // keep each .in() under PostgREST's URL limit
  */
 export async function refreshPayments(
   rows: PaymentRow[],
+  opts: PaymentPatchOptions = {},
 ): Promise<{ refreshed: number; unchanged: number; notInApp: string[] }> {
   const nos = [...new Set(rows.map((r) => r.makroOrderNo))]
   const have = new Map<string, Record<string, unknown>>()
@@ -28,7 +29,7 @@ export async function refreshPayments(
   for (const r of rows) {
     const now = have.get(r.makroOrderNo)
     if (!now) continue
-    const patch = paymentPatch(r)
+    const patch = paymentPatch(r, opts)
     // numeric comes back as a string or a number; compare as text; paid_marked_by follows paid_marked_at
     if (Object.entries(patch).every(([k, v]) => k === 'paid_marked_by' || String(now[k] ?? '') === String(v ?? '') || (k === 'outstanding_amount' && Number(now[k]) === Number(v)))) {
       unchanged++

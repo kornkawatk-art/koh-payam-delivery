@@ -98,3 +98,10 @@ test('paymentPatch: Makro facts, and Makro "not paid" clears a manager mark', ()
     makro_order_status: 'Delivered',
   })
 })
+
+test("paymentPatch with keepPaidMark (the hourly auto-import) never clears a manager's paid mark", () => {
+  const p = paymentPatch({ paymentMethod: 'Pay On Delivery', paymentStatus: 'Unpaid', outstandingAmount: 500, makroOrderStatus: 'Delivered' }, { keepPaidMark: true })
+  expect(p).not.toHaveProperty('paid_marked_at')
+  expect(p).not.toHaveProperty('paid_marked_by')
+  expect(p).toMatchObject({ payment_status: 'Unpaid', outstanding_amount: 500 })
+})
