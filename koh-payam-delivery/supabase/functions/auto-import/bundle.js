@@ -246,6 +246,32 @@ function buildImport(detailRows, orderRows, dm, om) {
     shippedAllZero
   };
 }
+function buildPaymentRefresh(orderRows, om) {
+  const headers = new Set(orderRows.flatMap((r) => Object.keys(r)));
+  const need = [
+    [om.orderNo, "\u0E40\u0E25\u0E02\u0E2D\u0E2D\u0E40\u0E14\u0E2D\u0E23\u0E4C"],
+    [om.paymentMethod, "\u0E27\u0E34\u0E18\u0E35\u0E0A\u0E33\u0E23\u0E30\u0E40\u0E07\u0E34\u0E19"],
+    [om.paymentStatus, "\u0E2A\u0E16\u0E32\u0E19\u0E30\u0E01\u0E32\u0E23\u0E0A\u0E33\u0E23\u0E30"],
+    [om.outstandingAmount, "\u0E22\u0E2D\u0E14\u0E04\u0E49\u0E32\u0E07\u0E0A\u0E33\u0E23\u0E30"]
+  ];
+  const missing = need.filter(([col]) => !col || !headers.has(col)).map(([, label]) => label);
+  if (orderRows.length && missing.length)
+    throw new Error(`\u0E44\u0E1F\u0E25\u0E4C\u0E19\u0E35\u0E49\u0E44\u0E21\u0E48\u0E43\u0E0A\u0E48 OrderExport \u2014 \u0E44\u0E21\u0E48\u0E1E\u0E1A\u0E04\u0E2D\u0E25\u0E31\u0E21\u0E19\u0E4C ${missing.join(", ")}`);
+  const cell = (r, col) => col ? String(r[col] ?? "").trim() : "";
+  const out = [];
+  for (const r of orderRows) {
+    const no = cell(r, om.orderNo);
+    if (!no) continue;
+    out.push({
+      makroOrderNo: no,
+      paymentMethod: cell(r, om.paymentMethod) || null,
+      paymentStatus: cell(r, om.paymentStatus) || null,
+      outstandingAmount: om.outstandingAmount ? toNum(r[om.outstandingAmount]) : 0,
+      makroOrderStatus: cell(r, om.orderStatus) || null
+    });
+  }
+  return out;
+}
 
 // supabase/functions/auto-import/clientShim.ts
 var supabase = new Proxy({}, {
@@ -402,20 +428,27 @@ function paymentPatch(p) {
 var CHUNK = 200;
 async function refreshPayments(rows) {
   const nos = [...new Set(rows.map((r) => r.makroOrderNo))];
-  const have = /* @__PURE__ */ new Set();
+  const have = /* @__PURE__ */ new Map();
   for (let i = 0; i < nos.length; i += CHUNK) {
-    const { data, error } = await supabase.from("orders").select("makro_order_no").in("makro_order_no", nos.slice(i, i + CHUNK));
+    const { data, error } = await supabase.from("orders").select("makro_order_no,payment_method,payment_status,outstanding_amount,makro_order_status,paid_marked_at").in("makro_order_no", nos.slice(i, i + CHUNK));
     if (error) throw new Error("\u0E42\u0E2B\u0E25\u0E14\u0E2D\u0E2D\u0E40\u0E14\u0E2D\u0E23\u0E4C\u0E44\u0E21\u0E48\u0E2A\u0E33\u0E40\u0E23\u0E47\u0E08: " + error.message);
-    for (const d of data ?? []) have.add(d.makro_order_no);
+    for (const d of data ?? []) have.set(String(d.makro_order_no), d);
   }
   let refreshed = 0;
+  let unchanged = 0;
   for (const r of rows) {
-    if (!have.has(r.makroOrderNo)) continue;
-    const { error } = await supabase.from("orders").update(paymentPatch(r)).eq("makro_order_no", r.makroOrderNo);
+    const now = have.get(r.makroOrderNo);
+    if (!now) continue;
+    const patch = paymentPatch(r);
+    if (Object.entries(patch).every(([k, v]) => k === "paid_marked_by" || String(now[k] ?? "") === String(v ?? "") || k === "outstanding_amount" && Number(now[k]) === Number(v))) {
+      unchanged++;
+      continue;
+    }
+    const { error } = await supabase.from("orders").update(patch).eq("makro_order_no", r.makroOrderNo);
     if (error) throw new Error(`\u0E2D\u0E31\u0E1B\u0E40\u0E14\u0E15\u0E01\u0E32\u0E23\u0E08\u0E48\u0E32\u0E22\u0E40\u0E07\u0E34\u0E19\u0E02\u0E2D\u0E07 ${r.makroOrderNo} \u0E44\u0E21\u0E48\u0E2A\u0E33\u0E40\u0E23\u0E47\u0E08: ${error.message}`);
     refreshed++;
   }
-  return { refreshed, notInApp: nos.filter((n) => !have.has(n)) };
+  return { refreshed, unchanged, notInApp: nos.filter((n) => !have.has(n)) };
 }
 
 // src/lib/api/dataImports.ts
@@ -616,7 +649,10 @@ async function autoImport(detailRows, orderRows, today) {
     });
   }
   if (days.length === 0) await recordImport(0, 0);
-  return { days, notIsland: r.skippedNotIsland };
+  const imported = new Set(r.orders.filter((o) => [today, nextDayISO(today)].includes(deliveryDate(o) ?? "")).map((o) => o.makroOrderNo));
+  const rest = buildPaymentRefresh(orderRows, DEFAULT_ORDER_MAPPING).filter((p) => !imported.has(p.makroOrderNo));
+  const { refreshed } = rest.length ? await refreshPayments(rest) : { refreshed: 0 };
+  return { days, notIsland: r.skippedNotIsland, paymentsRefreshed: refreshed };
 }
 export {
   MOVED_DATE_COLUMN,

@@ -11,13 +11,13 @@ vi.mock('../lib/api/paymentRefresh', () => ({ refreshPayments: (...a: unknown[])
 test('uploads only an OrderExport and reports what was refreshed', async () => {
   const O = DEFAULT_ORDER_MAPPING
   parseMakroFile.mockResolvedValue([{ [O.orderNo]: 'P-1', [O.paymentMethod]: 'Pay On Delivery', [O.paymentStatus]: 'Paid', [O.outstandingAmount]: '0' }])
-  refreshPayments.mockResolvedValue({ refreshed: 1, notInApp: ['P-9'] })
+  refreshPayments.mockResolvedValue({ refreshed: 1, unchanged: 2, notInApp: ['P-9'] })
   render(<PaymentRefreshCard orderMapping={O} />)
   const file = new File(['x'], 'OrderExport.xlsx')
   await userEvent.upload(screen.getByLabelText('ไฟล์ OrderExport (ย้อนหลังหลายวันได้)'), file)
   await userEvent.click(await screen.findByRole('button', { name: 'อัปเดตสถานะการจ่ายเงิน' }))
   expect(
-    await screen.findByText('อัปเดตสถานะการจ่ายเงิน 1 ออเดอร์ · ไม่พบในแอป 1 ออเดอร์ (ข้าม)'),
+    await screen.findByText('อัปเดตสถานะการจ่ายเงิน 1 ออเดอร์ · เหมือนเดิม 2 ออเดอร์ · ไม่พบในแอป 1 ออเดอร์ (ข้าม)'),
   ).toBeInTheDocument()
 })
 

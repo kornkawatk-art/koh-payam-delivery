@@ -5,10 +5,14 @@
 // - each order goes to its own delivery date -- Makro's moved date when it moved the delivery
 //   ("New Expected Delivery Date"), else the original one -- and only today's and tomorrow's are
 //   imported: the export spans 8 days, and earlier days are already done;
-// - postponed orders are never moved (that stays a manager's tick); they are only counted.
+// - postponed orders are never moved (that stays a manager's tick); they are only counted;
+// - every other order in the export (the earlier days) still gets Makro's latest payment facts, the same
+//   refresh as the "อัปเดตสถานะการจ่ายเงินอย่างเดียว" card: a bill paid after its delivery must stop
+//   locking the customer without anyone re-importing by hand.
 import type { RawRow } from './parseMakroFile'
 import {
   buildImport,
+  buildPaymentRefresh,
   parseExpectedDate,
   validateMapping,
   DEFAULT_DETAIL_MAPPING,
@@ -16,13 +20,14 @@ import {
 } from './buildImport'
 import { commitImport, listOrdersOnOtherDays } from '../api/orders'
 import { recordImport } from '../api/dataImports'
+import { refreshPayments } from '../api/paymentRefresh'
 import { movableNos, nextDayISO } from '../postponed'
 
 export type AutoImportDay = { shipDate: string; orders: number; created: number; synced: number; skipped: number; postponed: string[] }
 /** Makro's column for a delivery it moved to another day (blank when it did not) */
 export const MOVED_DATE_COLUMN = 'New Expected Delivery Date'
 
-export type AutoImportReport = { days: AutoImportDay[]; notIsland: number }
+export type AutoImportReport = { days: AutoImportDay[]; notIsland: number; paymentsRefreshed: number }
 
 export async function autoImport(detailRows: RawRow[], orderRows: RawRow[], today: string): Promise<AutoImportReport> {
   const problems = [
@@ -61,5 +66,10 @@ export async function autoImport(detailRows: RawRow[], orderRows: RawRow[], toda
   }
   // nothing island-bound today or tomorrow still counts as an up-to-date import
   if (days.length === 0) await recordImport(0, 0)
-  return { days, notIsland: r.skippedNotIsland }
+
+  // the earlier (and later) days' POs already in the app: payment facts only (today's and tomorrow's were synced above)
+  const imported = new Set(r.orders.filter((o) => [today, nextDayISO(today)].includes(deliveryDate(o) ?? '')).map((o) => o.makroOrderNo))
+  const rest = buildPaymentRefresh(orderRows, DEFAULT_ORDER_MAPPING).filter((p) => !imported.has(p.makroOrderNo))
+  const { refreshed } = rest.length ? await refreshPayments(rest) : { refreshed: 0 }
+  return { days, notIsland: r.skippedNotIsland, paymentsRefreshed: refreshed }
 }

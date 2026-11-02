@@ -7,6 +7,8 @@ vi.mock('../api/orders', () => ({
   commitImport: (...a: unknown[]) => commitImport(...a),
   listOrdersOnOtherDays: (...a: unknown[]) => listOrdersOnOtherDays(...a),
 }))
+const refreshPayments = vi.fn()
+vi.mock('../api/paymentRefresh', () => ({ refreshPayments: (...a: unknown[]) => refreshPayments(...a) }))
 const recordImport = vi.fn()
 vi.mock('../api/dataImports', () => ({ recordImport: (...a: unknown[]) => recordImport(...a) }))
 
@@ -39,6 +41,7 @@ beforeEach(() => {
   commitImport.mockReset().mockResolvedValue({ created: 1, synced: 0, moved: 0, skipped: [], refreshed: 0 })
   listOrdersOnOtherDays.mockReset().mockResolvedValue([])
   recordImport.mockReset()
+  refreshPayments.mockReset().mockResolvedValue({ refreshed: 1, notInApp: [] })
 })
 
 test("only today's and tomorrow's island orders are imported, each on its own day, never moving postponed ones", async () => {
@@ -85,4 +88,27 @@ test('a run with nothing for today or tomorrow still notes the import, so it doe
 test('a file without the expected columns stops before anything is saved', async () => {
   await expect(autoImport([{ foo: '1' }], [order('P1', '29-Oct-2026')], TODAY)).rejects.toThrow('ไฟล์จาก AO ไม่ตรงรูปแบบ')
   expect(commitImport).not.toHaveBeenCalled()
+})
+
+test("orders delivered on earlier days get Makro's latest payment status, so a bill paid since then stops locking the customer", async () => {
+  const r = await autoImport(
+    ['P1', 'P2'].map(item),
+    [
+      order('P1', '27-Oct-2026', { 'Payment Method': 'Pay on Delivery', 'Payment Status': 'Paid', 'Outstanding Amount': '0' }),
+      order('P2', '29-Oct-2026', { 'Payment Method': 'Pay on Delivery', 'Payment Status': 'Unpaid', 'Outstanding Amount': '500' }),
+    ],
+    TODAY,
+  )
+  // today's P2 is kept current by its own import; the earlier P1 only by the refresh
+  expect(refreshPayments).toHaveBeenCalledTimes(1)
+  expect(refreshPayments.mock.calls[0][0]).toEqual([
+    { makroOrderNo: 'P1', paymentMethod: 'Pay on Delivery', paymentStatus: 'Paid', outstandingAmount: 0, makroOrderStatus: 'Packed' },
+  ])
+  expect(r.paymentsRefreshed).toBe(1)
+})
+
+test('the payment refresh runs even when nothing is due today or tomorrow', async () => {
+  await autoImport([item('P1')], [order('P1', '25-Oct-2026', { 'Payment Status': 'Paid' })], TODAY)
+  expect(commitImport).not.toHaveBeenCalled()
+  expect(refreshPayments.mock.calls[0][0].map((p: { makroOrderNo: string }) => p.makroOrderNo)).toEqual(['P1'])
 })
