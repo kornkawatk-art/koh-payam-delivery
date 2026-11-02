@@ -39,7 +39,7 @@ export function PaymentRefreshCard({ orderMapping }: { orderMapping: OrderMappin
     try {
       const r = await refreshPayments(rows)
       setMsg(
-        `อัปเดตสถานะการจ่ายเงิน ${r.refreshed} ออเดอร์ · ไม่พบในแอป ${r.notInApp.length} ออเดอร์ (ข้าม)`,
+        `อัปเดตสถานะการจ่ายเงิน ${r.refreshed} ออเดอร์ · เหมือนเดิม ${r.unchanged} ออเดอร์ · ไม่พบในแอป ${r.notInApp.length} ออเดอร์ (ข้าม)`,
       )
     } catch (e) {
       setErr((e as Error).message)
