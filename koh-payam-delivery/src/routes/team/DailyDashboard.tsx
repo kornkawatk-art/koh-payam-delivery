@@ -24,7 +24,8 @@ import { PageSkeleton } from '../../components/ui/Skeleton'
 import { PageHeader } from '../../components/ui/PageHeader'
 import QrOrderScanner from '../../components/QrOrderScanner'
 import { todayLocalISO } from '../../lib/format'
-import { groupByPhone, entryOrders, entryHasUnpacked, type DayEntry } from '../../lib/groupOrders'
+import { groupByPhone, entryOrders, entryHasUnpacked, mergeCandidates, type DayEntry } from '../../lib/groupOrders'
+import { listPackMerges, setPackMerge } from '../../lib/api/packMerges'
 import { EmptyState } from '../../components/ui/EmptyState'
 import {
   IslandBadge,
@@ -57,6 +58,9 @@ export default function DailyDashboard() {
   const navigate = useNavigate()
   const [date, setDate] = useState(todayLocalISO())
   const [rows, setRows] = useState<any[] | null>(null)
+  // phones packed as one today although their shop names differ (0038)
+  const [merges, setMerges] = useState<Set<string>>(new Set())
+  const [mergeError, setMergeError] = useState<string>()
   const [failed, setFailed] = useState(false)
   const [q, setQ] = useState('')
   const [island, setIsland] = useState<IslandFilterValue>('all')
@@ -78,7 +82,9 @@ export default function DailyDashboard() {
     if (!date) return
     setFailed(false)
     try {
-      setRows(await listOrdersForDay(date))
+      const [r, m] = await Promise.all([listOrdersForDay(date), listPackMerges(date).catch(() => new Set<string>())])
+      setMerges(m)
+      setRows(r)
     } catch {
       setFailed(true)
     }
@@ -159,10 +165,30 @@ export default function DailyDashboard() {
   // One entry per customer: POs sharing a phone on this day collapse into a
   // group row (see groupByPhone). Grouped from ALL rows -- the search box then
   // keeps any entry with a matching PO, so a group never loses members to it.
-  const entries = useMemo(() => groupByPhone<any>(rows ?? []), [rows])
+  const entries = useMemo(() => groupByPhone<any>(rows ?? [], merges), [rows, merges])
+
+  // the same phone under 2+ shop names today, none packed yet: the team may pack them as one
+  const candidates = useMemo(
+    () =>
+      mergeCandidates<any>(rows ?? [], merges).filter((c) => {
+        const os = (rows ?? []).filter((o) => (o.customer_phone ?? '').trim() === c.phone)
+        // not when any shop is packed already, or still owes (its payment lock is per shop: merging must not hide it)
+        return os.every((o) => o.status === 'imported') && !os.some((o) => locks.get(customerKey(o))?.locked)
+      }),
+    [rows, merges, locks],
+  )
+  const toggleMerge = async (phone: string, on: boolean) => {
+    setMergeError(undefined)
+    try {
+      await setPackMerge(date, phone, on)
+      await load()
+    } catch (e) {
+      setMergeError((e as Error).message)
+    }
+  }
 
   // "พิมพ์สติ๊กเกอร์ทั้งหมด": per-customer jobs; the button counts what's still due
-  const stickerJobs = useMemo(() => buildStickerJobs(rows ?? []), [rows])
+  const stickerJobs = useMemo(() => buildStickerJobs(rows ?? [], merges), [rows, merges])
   const due = stickerJobs.filter((j) => !j.printed)
   const dueStickers = due.reduce((n, j) => n + j.counts.paper + j.counts.foam + j.counts.piece, 0)
 
@@ -206,7 +232,11 @@ export default function DailyDashboard() {
       live = false
     }
   }, [rows, date, lockTick])
-  const lockOf = (e: DayEntry<any>) => locks.get(customerKey(entryOrders(e)[0]))
+  // a merged phone (0038) is locked when any of its shops is
+  const lockOf = (e: DayEntry<any>) => {
+    const all = entryOrders(e).map((o) => locks.get(customerKey(o)))
+    return all.find((l) => l?.locked) ?? all[0]
+  }
 
   // A customer whose every PO is a store pickup gets its own section at the end.
   const isPickupEntry = (e: DayEntry<any>) => entryOrders(e).every((o) => o.is_pickup)
@@ -410,6 +440,23 @@ export default function DailyDashboard() {
         />
       )}
 
+      {editable && candidates.length > 0 && (
+        <section aria-label="เบอร์เดียวกันหลายชื่อ" className="card space-y-2 p-3">
+          <p className="text-sm font-medium">เบอร์เดียวกันแต่ชื่อร้านต่างกัน ปกติแพ็กแยก แพ็กรวมเฉพาะวันนี้ได้</p>
+          {candidates.map((c) => (
+            <div key={c.phone} className="flex flex-wrap items-center justify-between gap-2 text-sm">
+              <span>
+                <span className="font-mono">{c.phone}</span> · {c.names.join(' · ')}
+              </span>
+              <button type="button" className="btn btn-ok btn-sm" onClick={() => void toggleMerge(c.phone, true)}>
+                แพ็กรวม
+              </button>
+            </div>
+          ))}
+        </section>
+      )}
+      {mergeError && <p className="alert alert-danger">{mergeError}</p>}
+
       {showIslandFilter && <IslandFilter value={island} onChange={setIsland} />}
 
       {filtered.length === 0 ? (
@@ -456,7 +503,7 @@ export default function DailyDashboard() {
                     onReleased={() => setLockTick((n) => n + 1)}
                     onMoved={() => void load()}
                   />
-                  <EntryRows entry={e} date={date} showIsland={showIslandFilter} />
+                  <EntryRows entry={e} date={date} showIsland={showIslandFilter} onUnmerge={(p) => void toggleMerge(p, false)} />
                 </Fragment>
               ))}
               {notPacked.length > 0 && (
@@ -473,6 +520,7 @@ export default function DailyDashboard() {
                   date={date}
                   showIsland={showIslandFilter}
                   released={!!lockOf(e)?.released}
+                  onUnmerge={(p) => void toggleMerge(p, false)}
                 />
               ))}
               {packedOrAhead.length > 0 && (
@@ -489,6 +537,7 @@ export default function DailyDashboard() {
                   date={date}
                   showIsland={showIslandFilter}
                   released={!!lockOf(e)?.released}
+                  onUnmerge={(p) => void toggleMerge(p, false)}
                 />
               ))}
               {pickupEntries.length > 0 && (
@@ -505,6 +554,7 @@ export default function DailyDashboard() {
                   date={date}
                   showIsland={showIslandFilter}
                   released={!!lockOf(e)?.released}
+                  onUnmerge={(p) => void toggleMerge(p, false)}
                 />
               ))}
             </tbody>
@@ -623,15 +673,17 @@ function EntryRows({
   date,
   showIsland,
   released,
+  onUnmerge,
 }: {
   entry: DayEntry<any>
   date: string
   showIsland: boolean
   released?: boolean
+  onUnmerge?: (phone: string) => void
 }) {
   if (entry.kind === 'single')
     return <OrderRow order={entry.order} showIsland={showIsland} released={released} />
-  return <GroupRows group={entry} date={date} showIsland={showIsland} released={released} />
+  return <GroupRows group={entry} date={date} showIsland={showIsland} released={released} onUnmerge={onUnmerge} />
 }
 
 const ReleasedBadge = () => <span className="badge badge-warn ml-1.5">ปลดแล้ว</span>
@@ -731,11 +783,14 @@ function GroupRows({
   date,
   showIsland,
   released,
+  onUnmerge,
 }: {
   group: Extract<DayEntry<any>, { kind: 'group' }>
   date: string
   showIsland: boolean
   released?: boolean
+  /** a merged phone (0038): pack its shop names separately again, while nothing is packed */
+  onUnmerge?: (phone: string) => void
 }) {
   const { profile } = useAuth()
   const editable = canEdit(profile?.role ?? 'packer')
@@ -768,10 +823,16 @@ function GroupRows({
           {editable && (
             <Link
               className="btn btn-ok btn-sm ml-2"
-              to={`/customer/${date}/${encodeURIComponent(group.phone)}/pack?name=${encodeURIComponent(group.name)}`}
+              // a merged phone packs every shop name of it: the pack page then loads by phone alone
+              to={`/customer/${date}/${encodeURIComponent(group.phone)}/pack${group.merged ? '' : `?name=${encodeURIComponent(group.name)}`}`}
             >
               แพ็ครวม
             </Link>
+          )}
+          {editable && group.merged && onUnmerge && os.every((o) => o.status === 'imported') && (
+            <button type="button" className="btn btn-ghost btn-sm ml-1" onClick={() => onUnmerge(group.phone)}>
+              แยกแพ็ก
+            </button>
           )}
         </td>
         <td data-label="สถานะ">

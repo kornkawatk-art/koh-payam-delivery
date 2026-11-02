@@ -51,3 +51,12 @@ test('sorted by island (Payam, Chang, unpicked last) then customer name', () => 
   ])
   expect(jobs.map((j) => j.name)).toEqual(['Ann', 'Zed', 'Bay', 'Pier'])
 })
+
+test('a phone merged for the day prints one set of stickers across its shop names', () => {
+  const a = o('1', { customer_name_en: 'SHOP A', paper_box_count: 2, foam_box_count: 0 })
+  const b = o('2', { customer_name_en: 'SHOP B', paper_box_count: 1, foam_box_count: 1 })
+  expect(buildStickerJobs([a, b])).toHaveLength(2)
+  const [job] = buildStickerJobs([a, b], new Set(['0826289533']))
+  expect(job).toMatchObject({ name: 'SHOP A + SHOP B', counts: { paper: 3, foam: 1, piece: 0 } })
+  expect(job.orders).toHaveLength(2)
+})

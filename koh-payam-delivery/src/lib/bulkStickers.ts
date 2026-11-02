@@ -1,4 +1,4 @@
-import { customerKey } from '../../supabase/functions/_shared/customerKey'
+import { customerKey, normCustomerName } from '../../supabase/functions/_shared/customerKey'
 import { ISLAND_LIST } from './islands'
 import { makroVoid } from './makroStatus'
 
@@ -46,11 +46,13 @@ const islandRank = (i: string | null) => {
   return n === -1 ? ISLAND_LIST.length : n
 }
 
-export function buildStickerJobs(orders: StickerOrder[]): StickerJob[] {
+/** `merged`: phones packed as one this day although their shop names differ (pack_merges, 0038) -- one job for the phone */
+export function buildStickerJobs(orders: StickerOrder[], merged: ReadonlySet<string> = new Set()): StickerJob[] {
   const byKey = new Map<string, StickerJob>()
   for (const o of orders) {
     if (!PRINTABLE.includes(o.status) || makroVoid(o.makro_order_status)) continue
-    const key = customerKey(o)
+    const phone = (o.customer_phone ?? '').trim()
+    const key = phone && merged.has(phone) ? `merged:${phone}` : customerKey(o)
     const job =
       byKey.get(key) ??
       ({
@@ -65,6 +67,7 @@ export function buildStickerJobs(orders: StickerOrder[]): StickerJob[] {
     job.counts.paper += o.paper_box_count || 0
     job.counts.foam += o.foam_box_count || 0
     job.counts.piece += o.piece_count || 0
+    if (key.startsWith('merged:') && !job.name.split(' + ').some((n) => normCustomerName(n) === normCustomerName(o.customer_name_en))) job.name += ` + ${o.customer_name_en}`
     job.orders.push(o)
     if (o.stickers_printed !== printedSnapshot(o)) job.printed = false
     byKey.set(key, job)

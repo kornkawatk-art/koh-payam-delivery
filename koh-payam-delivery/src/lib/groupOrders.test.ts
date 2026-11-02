@@ -1,4 +1,4 @@
-import { groupByPhone, entryHasUnpacked, entryOrders, pickPrimary, normCustomerName } from './groupOrders'
+import { groupByPhone, entryHasUnpacked, entryOrders, mergeCandidates, pickPrimary, normCustomerName } from './groupOrders'
 
 const o = (id: string, no: string, name: string, phone: string | null, status = 'imported') => ({
   id,
@@ -91,4 +91,24 @@ test('Makro spacing/case differences in a name do not split one shop', () => {
   ])
   expect(entries).toHaveLength(1)
   expect(entries[0].kind).toBe('group')
+})
+
+test('a phone merged for the day packs as one group across its names, listed by name', () => {
+  const day = [o('1', 'PO-1', 'SHOP A', '081'), o('2', 'PO-2', 'shop  b', '081'), o('3', 'PO-3', 'SHOP A', '081'), o('4', 'PO-4', 'C', '082')]
+  const r = groupByPhone(day, new Set(['081']))
+  expect(r).toHaveLength(2)
+  expect(r[0]).toMatchObject({ kind: 'group', phone: '081', name: 'SHOP A + shop  b', merged: true })
+  expect(entryOrders(r[0]).map((x) => x.makro_order_no)).toEqual(['PO-1', 'PO-2', 'PO-3'])
+  // without the merge each shop stays its own customer
+  expect(groupByPhone(day).filter((e) => e.kind === 'group')).toEqual([expect.objectContaining({ name: 'SHOP A', merged: false })])
+})
+
+test('a merged phone with a single PO stays a single entry', () => {
+  expect(groupByPhone([o('1', 'PO-1', 'A', '081')], new Set(['081']))[0].kind).toBe('single')
+})
+
+test('mergeCandidates: phones with 2+ different shop names that day, not merged yet', () => {
+  const day = [o('1', 'PO-1', 'SHOP A', '081'), o('2', 'PO-2', 'SHOP B', '081'), o('3', 'PO-3', 'X', '082'), o('4', 'PO-4', 'x ', '082'),
+    o('5', 'PO-5', 'P', '083'), o('6', 'PO-6', 'Q', '083'), o('7', 'PO-7', 'M', null), o('8', 'PO-8', 'N', null)]
+  expect(mergeCandidates(day, new Set(['083']))).toEqual([{ phone: '081', names: ['SHOP A', 'SHOP B'] }])
 })

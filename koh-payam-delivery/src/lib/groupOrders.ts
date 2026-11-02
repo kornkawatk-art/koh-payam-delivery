@@ -8,7 +8,7 @@ type Groupable = {
 
 export type DayEntry<T extends Groupable> =
   | { kind: 'single'; order: T }
-  | { kind: 'group'; phone: string; name: string; orders: T[] }
+  | { kind: 'group'; phone: string; name: string; orders: T[]; merged: boolean }
 
 /**
  * The same customer name however Makro spaced or cased it ("สุวิทย์  เพชร์รัตน์"
@@ -25,11 +25,14 @@ export { normCustomerName } from '../../supabase/functions/_shared/customerKey'
  * name become one group; everything else stays a single entry. Entries keep
  * the order in which their first PO appeared; POs inside a group are sorted
  * by order number, which is also how the pack page picks its "primary" PO.
+ * `merged`: phones a team member chose to pack as one for this day (pack_merges, 0038) although their
+ * shop names differ -- those group by phone alone, named "A + B".
  */
-export function groupByPhone<T extends Groupable>(orders: T[]): DayEntry<T>[] {
+export function groupByPhone<T extends Groupable>(orders: T[], merged: ReadonlySet<string> = new Set()): DayEntry<T>[] {
   const keyOf = (o: T) => {
     const phone = (o.customer_phone ?? '').trim()
-    return phone ? `${phone}|${normCustomerName(o.customer_name_en)}` : ''
+    if (!phone) return ''
+    return merged.has(phone) ? `${phone}|*` : `${phone}|${normCustomerName(o.customer_name_en)}`
   }
   const byKey = new Map<string, T[]>()
   for (const o of orders) {
@@ -48,14 +51,35 @@ export function groupByPhone<T extends Groupable>(orders: T[]): DayEntry<T>[] {
     if (emitted.has(k)) continue
     emitted.add(k)
     const sorted = [...members].sort((a, b) => a.makro_order_no.localeCompare(b.makro_order_no))
+    const isMerged = k.endsWith('|*')
     entries.push({
       kind: 'group',
       phone: (o.customer_phone ?? '').trim(),
-      name: sorted[0].customer_name_en,
+      name: isMerged ? shopNames(sorted).join(' + ') : sorted[0].customer_name_en,
       orders: sorted,
+      merged: isMerged,
     })
   }
   return entries
+}
+
+/** Each shop name once, as first written, in order-number order */
+function shopNames<T extends Groupable>(orders: T[]): string[] {
+  const seen = new Map<string, string>()
+  for (const o of orders) if (!seen.has(normCustomerName(o.customer_name_en))) seen.set(normCustomerName(o.customer_name_en), o.customer_name_en)
+  return [...seen.values()]
+}
+
+/** Phones that have 2+ different shop names this day and are not merged yet: the team may pack them as one */
+export function mergeCandidates<T extends Groupable>(orders: T[], merged: ReadonlySet<string>): { phone: string; names: string[] }[] {
+  const byPhone = new Map<string, T[]>()
+  for (const o of orders) {
+    const phone = (o.customer_phone ?? '').trim()
+    if (phone && !merged.has(phone)) byPhone.set(phone, [...(byPhone.get(phone) ?? []), o])
+  }
+  return [...byPhone]
+    .map(([phone, os]) => ({ phone, names: shopNames([...os].sort((a, b) => a.makro_order_no.localeCompare(b.makro_order_no))) }))
+    .filter((c) => c.names.length > 1)
 }
 
 export function entryOrders<T extends Groupable>(e: DayEntry<T>): T[] {

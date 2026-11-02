@@ -93,6 +93,17 @@ vi.mock('../../lib/api/payments', () => ({
   releaseCustomer: (...a: unknown[]) => releaseCustomer(...a),
 }))
 
+let merges = new Set<string>()
+const setPackMerge = vi.fn().mockImplementation((_d: string, phone: string, on: boolean) => {
+  merges = new Set(merges)
+  if (on) merges.add(phone)
+  else merges.delete(phone)
+  return Promise.resolve()
+})
+vi.mock('../../lib/api/packMerges', () => ({
+  listPackMerges: () => Promise.resolve(merges),
+  setPackMerge: (...a: [string, string, boolean]) => setPackMerge(...a),
+}))
 vi.mock('../../lib/api/backorders', () => ({
   listBackordersForDay: (...a: unknown[]) => listBackordersForDay(...a),
 }))
@@ -824,4 +835,45 @@ test('combined orders (one customer, several POs) come first, then the single PO
   const order = ['2 PO', 'ALONE FIRST', 'ALONE SECOND'].map((t) => screen.getByText(t).closest('tr')!)
   expect(order[0].compareDocumentPosition(order[1]) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
   expect(order[1].compareDocumentPosition(order[2]) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+})
+
+const shop = (id: string, no: string, name: string, status = 'imported') => ({
+  id, makro_order_no: no, customer_name_en: name, customer_phone: '0812223333', island: 'payam', status, boat_id: null,
+  paper_box_count: 0, foam_box_count: 0, piece_count: 0, outstanding_amount: 0,
+})
+
+test('one phone with two shop names that day is offered for packing as one; merging makes one group packed by phone', async () => {
+  authRole.current = 'manager'
+  merges = new Set()
+  vi.mocked(listOrdersForDay).mockResolvedValue([shop('a', 'PO-A', 'SHOP A'), shop('b', 'PO-B', 'SHOP B')] as never)
+  renderPage()
+  const offer = await screen.findByRole('region', { name: 'เบอร์เดียวกันหลายชื่อ' })
+  expect(offer).toHaveTextContent('0812223333')
+  expect(offer).toHaveTextContent('SHOP A · SHOP B')
+  await userEvent.click(within(offer).getByRole('button', { name: 'แพ็กรวม' }))
+  expect(setPackMerge).toHaveBeenCalledWith(expect.any(String), '0812223333', true)
+  const link = await screen.findByRole('link', { name: 'แพ็ครวม' })
+  expect(link.getAttribute('href')).toMatch(/\/customer\/.+\/0812223333\/pack$/) // no shop name: every name of the phone
+  expect(screen.getByText('SHOP A + SHOP B')).toBeInTheDocument()
+  await userEvent.click(screen.getByRole('button', { name: 'แยกแพ็ก' }))
+  expect(setPackMerge).toHaveBeenLastCalledWith(expect.any(String), '0812223333', false)
+})
+
+test('nothing is offered once one of the shops is already packed', async () => {
+  authRole.current = 'manager'
+  merges = new Set()
+  vi.mocked(listOrdersForDay).mockResolvedValue([shop('a', 'PO-A', 'SHOP A', 'packed'), shop('b', 'PO-B', 'SHOP B')] as never)
+  renderPage()
+  await screen.findByText('SHOP B')
+  expect(screen.queryByRole('region', { name: 'เบอร์เดียวกันหลายชื่อ' })).not.toBeInTheDocument()
+})
+
+test("a phone with a shop that still owes is not offered for packing as one (the payment lock stays per shop)", async () => {
+  authRole.current = 'manager'
+  merges = new Set()
+  vi.mocked(listOrdersForDay).mockResolvedValue([shop('a', 'PO-A', 'SHOP A'), shop('b', 'PO-B', 'SHOP B')] as never)
+  getDayLocks.mockResolvedValueOnce(new Map([['phone:0812223333|name:SHOP B', { locked: true, released: false, priorBills: [], total: 500, oldestDays: 2 }]]))
+  renderPage()
+  await screen.findByText('SHOP A')
+  expect(screen.queryByRole('region', { name: 'เบอร์เดียวกันหลายชื่อ' })).not.toBeInTheDocument()
 })
