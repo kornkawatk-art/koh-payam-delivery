@@ -359,3 +359,17 @@ test('broken eggs is unavailable on an order with no eggs', () => {
   expect(screen.getByRole('radio', { name: /Broken eggs/ })).toBeDisabled()
   expect(screen.getByText('(This order has no eggs.)')).toBeInTheDocument()
 })
+
+test('wrong order: the customer picks the wrongly ordered items and how many, in Thai too', async () => {
+  const onDone = vi.fn()
+  render(<CustomerClaimForm token="tok_abc" items={items} lang="th" onDone={onDone} />)
+
+  await userEvent.click(screen.getByRole('radio', { name: 'สั่งสินค้าผิดรายการ' }))
+  expect(screen.getByText('สินค้าที่สั่งผิดมีรายการใดบ้าง')).toBeInTheDocument()
+  expect(screen.getByRole('button', { name: 'ส่งเรื่อง' })).toBeDisabled()
+  await userEvent.click(screen.getByRole('checkbox', { name: 'Rice 5kg' }))
+  await userEvent.click(screen.getByRole('button', { name: 'ส่งเรื่อง' }))
+
+  await waitFor(() => expect(onDone).toHaveBeenCalled())
+  expect(lastBody()).toMatchObject({ type: 'wrong_order', items: [{ orderItemIndex: 0, qty: 1 }] })
+})

@@ -6,7 +6,7 @@ import { maxBrokenEggs } from '../../../supabase/functions/_shared/eggs'
 const FN = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/submit-claim`
 const ANON = import.meta.env.VITE_SUPABASE_ANON_KEY as string
 
-const CLAIM_TYPES = ['missing_in_box', 'damaged', 'broken_eggs', 'box_lost'] as const
+const CLAIM_TYPES = ['missing_in_box', 'damaged', 'wrong_order', 'broken_eggs', 'box_lost'] as const
 type ClaimType = (typeof CLAIM_TYPES)[number]
 
 type Props = {
@@ -37,7 +37,7 @@ function selectOnFocus(e: React.FocusEvent<HTMLInputElement>) {
  *
  * Item selection depends on the claim type:
  *  - box_lost references no item at all.
- *  - missing_in_box and damaged both reference one or more items — a
+ *  - missing_in_box, damaged and wrong_order reference one or more items — a
  *    checkbox per item, each with its own qty once checked, capped at that
  *    item's shippedQty (an item that shipped 0 units isn't offered at all —
  *    that's the existing shortage/backorder flow, a different concept).
@@ -153,7 +153,9 @@ export default function CustomerClaimForm({ token, items, lang, onDone }: Props)
                 ? 'claim_form_egg_items'
                 : type === 'damaged'
                   ? 'claim_form_damaged_items'
-                  : 'claim_form_missing_items',
+                  : type === 'wrong_order'
+                    ? 'claim_form_wrong_order_items'
+                    : 'claim_form_missing_items',
             )}
           </legend>
           {claimableItems.map(({ productName, itemId, max, index }) => {

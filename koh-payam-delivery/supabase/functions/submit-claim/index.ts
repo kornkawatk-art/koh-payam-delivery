@@ -2,8 +2,8 @@
 //   -> { ok: true, claimId }
 //
 // `items` holds the order_items this claim references, each with its own qty:
-// box_lost must send [] (no item is referenced), damaged and missing_in_box
-// must both send 1+ entries (a claim can reference several products at
+// box_lost must send [] (no item is referenced), damaged, missing_in_box and
+// wrong_order must send 1+ entries (a claim can reference several products at
 // once). Each entry's qty is clamped server-side to that order_item's
 // qty_shipped — defense-in-depth against a client that bypasses the UI cap.
 // The claim + its items are created atomically by the `create_claim` RPC.
@@ -28,6 +28,7 @@ const ITEMS_COUNT_OK: Record<string, (n: number) => boolean> = {
   box_lost: (n) => n === 0,
   damaged: (n) => n >= 1,
   missing_in_box: (n) => n >= 1,
+  wrong_order: (n) => n >= 1,
   broken_eggs: (n) => n >= 1,
 }
 
