@@ -668,3 +668,15 @@ test('commitImport refreshes payment facts of POs that live on another day, with
   expect(refreshPayments).toHaveBeenCalledWith([paid], {}) // an import by hand: Makro "not paid" still clears a paid mark
   expect(r.refreshed).toBe(1)
 })
+
+test('a Myanmar-bound PO is saved with its box name; a re-import keeps the name current and sets the destination', async () => {
+  await commitImport('2026-10-01', [{ ...parsedOrders[0], island: 'myanmar', boxLabel: 'ครูวิทย์' }] as any)
+  const ordIns = state.inserted.find((i) => i.table === 'orders')
+  expect(ordIns.rows).toMatchObject({ island: 'myanmar', box_label: 'ครูวิทย์' })
+})
+
+test('a re-import brings a renamed box label onto the PO, and the Myanmar destination with it', async () => {
+  state.existing = [{ id: 'old1', makro_order_no: 'PO-1' }]
+  await commitImport('2026-10-01', [{ ...parsedOrders[0], island: 'myanmar', boxLabel: 'ครูวิทย์ 2' }] as any)
+  expect(state.updated.find((u) => u.table === 'orders').patch).toMatchObject({ box_label: 'ครูวิทย์ 2', island: 'myanmar' })
+})

@@ -18,6 +18,8 @@ export type StickerOrder = {
   piece_count: number
   // the box counts this order's stickers were last printed with ("p,f,n")
   stickers_printed?: string | null
+  // the name sale gave this PO's boxes in O2O Desk (0039): printed as it is, one job per PO
+  box_label?: string | null
 }
 
 export type StickerJob = {
@@ -29,6 +31,8 @@ export type StickerJob = {
   orders: StickerOrder[]
   // already printed with the counts the orders have now
   printed: boolean
+  // a box-named PO: its number, printed small on each sticker; the name is fixed (no short name)
+  po?: string
 }
 
 /** What gets remembered when an order's stickers print. */
@@ -52,12 +56,13 @@ export function buildStickerJobs(orders: StickerOrder[], merged: ReadonlySet<str
   for (const o of orders) {
     if (!PRINTABLE.includes(o.status) || makroVoid(o.makro_order_status)) continue
     const phone = (o.customer_phone ?? '').trim()
-    const key = phone && merged.has(phone) ? `merged:${phone}` : customerKey(o)
+    const key = o.box_label ? `po:${o.makro_order_no}` : phone && merged.has(phone) ? `merged:${phone}` : customerKey(o)
     const job =
       byKey.get(key) ??
       ({
         key,
-        name: o.customer_name_en,
+        name: o.box_label || o.customer_name_en,
+        ...(o.box_label ? { po: o.makro_order_no } : {}),
         phone: o.customer_phone,
         island: o.island ?? null,
         counts: { paper: 0, foam: 0, piece: 0 },
@@ -67,7 +72,7 @@ export function buildStickerJobs(orders: StickerOrder[], merged: ReadonlySet<str
     job.counts.paper += o.paper_box_count || 0
     job.counts.foam += o.foam_box_count || 0
     job.counts.piece += o.piece_count || 0
-    if (key.startsWith('merged:') && !job.name.split(' + ').some((n) => normCustomerName(n) === normCustomerName(o.customer_name_en))) job.name += ` + ${o.customer_name_en}`
+    if (key.startsWith('merged:') && !o.box_label && !job.name.split(' + ').some((n) => normCustomerName(n) === normCustomerName(o.customer_name_en))) job.name += ` + ${o.customer_name_en}`
     job.orders.push(o)
     if (o.stickers_printed !== printedSnapshot(o)) job.printed = false
     byKey.set(key, job)

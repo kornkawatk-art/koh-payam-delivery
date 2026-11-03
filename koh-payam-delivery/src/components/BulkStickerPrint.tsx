@@ -8,7 +8,7 @@ import type { StickerJob } from '../lib/bulkStickers'
 import { getShortNames, saveShortName, suggestShortName } from '../lib/api/customerAliases'
 import { markStickersPrinted } from '../lib/api/stickerPrints'
 
-type Printable = { key: string; name: string; island: string | null; s: Sticker }
+type Printable = { key: string; name: string; island: string | null; po?: string; s: Sticker }
 
 const refOf = (j: StickerJob) => ({ customer_phone: j.phone, customer_name_en: j.name })
 
@@ -43,6 +43,10 @@ export function BulkStickerDialog({
         const n: Record<string, string> = {}
         const g = new Set<string>()
         for (const j of jobs) {
+          if (j.po) {
+            n[j.key] = j.name // sale's box name, as it is
+            continue
+          }
           const s = saved.get(j.key)
           n[j.key] = s ?? suggestShortName(j.name)
           if (!s) g.add(j.key)
@@ -93,7 +97,7 @@ export function BulkStickerDialog({
     setErr('')
     setBusy(true)
     try {
-      for (const j of chosen) await saveShortName(refOf(j), names[j.key].trim())
+      for (const j of chosen) if (!j.po) await saveShortName(refOf(j), names[j.key].trim())
     } catch (e) {
       setErr((e as Error).message)
       setBusy(false)
@@ -101,7 +105,7 @@ export function BulkStickerDialog({
     }
     setPrinting(
       chosen.flatMap((j) =>
-        stickerList(j.counts).map((s) => ({ key: j.key, name: names[j.key].trim(), island: j.island, s })),
+        stickerList(j.counts).map((s) => ({ key: j.key, name: names[j.key].trim(), island: j.island, po: j.po, s })),
       ),
     )
     let warning: string | undefined
@@ -191,7 +195,7 @@ export function BulkStickerDialog({
           <div className="sticker-print-root" data-testid="sticker-print-root">
             <style>{'@page { size: 50mm 30mm; margin: 0; }'}</style>
             {printing.map((p) => (
-              <StickerFace key={`${p.key}-${p.s.no}`} name={p.name} s={p.s} island={p.island} />
+              <StickerFace key={`${p.key}-${p.s.no}`} name={p.name} s={p.s} island={p.island} po={p.po} />
             ))}
           </div>,
           document.body,

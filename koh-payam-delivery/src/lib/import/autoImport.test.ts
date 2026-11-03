@@ -7,6 +7,8 @@ vi.mock('../api/orders', () => ({
   commitImport: (...a: unknown[]) => commitImport(...a),
   listOrdersOnOtherDays: (...a: unknown[]) => listOrdersOnOtherDays(...a),
 }))
+let boxLabels = new Map<string, string>()
+vi.mock('../api/boxLabels', () => ({ listBoxLabelMap: () => Promise.resolve(boxLabels) }))
 const refreshPayments = vi.fn()
 vi.mock('../api/paymentRefresh', () => ({ refreshPayments: (...a: unknown[]) => refreshPayments(...a) }))
 const recordImport = vi.fn()
@@ -117,4 +119,11 @@ test("the automatic import never clears a manager's paid mark: both its own sync
   await autoImport(['P1', 'P2'].map(item), [order('P1', '27-Oct-2026'), order('P2', '29-Oct-2026')], TODAY)
   expect(commitImport.mock.calls[0][4]).toEqual({ keepPaidMark: true })
   expect(refreshPayments.mock.calls[0][1]).toEqual({ keepPaidMark: true })
+})
+
+test("a PO sale named in O2O Desk is imported for its day as a Myanmar-bound order with its box name", async () => {
+  boxLabels = new Map([['M1', 'ครูวิทย์']])
+  await autoImport([item('M1')], [order('M1', '29-Oct-2026', { 'Sub District': 'บางริ้น', 'Shipping Address': 'ระนอง' })], TODAY)
+  expect(commitImport.mock.calls[0][1]).toEqual([expect.objectContaining({ makroOrderNo: 'M1', island: 'myanmar', boxLabel: 'ครูวิทย์' })])
+  boxLabels = new Map()
 })

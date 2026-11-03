@@ -140,7 +140,7 @@ function validateMapping(kind, headers, mapping) {
   }
   return problems;
 }
-function buildImport(detailRows, orderRows, dm, om) {
+function buildImport(detailRows, orderRows, dm, om, boxLabels = /* @__PURE__ */ new Map()) {
   const payamOrders = /* @__PURE__ */ new Map();
   let skippedNotIsland = 0;
   const skippedVoid = [];
@@ -149,7 +149,8 @@ function buildImport(detailRows, orderRows, dm, om) {
     if (!orderNo) continue;
     const subDistrict = (r[om.subDistrict] ?? "").trim();
     const shippingAddress = (r[om.shippingAddress] ?? "").trim();
-    const island = classifyIsland({ subDistrict, shippingAddress });
+    const boxLabel = boxLabels.get(orderNo) ?? null;
+    const island = classifyIsland({ subDistrict, shippingAddress }) ?? (boxLabel ? "myanmar" : null);
     if (!island) {
       skippedNotIsland++;
       continue;
@@ -176,6 +177,7 @@ function buildImport(detailRows, orderRows, dm, om) {
       customerPhone: customerPhone || null,
       island: island === "unknown" ? null : island,
       isPickup: /pick\s*-?\s*up/i.test(orderType),
+      boxLabel,
       items: []
     });
   }
@@ -541,7 +543,8 @@ async function commitImport(shipDate, incoming, voided = [], move = [], payment 
         outstanding_amount: o.outstandingAmount,
         customer_phone: o.customerPhone,
         island: o.island,
-        is_pickup: o.isPickup
+        is_pickup: o.isPickup,
+        box_label: o.boxLabel ?? null
       }).select("id").single();
       if (error) throw new Error(`\u0E2A\u0E23\u0E49\u0E32\u0E07\u0E2D\u0E2D\u0E40\u0E14\u0E2D\u0E23\u0E4C ${o.makroOrderNo} \u0E44\u0E21\u0E48\u0E2A\u0E33\u0E40\u0E23\u0E47\u0E08: ${error.message}`);
       const orderId = ins.id;
@@ -560,6 +563,8 @@ async function commitImport(shipDate, incoming, voided = [], move = [], payment 
         // Makro's own fact -- a re-import keeps it current (unlike island,
         // which a manager may have picked by hand)
         is_pickup: o.isPickup,
+        // sale's box name (O2O Desk) stays current; such a PO ships to Myanmar
+        ...o.boxLabel ? { box_label: o.boxLabel, ...o.island === "myanmar" ? { island: "myanmar" } : {} } : {},
         // the customer collected it -- close it, unless it already went further
         ...collected(o) && ["imported", "packed"].includes(statusByNo.get(o.makroOrderNo) ?? "") ? { status: "picked_up", picked_up_at: (/* @__PURE__ */ new Date()).toISOString() } : {}
       }).eq("id", existingId);
@@ -613,6 +618,13 @@ async function commitImport(shipDate, incoming, voided = [], move = [], payment 
   return { created, synced, moved, skipped, refreshed };
 }
 
+// src/lib/api/boxLabels.ts
+async function listBoxLabelMap() {
+  const { data, error } = await supabase.from("box_labels").select("makro_order_no,label");
+  if (error) throw new Error("\u0E42\u0E2B\u0E25\u0E14\u0E0A\u0E37\u0E48\u0E2D\u0E2B\u0E19\u0E49\u0E32\u0E25\u0E31\u0E07\u0E44\u0E21\u0E48\u0E2A\u0E33\u0E40\u0E23\u0E47\u0E08: " + error.message);
+  return new Map((data ?? []).map((r) => [r.makro_order_no, r.label]));
+}
+
 // src/lib/import/autoImport.ts
 var MOVED_DATE_COLUMN = "New Expected Delivery Date";
 async function autoImport(detailRows, orderRows, today) {
@@ -621,7 +633,7 @@ async function autoImport(detailRows, orderRows, today) {
     ...validateMapping("order", Object.keys(orderRows[0] ?? {}), DEFAULT_ORDER_MAPPING)
   ];
   if (problems.length) throw new Error("\u0E44\u0E1F\u0E25\u0E4C\u0E08\u0E32\u0E01 AO \u0E44\u0E21\u0E48\u0E15\u0E23\u0E07\u0E23\u0E39\u0E1B\u0E41\u0E1A\u0E1A: " + problems.join(" \xB7 "));
-  const r = buildImport(detailRows, orderRows, DEFAULT_DETAIL_MAPPING, DEFAULT_ORDER_MAPPING);
+  const r = buildImport(detailRows, orderRows, DEFAULT_DETAIL_MAPPING, DEFAULT_ORDER_MAPPING, await listBoxLabelMap());
   const moved = /* @__PURE__ */ new Map();
   for (const row of orderRows) {
     const d = parseExpectedDate(row[MOVED_DATE_COLUMN] ?? "");

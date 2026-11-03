@@ -143,6 +143,7 @@ export async function commitImport(
           customer_phone: o.customerPhone,
           island: o.island,
           is_pickup: o.isPickup,
+          box_label: o.boxLabel ?? null,
         })
         .select('id')
         .single()
@@ -167,6 +168,8 @@ export async function commitImport(
           // Makro's own fact -- a re-import keeps it current (unlike island,
           // which a manager may have picked by hand)
           is_pickup: o.isPickup,
+          // sale's box name (O2O Desk) stays current; such a PO ships to Myanmar
+          ...(o.boxLabel ? { box_label: o.boxLabel, ...(o.island === 'myanmar' ? { island: 'myanmar' } : {}) } : {}),
           // the customer collected it -- close it, unless it already went further
           ...(collected(o) && ['imported', 'packed'].includes(statusByNo.get(o.makroOrderNo) ?? '')
             ? { status: 'picked_up', picked_up_at: new Date().toISOString() }

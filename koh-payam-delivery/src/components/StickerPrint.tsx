@@ -51,6 +51,8 @@ export function StickerPrintButton({
   counts,
   beforePrint,
   disabled,
+  fixedName,
+  po,
   className = 'btn btn-secondary w-full sm:w-fit',
 }: {
   customer: CustomerRef
@@ -60,6 +62,10 @@ export function StickerPrintButton({
   counts: Counts
   beforePrint?: () => Promise<void>
   disabled?: boolean
+  /** the name sale gave this PO's boxes (O2O Desk): printed as it is, not the customer's short name */
+  fixedName?: string
+  /** printed small under the count, so the pier can check the PO */
+  po?: string
   className?: string
 }) {
   const [open, setOpen] = useState(false)
@@ -82,6 +88,8 @@ export function StickerPrintButton({
           printedOrders={printedOrders}
           counts={counts}
           beforePrint={beforePrint}
+          fixedName={fixedName}
+          po={po}
           onClose={() => setOpen(false)}
         />
       )}
@@ -95,6 +103,8 @@ export function StickerPrintDialog({
   printedOrders,
   counts,
   beforePrint,
+  fixedName,
+  po,
   onClose,
 }: {
   customer: CustomerRef
@@ -102,6 +112,8 @@ export function StickerPrintDialog({
   printedOrders?: PrintedOrder[]
   counts: Counts
   beforePrint?: () => Promise<void>
+  fixedName?: string
+  po?: string
   onClose: () => void
 }) {
   const all = stickerList(counts)
@@ -113,6 +125,7 @@ export function StickerPrintDialog({
   const [printing, setPrinting] = useState<Sticker[] | null>(null)
 
   useEffect(() => {
+    if (fixedName) return setName(fixedName)
     let live = true
     getShortName(customer)
       .then((saved) => live && setName(saved ?? suggestShortName(customer.customer_name_en)))
@@ -154,7 +167,7 @@ export function StickerPrintDialog({
     }
     setBusy(true)
     try {
-      await saveShortName(customer, trimmed) // remembered for this customer's next orders
+      if (!fixedName) await saveShortName(customer, trimmed) // remembered for this customer's next orders
       await beforePrint?.()
       setPrinting(chosen)
       // best effort: the stickers are printing either way; at worst the bulk
@@ -186,12 +199,12 @@ export function StickerPrintDialog({
           <span className="field-label">ชื่อบนสติ๊กเกอร์</span>
           <input
             value={name ?? ''}
-            disabled={name === null}
+            disabled={name === null || !!fixedName}
             onChange={(e) => setName(e.target.value)}
             placeholder={name === null ? 'กำลังโหลด…' : 'เช่น JJ'}
           />
           <span className="text-xs text-ink-faint">
-            ชื่อย่อที่คนเรือเรียก — ระบบจำไว้ใช้กับลูกค้ารายนี้ครั้งต่อไป
+            {fixedName ? 'ชื่อหน้าลังที่ sale ตั้งไว้ใน O2O Desk' : 'ชื่อย่อที่คนเรือเรียก — ระบบจำไว้ใช้กับลูกค้ารายนี้ครั้งต่อไป'}
           </span>
         </label>
 
@@ -199,7 +212,7 @@ export function StickerPrintDialog({
           <div className="flex flex-col items-center gap-1.5">
             <span className="text-xs text-ink-faint">ตัวอย่าง (ขนาดจริง 50×30 มม.)</span>
             <div className="sticker-preview">
-              <StickerFace name={trimmed} s={all[0]} island={island} />
+              <StickerFace name={trimmed} s={all[0]} island={island} po={po} />
             </div>
           </div>
         )}
@@ -252,7 +265,7 @@ export function StickerPrintDialog({
             {/* page size only while stickers print, so nothing else is affected */}
             <style>{'@page { size: 50mm 30mm; margin: 0; }'}</style>
             {printing.map((s) => (
-              <StickerFace key={s.no} name={trimmed} s={s} island={island} />
+              <StickerFace key={s.no} name={trimmed} s={s} island={island} po={po} />
             ))}
           </div>,
           document.body,

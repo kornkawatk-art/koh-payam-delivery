@@ -18,6 +18,7 @@ import { PageHeader } from '../../components/ui/PageHeader'
 import { todayLocalISO } from '../../lib/format'
 import { ISLAND_LIST, ISLANDS } from '../../lib/islands'
 import { PaymentRefreshCard } from '../../components/PaymentRefreshCard'
+import { listBoxLabelMap } from '../../lib/api/boxLabels'
 
 function loadMapping<T>(key: string, fallback: T): T {
   try {
@@ -138,11 +139,17 @@ export default function ImportOrders() {
     }
   }
 
+  // POs sale named in O2O Desk (box_labels) import too, as Myanmar-bound orders (0039)
+  const [boxLabels, setBoxLabels] = useState<Map<string, string>>(new Map())
+  useEffect(() => {
+    listBoxLabelMap().then(setBoxLabels).catch(() => {})
+  }, [])
+
   function doPreview() {
     setError(undefined)
     setImportMsg(undefined)
     try {
-      const r = buildImport(detailRows, orderRows, dm, om)
+      const r = buildImport(detailRows, orderRows, dm, om, boxLabels)
       setResult(r)
       if (!dateTouched) setShipDate(r.orders[0]?.expectedDate ?? todayLocalISO())
     } catch (e) {

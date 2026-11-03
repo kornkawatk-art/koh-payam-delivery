@@ -38,19 +38,23 @@ vi.mock('../../lib/api/photos', () => ({
   attachEvidencePhoto: (...a: unknown[]) => attachEvidencePhoto(...a),
   removeEvidencePhoto: (...a: unknown[]) => removeEvidencePhoto(...a),
 }))
+const photoMax = { current: undefined as number | undefined }
 vi.mock('../../components/PhotoCapture', () => ({
   default: ({
+    max,
     onUploaded,
     onRemoved,
     onBusyChange,
     initialPhotos,
   }: {
+    max?: number
     onUploaded: (k: string) => void
     onRemoved?: (k: string) => void
     onBusyChange?: (busy: boolean) => void
     initialPhotos?: { key: string; url: string }[]
   }) => (
     <>
+      {(photoMax.current = max) === undefined ? null : null}
       {(initialPhotos ?? []).map((p) => (
         <img key={p.key} src={p.url} alt="รูปที่อัปโหลด" />
       ))}
@@ -563,4 +567,34 @@ test('a store pickup is never payment-locked on the pack page', async () => {
   await screen.findByText('rice')
   expect(screen.queryByRole('alert')).not.toBeInTheDocument()
   lockState.current = null
+})
+
+const named = { ...order, island: 'myanmar', box_label: 'ครูวิทย์' }
+async function packAll() {
+  await userEvent.type(screen.getByLabelText(/ลังกระดาษ/), '2')
+  await userEvent.type(screen.getByLabelText(/ชื่อคนแพ็ค/), 'สมชาย')
+  await userEvent.click(screen.getByRole('button', { name: 'mock-upload' }))
+  for (const cb of screen.getAllByRole('checkbox')) await userEvent.click(cb)
+}
+
+test('a PO sale named in O2O Desk shows its box name large, takes up to 20 photos, and prints only after "แพ็คเสร็จ"', async () => {
+  getOrder.mockResolvedValue(named)
+  renderPage()
+  await screen.findByText('rice')
+  expect(screen.getByText('ครูวิทย์')).toHaveClass('text-3xl')
+  expect(photoMax.current).toBe(20)
+  await packAll()
+  const print = screen.getByRole('button', { name: /พิมพ์สติ๊กเกอร์/ })
+  expect(print).toBeDisabled()
+  expect(screen.getByText('กด "บันทึก + แพ็คเสร็จ" ก่อน แล้วค่อยพิมพ์สติ๊กเกอร์')).toBeInTheDocument()
+  await userEvent.click(screen.getByRole('button', { name: 'บันทึก + แพ็คเสร็จ' }))
+  await waitFor(() => expect(updateOrderStatus).toHaveBeenCalledWith('ord1', 'packed'))
+  await waitFor(() => expect(screen.getByRole('button', { name: /พิมพ์สติ๊กเกอร์/ })).toBeEnabled())
+})
+
+test('an island PO without a box name keeps the old order of things (print any time, photos unlimited)', async () => {
+  renderPage()
+  await screen.findByText('rice')
+  expect(photoMax.current).toBeUndefined()
+  expect(screen.queryByText(/ก่อน แล้วค่อยพิมพ์สติ๊กเกอร์/)).not.toBeInTheDocument()
 })

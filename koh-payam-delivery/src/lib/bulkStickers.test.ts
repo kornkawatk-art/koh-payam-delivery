@@ -60,3 +60,10 @@ test('a phone merged for the day prints one set of stickers across its shop name
   expect(job).toMatchObject({ name: 'SHOP A + SHOP B', counts: { paper: 3, foam: 1, piece: 0 } })
   expect(job.orders).toHaveLength(2)
 })
+
+test('a PO sale named in O2O Desk prints on its own, under that box name, with its PO', () => {
+  const [named, plain] = [o('1', { box_label: 'ครูวิทย์', paper_box_count: 2, foam_box_count: 0 }), o('2')]
+  const jobs = buildStickerJobs([named, plain])
+  expect(jobs).toHaveLength(2)
+  expect(jobs.find((j) => j.name === 'ครูวิทย์')).toMatchObject({ po: 'PO-1', counts: { paper: 2, foam: 0, piece: 0 } })
+})
