@@ -23,6 +23,7 @@ import {
 import { commitImport, listOrdersOnOtherDays } from '../api/orders'
 import { recordImport } from '../api/dataImports'
 import { refreshPayments } from '../api/paymentRefresh'
+import { listBoxLabelMap } from '../api/boxLabels'
 import { movableNos, nextDayISO } from '../postponed'
 
 export type AutoImportDay = { shipDate: string; orders: number; created: number; synced: number; skipped: number; postponed: string[] }
@@ -38,7 +39,8 @@ export async function autoImport(detailRows: RawRow[], orderRows: RawRow[], toda
   ]
   if (problems.length) throw new Error('ไฟล์จาก AO ไม่ตรงรูปแบบ: ' + problems.join(' · '))
 
-  const r = buildImport(detailRows, orderRows, DEFAULT_DETAIL_MAPPING, DEFAULT_ORDER_MAPPING)
+  // POs sale named in O2O Desk come in too, as Myanmar-bound orders (0039)
+  const r = buildImport(detailRows, orderRows, DEFAULT_DETAIL_MAPPING, DEFAULT_ORDER_MAPPING, await listBoxLabelMap())
   const moved = new Map<string, string>()
   for (const row of orderRows) {
     const d = parseExpectedDate(row[MOVED_DATE_COLUMN] ?? '')

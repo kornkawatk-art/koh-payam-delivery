@@ -51,6 +51,8 @@ export default function PackOrder() {
   const [msg, setMsg] = useState<string>()
   const [busy, setBusy] = useState(false)
   const [failed, setFailed] = useState(false)
+  // "แพ็คเสร็จ" pressed on this visit (a box-named PO prints only after it, see below)
+  const [packedNow, setPackedNow] = useState(false)
 
   useEffect(() => {
     getOrder(id!)
@@ -92,12 +94,19 @@ export default function PackOrder() {
     itemPacked: items.map((it) => ({ id: it.id, packed: packedIds.has(it.id) })),
   })
 
+  // a PO sale named in O2O Desk (0039): its stickers carry that name, and print only once it is marked packed
+  const named = !!order?.box_label
+  const isPacked = packedNow || ['packed', 'at_pier', 'shipped', 'picked_up'].includes(order?.status)
+
   async function save(markPacked: boolean) {
     setBusy(true)
     setMsg(undefined)
     try {
       await savePack(packInput())
-      if (markPacked) await updateOrderStatus(id!, 'packed')
+      if (markPacked) {
+        await updateOrderStatus(id!, 'packed')
+        setPackedNow(true)
+      }
       setMsg(markPacked ? 'บันทึกและทำเครื่องหมายแพ็คเสร็จแล้ว' : 'บันทึกแล้ว')
     } catch (e) {
       setMsg((e as Error).message)
@@ -167,6 +176,12 @@ export default function PackOrder() {
         </p>
       )}
 
+      {named && (
+        <section aria-label="ชื่อหน้าลัง" className="card flex flex-col gap-1">
+          <p className="text-sm text-ink-soft">ชื่อหน้าลัง (จาก sale) · ส่งฝั่งเมียนมา</p>
+          <p className="text-3xl font-bold">{order.box_label}</p>
+        </section>
+      )}
       <PaymentLockNote lock={lock} />
       <ShippingAddress addresses={[order.shipping_address]} />
 
@@ -309,15 +324,19 @@ export default function PackOrder() {
             beforePrint={async () => {
               await savePack(packInput())
             }}
-            disabled={saveBlocked}
+            disabled={saveBlocked || (named && !isPacked)}
+            fixedName={named ? order.box_label : undefined}
+            po={named ? order.makro_order_no : undefined}
           />
         </div>
+        {named && !isPacked && <p className="text-sm text-ink-soft">กด "บันทึก + แพ็คเสร็จ" ก่อน แล้วค่อยพิมพ์สติ๊กเกอร์</p>}
         <section className="flex flex-col gap-2 border-t border-line pt-4">
           <p className="section-title">รูปหลักฐานตอนแพ็ค</p>
           <PhotoCapture
             scope="evidence"
             stage="pack"
             orderId={id}
+            max={named ? 20 : undefined}
             initialPhotos={(order.evidence_photos ?? [])
               .filter((p: any) => p.stage === 'pack')
               .map((p: any) => ({ key: p.r2_key, url: `${R2}/${p.r2_key}` }))}

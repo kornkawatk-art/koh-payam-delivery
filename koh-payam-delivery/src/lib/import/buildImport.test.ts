@@ -736,3 +736,18 @@ test('buildPaymentRefresh refuses a file without the payment columns (e.g. the O
     buildPaymentRefresh([{ [O.orderNo]: 'P-1', [O.paymentStatus]: 'Paid', [O.outstandingAmount]: '0' }], { ...O, paymentMethod: '' }),
   ).toThrow(/ไม่พบคอลัมน์/)
 })
+
+test('buildImport: a PO sale named in O2O Desk (box_labels) is imported as a Myanmar-bound order with its box name, though not an island order', async () => {
+  const { detail, order } = await fixtures()
+  const r = buildImport(detail, order, DEFAULT_DETAIL_MAPPING, DEFAULT_ORDER_MAPPING, new Map([['P-004', 'ครูวิทย์']]))
+  const p4 = r.orders.find((o) => o.makroOrderNo === 'P-004')
+  expect(p4).toMatchObject({ island: 'myanmar', boxLabel: 'ครูวิทย์' })
+  expect(r.skippedNotIsland).toBe(0)
+  expect(r.orders.find((o) => o.makroOrderNo === 'P-001')).toMatchObject({ boxLabel: null })
+})
+
+test('buildImport: a box name on an island PO keeps its island but carries the name for the stickers', async () => {
+  const { detail, order } = await fixtures()
+  const r = buildImport(detail, order, DEFAULT_DETAIL_MAPPING, DEFAULT_ORDER_MAPPING, new Map([['P-001', 'ร้านป้าแดง']]))
+  expect(r.orders.find((o) => o.makroOrderNo === 'P-001')).toMatchObject({ island: 'payam', boxLabel: 'ร้านป้าแดง' })
+})

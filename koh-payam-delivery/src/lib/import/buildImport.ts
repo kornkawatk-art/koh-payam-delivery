@@ -142,6 +142,8 @@ export type ParsedOrder = {
   island: Island | null
   // Makro Order Type "Pick up at store": the customer collects at the branch.
   isPickup: boolean
+  // the name sale gave this PO's boxes in O2O Desk (box_labels); printed on the stickers instead of the short name
+  boxLabel: string | null
   items: ParsedItem[]
 }
 
@@ -265,11 +267,16 @@ export function validateMapping(
 
 // --- Build ----------------------------------------------------------------
 
+/**
+ * `boxLabels`: PO -> box name from O2O Desk (box_labels, makro-claim 0122). Such a PO is imported even though it
+ * is not an island order (it ships from the pier to Myanmar: island 'myanmar'); an island PO keeps its island.
+ */
 export function buildImport(
   detailRows: RawRow[],
   orderRows: RawRow[],
   dm: DetailMapping,
   om: OrderMapping,
+  boxLabels: ReadonlyMap<string, string> = new Map(),
 ): BuildResult {
   // 1. index order rows by orderNo, keep only island orders
   const payamOrders = new Map<string, ParsedOrder>()
@@ -280,7 +287,8 @@ export function buildImport(
     if (!orderNo) continue
     const subDistrict = (r[om.subDistrict] ?? '').trim()
     const shippingAddress = (r[om.shippingAddress] ?? '').trim()
-    const island = classifyIsland({ subDistrict, shippingAddress })
+    const boxLabel = boxLabels.get(orderNo) ?? null
+    const island = classifyIsland({ subDistrict, shippingAddress }) ?? (boxLabel ? 'myanmar' : null)
     if (!island) {
       skippedNotIsland++
       continue
@@ -307,6 +315,7 @@ export function buildImport(
       customerPhone: customerPhone || null,
       island: island === 'unknown' ? null : island,
       isPickup: /pick\s*-?\s*up/i.test(orderType),
+      boxLabel,
       items: [],
     })
   }
