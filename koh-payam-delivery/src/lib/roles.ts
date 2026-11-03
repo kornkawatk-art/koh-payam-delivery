@@ -1,5 +1,6 @@
 import {
   House,
+  Printer,
   UploadSimple,
   Anchor,
   MapPin,
@@ -48,6 +49,8 @@ export const NAV: { path: string; label: string; roles: Role[]; icon: Icon }[] =
       icon: Anchor,
     },
     { path: '/pier', label: 'ที่ท่าเรือ', roles: ['pier', 'manager', 'online'], icon: MapPin },
+    // city / Myanmar POs that sale named in O2O Desk (box_labels, O2O Desk 0122)
+    { path: '/box-labels', label: 'สติ๊กเกอร์หน้าลัง', roles: ['packer', 'manager', 'online'], icon: Printer },
     { path: '/foam', label: 'ลังโฟม', roles: ['pier', 'manager', 'online'], icon: Package },
     { path: '/claims', label: 'คิวเคลม', roles: ['manager', 'online'], icon: Flag },
     { path: '/debts', label: 'ยอดค้างชำระ', roles: ['manager', 'online'], icon: Money },

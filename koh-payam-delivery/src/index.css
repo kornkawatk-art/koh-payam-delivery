@@ -545,6 +545,12 @@
   white-space: nowrap;
 }
 
+.sticker-po {
+  font-size: 2.6mm;
+  line-height: 1.1;
+  white-space: nowrap;
+}
+
 .sticker-meta b {
   font-size: 4.4mm;
 }
