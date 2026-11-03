@@ -2,6 +2,7 @@
 export const CLAIM_TYPE_TH: Record<string, string> = {
   missing_in_box: 'ของขาดในกล่อง',
   damaged: 'สินค้าเสียหาย',
+  wrong_order: 'สั่งสินค้าผิดรายการ',
   broken_eggs: 'ไข่แตก',
   box_lost: 'กล่องสูญหาย',
 }

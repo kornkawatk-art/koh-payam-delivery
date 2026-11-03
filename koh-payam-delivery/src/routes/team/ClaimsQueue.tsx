@@ -12,6 +12,7 @@ import {
   Egg,
   Flag,
   Package,
+  ShoppingCart,
   Warning,
   type Icon,
 } from '@phosphor-icons/react'
@@ -28,6 +29,7 @@ type Tab = 'open' | 'approved' | 'rejected' | 'backorders' | 'all'
 const TYPE_ICON: Record<string, Icon> = {
   missing_in_box: Package,
   damaged: Warning,
+  wrong_order: ShoppingCart,
   broken_eggs: Egg,
   box_lost: Package,
 }
