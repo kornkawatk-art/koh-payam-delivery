@@ -18,7 +18,7 @@ type Counts = { paper: number; foam: number; piece: number }
  * boat -- left off while the order's island is still unpicked), the
  * customer's short name, then "3 / 29 · ลังโฟม".
  */
-export function StickerFace({ name, s, island }: { name: string; s: Sticker; island?: unknown }) {
+export function StickerFace({ name, s, island, po }: { name: string; s: Sticker; island?: unknown; po?: string }) {
   const where = islandName(island)
   return (
     <div className="sticker">
@@ -32,6 +32,7 @@ export function StickerFace({ name, s, island }: { name: string; s: Sticker; isl
         </b>{' '}
         · {s.kind}
       </div>
+      {po && <div className="sticker-po">PO {po}</div>}
     </div>
   )
 }

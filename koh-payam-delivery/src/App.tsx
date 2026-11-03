@@ -24,6 +24,7 @@ const Debts = lazyPage(() => import('./routes/team/Debts'))
 const AuditLog = lazyPage(() => import('./routes/team/AuditLog'))
 const ShortageReport = lazyPage(() => import('./routes/team/ShortageReport'))
 const CustomerAliases = lazyPage(() => import('./routes/team/CustomerAliases'))
+const BoxLabelPrint = lazyPage(() => import('./routes/team/BoxLabelPrint'))
 const OrderDetail = lazyPage(() => import('./routes/team/OrderDetail'))
 const PackOrder = lazyPage(() => import('./routes/team/PackOrder'))
 const PackGroup = lazyPage(() => import('./routes/team/PackGroup'))
@@ -157,6 +158,14 @@ export default function App() {
               element={
                 <RequireRole path="/shortage-report">
                   <ShortageReport />
+                </RequireRole>
+              }
+            />
+            <Route
+              path="/box-labels"
+              element={
+                <RequireRole path="/box-labels">
+                  <BoxLabelPrint />
                 </RequireRole>
               }
             />
