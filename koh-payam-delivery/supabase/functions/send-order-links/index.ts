@@ -6,8 +6,8 @@
 // copy those links by hand. Also returned when the day was already sent
 // (skipped), so pressing the button again still shows who is missing.
 //
-// Called by BoatSetup.tsx (via src/lib/api/shipDays.ts's sendOrderLinks) right
-// after a team member saves that day's boat list, from an authenticated team
+// Called by DailyDashboard.tsx's "ส่งลิงก์ไลน์เลย" button (via
+// src/lib/api/shipDays.ts's sendOrderLinks), from an authenticated team
 // session — the FIRST edge function in this codebase meant for that caller
 // shape instead of a customer link. Unlike every other function here, it has
 // NO [functions.send-order-links] entry in config.toml: leaving it out keeps
@@ -23,14 +23,11 @@
 // business logic).
 //
 // Algorithm (see the plan's Global Constraints section):
-//   0. Today-only guard: BoatSetup.tsx's date picker makes ANY past date
-//      reachable in one click ("let me check yesterday's boats"), and saving
-//      from there would re-send links that order-view already treats as
-//      expired (7 days after shipped_at) — a shop-branded "your order is ready"
-//      pointing at a 404. Only *today* (Asia/Bangkok, see guards.ts) sends.
-//      Any other date is a QUIET skip, not an error: setting up boats for a
-//      future date in advance is legitimate existing behaviour — it is only
-//      the automatic *send* that is scoped to today.
+//   0. Today-only guard: a past date must never send -- that would re-send
+//      links that order-view already treats as expired (7 days after
+//      shipped_at) — a shop-branded "your order is ready" pointing at a 404.
+//      Only *today* (Asia/Bangkok, see guards.ts) sends. Any other date is a
+//      QUIET skip, not an error.
 //   1. Idempotency guard: ship_days.links_sent_at already set for this day ->
 //      no-op, { ok: true, sent: 0, failed: 0, skipped: true }.
 //   1b. Fail fast if LINE_CHANNEL_ACCESS_TOKEN or SITE_URL is unset (the
@@ -183,8 +180,8 @@ Deno.serve(async (req) => {
     // or any push attempted, and without touching links_sent_at. Both default
     // to '' when unset — the expected state until the team completes the LINE
     // Console setup (runbook A6). Marking the day "sent" here would burn the
-    // one-shot guard on day one; failing loudly instead surfaces in BoatSetup's
-    // "แต่ส่งลิงก์ไลน์ไม่สำเร็จ" message while the boat save itself still succeeds.
+    // one-shot guard on day one; failing loudly instead shows the error next
+    // to the dashboard's send button, and the day can be sent again later.
     const channelToken = Deno.env.get('LINE_CHANNEL_ACCESS_TOKEN') ?? ''
     const site = Deno.env.get('SITE_URL') ?? ''
     const missingSecrets = missingLineSecrets(channelToken, site)

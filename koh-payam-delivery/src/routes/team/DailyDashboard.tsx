@@ -110,10 +110,9 @@ export default function DailyDashboard() {
     }
   }, [date])
 
-  // Manual catch-all for a day nobody opened "ตั้งค่าเรือประจำวัน" for (the
-  // only other place that triggers a send) -- e.g. the boat list from
-  // yesterday is still fine so nobody saves it again. Safe to press more than
-  // once: the edge function itself is idempotent per ship day.
+  // The one place that sends the day's LINE links (saving the boats does
+  // not). Safe to press more than once: the edge function itself is
+  // idempotent per ship day.
   async function sendLinksNow() {
     setLinkSendBusy(true)
     setLinkSendMsg(undefined)

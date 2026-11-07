@@ -2,7 +2,6 @@ import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
 import BoatSetup from './BoatSetup'
-import { todayLocalISO } from '../../lib/format'
 
 const getOrCreateShipDay = vi.fn()
 const setBoats = vi.fn().mockResolvedValue(undefined)
@@ -121,31 +120,15 @@ test('save() shows a Thai error message when persisting fails', async () => {
   ).toBeInTheDocument()
 })
 
-test('saving boats successfully also sends LINE links for the same date and folds the count into the success message', async () => {
-  sendOrderLinks.mockResolvedValueOnce({ sent: 5, failed: 1, skipped: false, unreached: [] })
+test('saving boats does not send LINE links (the daily dashboard has that button)', async () => {
   renderPage()
   await screen.findByDisplayValue('เรือเช้า')
 
   await userEvent.click(screen.getByRole('button', { name: 'บันทึก' }))
 
-  expect(sendOrderLinks).toHaveBeenCalledTimes(1)
-  expect(sendOrderLinks).toHaveBeenCalledWith(todayLocalISO())
-  expect(
-    await screen.findByText('บันทึกรายการเรือแล้ว · ส่งลิงก์ไลน์ 5 ฉบับ'),
-  ).toBeInTheDocument()
-})
-
-test('a sendOrderLinks failure still shows the boat-save success, distinctly, not the whole save reported as failed', async () => {
-  sendOrderLinks.mockRejectedValueOnce(new Error('LINE API ล่ม'))
-  renderPage()
-  await screen.findByDisplayValue('เรือเช้า')
-
-  await userEvent.click(screen.getByRole('button', { name: 'บันทึก' }))
-
-  const msg = await screen.findByText(/บันทึกรายการเรือแล้ว/)
-  expect(msg).toBeInTheDocument()
-  expect(msg.textContent).toMatch(/ส่งลิงก์ไลน์ไม่สำเร็จ/)
-  expect(screen.queryByText('บันทึกรายการเรือไม่สำเร็จ ลองใหม่อีกครั้ง')).not.toBeInTheDocument()
+  expect(await screen.findByText('บันทึกรายการเรือแล้ว')).toBeInTheDocument()
+  expect(setBoats).toHaveBeenCalledTimes(1)
+  expect(sendOrderLinks).not.toHaveBeenCalled()
 })
 
 test('fails closed when the count query errors — boat stays, warning shown', async () => {
@@ -159,20 +142,4 @@ test('fails closed when the count query errors — boat stays, warning shown', a
     await screen.findByText('ตรวจสอบออเดอร์ที่ผูกกับเรือไม่สำเร็จ ลองใหม่อีกครั้ง'),
   ).toBeInTheDocument()
   expect(screen.getByDisplayValue('เรือเช้า')).toBeInTheDocument()
-})
-
-test('saving boats then shows who LINE did not reach', async () => {
-  sendOrderLinks.mockResolvedValueOnce({
-    sent: 4,
-    failed: 1,
-    skipped: false,
-    unreached: [{ customerName: 'BLOCKED', phone: '0833333333', reason: 'push_failed', orders: [{ id: 'o5', makroOrderNo: 'PO-5' }] }],
-  })
-  renderPage()
-  await screen.findByDisplayValue('เรือเช้า')
-  await userEvent.click(screen.getByRole('button', { name: 'บันทึก' }))
-  const dialog = await screen.findByRole('dialog', { name: 'ลูกค้าที่ยังไม่ได้รับลิงก์ทางไลน์' })
-  expect(dialog).toHaveTextContent('BLOCKED')
-  expect(dialog).toHaveTextContent('ส่งไม่สำเร็จ (อาจบล็อก LINE ร้าน)')
-  expect(screen.getByText('บันทึกรายการเรือแล้ว · ส่งลิงก์ไลน์ 4 ฉบับ · ยังไม่ได้รับ 1 ราย')).toBeInTheDocument()
 })
