@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { getOrCreateShipDay, listOrdersForDay } from '../../lib/api/shipDays'
+import { getOrCreateShipDay, listOrdersForDay, type Boat } from '../../lib/api/shipDays'
 import {
   setOrderBoat,
   setOrderPierName,
@@ -16,6 +16,7 @@ import PhotoCapture from '../../components/PhotoCapture'
 import { MapPin, Anchor } from '@phosphor-icons/react'
 import { PageHeader } from '../../components/ui/PageHeader'
 import PierGroup from './PierGroup'
+import { BoatPicker } from '../../components/BoatPicker'
 import { groupByPhone } from '../../lib/groupOrders'
 import { listPackMerges } from '../../lib/api/packMerges'
 import { Spinner } from '../../components/ui/Spinner'
@@ -39,7 +40,6 @@ import { MakroVoidBadge } from '../../components/ui/MakroVoidBadge'
 import { makroVoid } from '../../lib/makroStatus'
 import { PaymentLockNote, usePaymentLock } from '../../components/PaymentLockNote'
 
-type Boat = { id: string; name: string }
 type PierOrder = {
   id: string
   makro_order_no: string
@@ -69,6 +69,7 @@ type PierEntry =
 
 export default function PierLoad() {
   const [date, setDate] = useState(todayLocalISO())
+  const [shipDayId, setShipDayId] = useState('')
   const [boats, setBoats] = useState<Boat[]>([])
   const [all, setAll] = useState<PierOrder[]>([])
   const [island, setIsland] = useState<IslandFilterValue>('all')
@@ -96,6 +97,7 @@ export default function PierLoad() {
     setFailed(false)
     Promise.all([getOrCreateShipDay(date), listOrdersForDay(date), listPackMerges(date).catch(() => new Set<string>())])
       .then(([day, list, m]) => {
+        setShipDayId(day.id)
         setBoats(day.boats)
         setMerges(m)
         setAll(list as PierOrder[])
@@ -190,7 +192,9 @@ export default function PierLoad() {
         date={date}
         phone={selGroup.phone}
         name={selGroup.name}
+        shipDayId={shipDayId}
         boats={boats}
+        onBoatAdded={(b) => setBoats((bs) => [...bs, b])}
         onBack={() => {
           setSelGroup(null)
           load()
@@ -342,22 +346,14 @@ export default function PierLoad() {
 
       <section>
         <p className="section-title mb-2">เลือกเรือ</p>
-        <div className="flex flex-wrap gap-2">
-          {boats.map((b) => (
-            <button
-              key={b.id}
-              onClick={() => void chooseBoat(b.id)}
-              className={
-                'min-h-[3.25rem] rounded-xl border px-5 text-lg font-medium transition-colors ' +
-                (sel.boat_id === b.id
-                  ? 'border-ink bg-ink text-surface'
-                  : 'border-line-strong bg-surface hover:bg-paper')
-              }
-            >
-              {b.name}
-            </button>
-          ))}
-        </div>
+        <BoatPicker
+          shipDayId={shipDayId}
+          boats={boats}
+          selectedId={sel.boat_id}
+          onChoose={chooseBoat}
+          onBoatAdded={(b) => setBoats((bs) => [...bs, b])}
+          onError={(m) => setMsg(flash.error(m))}
+        />
       </section>
 
       <label className="field">

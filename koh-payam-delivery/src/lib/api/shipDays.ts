@@ -3,25 +3,57 @@ import { fetchWithTeamSession } from './teamFetch'
 
 const FN_BASE = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1`
 
+/**
+ * One boat of a ship day (ship_days.boats) or of the boat presets
+ * (boat_defaults, 0041). `timed`: leaves many times a day (Speed boat) -- the
+ * pier picks a time and addTimedBoat adds that day's "Speed boat 14:30",
+ * which carries `of` = the preset's id.
+ */
+export type Boat = { id: string; name: string; timed?: boolean; of?: string }
+
 export async function getOrCreateShipDay(shipDate: string) {
   const { data: found } = await supabase
     .from('ship_days')
     .select('id,boats')
     .eq('ship_date', shipDate)
     .maybeSingle()
-  if (found) return found as { id: string; boats: { id: string; name: string }[] }
+  if (found) return found as { id: string; boats: Boat[] }
   const { data, error } = await supabase
     .from('ship_days')
     .insert({ ship_date: shipDate })
     .select('id,boats')
     .single()
   if (error) throw new Error('สร้างรอบจัดส่งไม่สำเร็จ: ' + error.message)
-  return data as { id: string; boats: { id: string; name: string }[] }
+  return data as { id: string; boats: Boat[] }
 }
 
-export async function setBoats(shipDayId: string, boats: { id: string; name: string }[]) {
+export async function setBoats(shipDayId: string, boats: Boat[]) {
   const { error } = await supabase.from('ship_days').update({ boats }).eq('id', shipDayId)
   if (error) throw new Error('บันทึกรายการเรือไม่สำเร็จ: ' + error.message)
+}
+
+/** The preset boat list every new ship day starts with. */
+export async function getBoatDefaults(): Promise<Boat[]> {
+  const { data, error } = await supabase.from('boat_defaults').select('boats').eq('id', 1).maybeSingle()
+  if (error) throw new Error('โหลดเรือประจำไม่สำเร็จ: ' + error.message)
+  return ((data as { boats: Boat[] } | null)?.boats ?? []) as Boat[]
+}
+
+export async function setBoatDefaults(boats: Boat[]) {
+  const { data, error } = await supabase
+    .from('boat_defaults')
+    .update({ boats, updated_at: new Date().toISOString() })
+    .eq('id', 1)
+    .select('id')
+  if (error) throw new Error('บันทึกเรือประจำไม่สำเร็จ: ' + error.message)
+  if (!data || data.length === 0) throw new Error('บันทึกเรือประจำไม่สำเร็จ (ไม่มีสิทธิ์)')
+}
+
+/** That day's run of a timed boat at `time` (HH:MM), added when missing. */
+export async function addTimedBoat(shipDayId: string, of: string, time: string): Promise<Boat> {
+  const { data, error } = await supabase.rpc('add_timed_boat', { p_ship_day: shipDayId, p_of: of, p_time: time })
+  if (error) throw new Error('เพิ่มรอบเรือไม่สำเร็จ: ' + error.message)
+  return data as Boat
 }
 
 /**
@@ -88,9 +120,15 @@ export async function listOrdersForDay(shipDate: string) {
   const { data, error } = await supabase
     .from('orders')
     .select(
-      'id,makro_order_no,customer_name_en,island,box_label,is_pickup,makro_order_status,status,boat_id,paper_box_count,foam_box_count,piece_count,stickers_printed,sub_district,outstanding_amount,payment_method,customer_phone,packer_name,pier_name,packed_with_order_id,packed_with:orders!packed_with_order_id(makro_order_no),item_statuses:order_items(status,product_name,qty_ordered,qty_shipped,shortage_qty)',
+      'id,makro_order_no,customer_name_en,island,box_label,is_pickup,makro_order_status,status,boat_id,paper_box_count,foam_box_count,piece_count,stickers_printed,sub_district,outstanding_amount,payment_method,customer_phone,packer_name,pier_name,packed_with_order_id,packed_with:orders!packed_with_order_id(makro_order_no),item_statuses:order_items(status,product_name,qty_ordered,qty_shipped,shortage_qty),ship_day:ship_days(boats)',
     )
     .eq('ship_date', shipDate)
   if (error) throw new Error('โหลดรายการออเดอร์ไม่สำเร็จ: ' + error.message)
-  return (data ?? []) as any[]
+  // boat_name: the boat's name that day (boat_id is only an id)
+  return ((data ?? []) as any[]).map((o) => ({
+    ...o,
+    boat_name: o.boat_id
+      ? ((o.ship_day?.boats ?? []) as Boat[]).find((b) => b.id === o.boat_id)?.name ?? o.boat_id
+      : null,
+  }))
 }

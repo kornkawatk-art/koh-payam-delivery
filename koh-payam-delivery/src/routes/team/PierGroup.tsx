@@ -21,11 +21,12 @@ import { isIsland } from '../../lib/islands'
 import { FoamOwedNote } from '../../components/FoamOwedNote'
 import { makroVoid } from '../../lib/makroStatus'
 import { PaymentLockNote, usePaymentLock } from '../../components/PaymentLockNote'
+import { BoatPicker } from '../../components/BoatPicker'
+import type { Boat } from '../../lib/api/shipDays'
 
 const R2 = import.meta.env.VITE_R2_PUBLIC_BASE_URL as string
 const READY = ['packed', 'at_pier']
 
-type Boat = { id: string; name: string }
 
 // Ship every ready PO of one customer (same ship date + phone) together: one
 // boat choice, one photo set (attached to each PO's own evidence rows so the
@@ -34,7 +35,9 @@ export default function PierGroup({
   date,
   phone,
   name,
+  shipDayId,
   boats,
+  onBoatAdded,
   onBack,
   onShipped,
 }: {
@@ -42,7 +45,9 @@ export default function PierGroup({
   phone: string
   /** The shop's Makro name -- one owner's shops ship separately. */
   name?: string | null
+  shipDayId: string
   boats: Boat[]
+  onBoatAdded: (boat: Boat) => void
   onBack: () => void
   onShipped: (message: string) => void
 }) {
@@ -269,22 +274,14 @@ export default function PierGroup({
 
           <section>
             <p className="section-title mb-2">เลือกเรือ (ทุกออเดอร์ไปเรือลำเดียวกัน)</p>
-            <div className="flex flex-wrap gap-2">
-              {boats.map((b) => (
-                <button
-                  key={b.id}
-                  onClick={() => void chooseBoat(b.id)}
-                  className={
-                    'min-h-[3.25rem] rounded-xl border px-5 text-lg font-medium transition-colors ' +
-                    (boatId === b.id
-                      ? 'border-ink bg-ink text-surface'
-                      : 'border-line-strong bg-surface hover:bg-paper')
-                  }
-                >
-                  {b.name}
-                </button>
-              ))}
-            </div>
+            <BoatPicker
+              shipDayId={shipDayId}
+              boats={boats}
+              selectedId={boatId}
+              onChoose={chooseBoat}
+              onBoatAdded={onBoatAdded}
+              onError={(m) => setMsg(flash.error(m))}
+            />
           </section>
 
           <label className="field">

@@ -11,6 +11,8 @@ vi.mock('../../lib/api/shipDays', () => ({
   getOrCreateShipDay: (...a: unknown[]) => getOrCreateShipDay(...a),
   setBoats: (...a: unknown[]) => setBoats(...a),
   sendOrderLinks: (...a: unknown[]) => sendOrderLinks(...a),
+  getBoatDefaults: () => Promise.resolve([{ id: 'speed', name: 'Speed boat', timed: true }]),
+  setBoatDefaults: vi.fn(),
 }))
 
 // Reconfigurable per test: the orders count-query result that removeBoat sees.

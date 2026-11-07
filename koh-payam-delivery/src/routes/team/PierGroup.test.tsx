@@ -111,7 +111,9 @@ const renderPanel = () =>
       date="2026-10-01"
       phone="0811111111"
       name="BLUE VIEW"
+      shipDayId="sd1"
       boats={boats}
+      onBoatAdded={vi.fn()}
       onBack={onBack}
       onShipped={onShipped}
     />,
