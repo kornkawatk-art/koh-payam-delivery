@@ -796,7 +796,7 @@ function GroupRows({
   const [open, setOpen] = useState(false)
   const os = group.orders
   const packed = os.filter((o) => o.status !== 'imported').length
-  const boats = uniq(os.map((o) => o.boat_id))
+  const boats = uniq(os.map((o) => o.boat_name))
   return (
     <>
       <tr className="bg-brand-soft/40">
@@ -911,7 +911,7 @@ function OrderRow({
         {o.paper_box_count + o.foam_box_count + o.piece_count}
       </td>
       <td data-label="เรือ" className="whitespace-nowrap">
-        {o.boat_id ?? '—'}
+        {o.boat_name ?? '—'}
       </td>
       <td data-label="คนแพ็ค">{o.packer_name || '—'}</td>
       <td data-label="คนลงเรือ">{o.pier_name || '—'}</td>

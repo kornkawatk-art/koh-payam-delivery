@@ -1,13 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { getOrCreateShipDay, setBoats } from '../../lib/api/shipDays'
+import { getOrCreateShipDay, setBoats, type Boat } from '../../lib/api/shipDays'
+import { BoatDefaults } from './BoatDefaults'
 import { supabase } from '../../lib/supabase'
 import { Anchor } from '@phosphor-icons/react'
 import { PageHeader } from '../../components/ui/PageHeader'
 import { todayLocalISO } from '../../lib/format'
 import { EmptyState } from '../../components/ui/EmptyState'
 import { Notice, flash, type Flash } from '../../components/ui/Notice'
-
-type Boat = { id: string; name: string }
 
 export default function BoatSetup() {
   const [date, setDate] = useState(todayLocalISO())
@@ -114,6 +113,7 @@ export default function BoatSetup() {
                 )
               }
             />
+            {b.timed && <span className="badge whitespace-nowrap">เลือกเวลาตอนลงเรือ</span>}
             <button
               className="btn btn-ghost btn-sm text-danger-ink"
               onClick={() => removeBoat(b.id)}
@@ -141,6 +141,8 @@ export default function BoatSetup() {
         </button>
         <Notice flash={msg} />
       </div>
+
+      <BoatDefaults />
     </div>
   )
 }

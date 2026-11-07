@@ -30,10 +30,22 @@ test('queries the orders table filtered by ship_date', async () => {
   const rows = await listOrdersForDay('2026-10-01')
   expect(from).toHaveBeenCalledWith('orders')
   expect(select).toHaveBeenCalledWith(
-    'id,makro_order_no,customer_name_en,island,box_label,is_pickup,makro_order_status,status,boat_id,paper_box_count,foam_box_count,piece_count,stickers_printed,sub_district,outstanding_amount,payment_method,customer_phone,packer_name,pier_name,packed_with_order_id,packed_with:orders!packed_with_order_id(makro_order_no),item_statuses:order_items(status,product_name,qty_ordered,qty_shipped,shortage_qty)',
+    'id,makro_order_no,customer_name_en,island,box_label,is_pickup,makro_order_status,status,boat_id,paper_box_count,foam_box_count,piece_count,stickers_printed,sub_district,outstanding_amount,payment_method,customer_phone,packer_name,pier_name,packed_with_order_id,packed_with:orders!packed_with_order_id(makro_order_no),item_statuses:order_items(status,product_name,qty_ordered,qty_shipped,shortage_qty),ship_day:ship_days(boats)',
   )
   expect(eq).toHaveBeenCalledWith('ship_date', '2026-10-01')
-  expect(rows).toEqual([{ id: '1' }])
+  expect(rows).toEqual([{ id: '1', boat_name: null }])
+})
+
+test("names each order's boat from that day's boat list", async () => {
+  eq.mockResolvedValueOnce({
+    data: [
+      { id: 'a', boat_id: 'speed-1430', ship_day: { boats: [{ id: 'speed-1430', name: 'Speed boat 14:30', of: 'speed' }] } },
+      { id: 'b', boat_id: 'gone', ship_day: { boats: [] } },
+    ],
+    error: null,
+  })
+  const rows = await listOrdersForDay('2026-10-01')
+  expect(rows.map((r) => r.boat_name)).toEqual(['Speed boat 14:30', 'gone'])
 })
 
 test('throws a Thai error message when the query fails', async () => {
