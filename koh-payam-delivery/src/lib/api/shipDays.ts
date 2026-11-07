@@ -27,10 +27,8 @@ export async function setBoats(shipDayId: string, boats: { id: string; name: str
 /**
  * Whether `send-order-links` has already run for this ship day, straight off
  * `ship_days.links_sent_at` — same table/column the edge function itself
- * guards on (see its file header, step 1). Used to show a "ยังไม่ได้ส่งลิงก์"
- * prompt on the daily dashboard for days where nobody ever opened
- * BoatSetup.tsx (the only other place that currently triggers a send) --
- * a plain select, not `getOrCreateShipDay`, so just looking at the
+ * guards on (see its file header, step 1). Used to show the "ยังไม่ได้ส่งลิงก์"
+ * prompt and its send button on the daily dashboard -- a plain select, not `getOrCreateShipDay`, so just looking at the
  * dashboard never creates a ship_days row of its own.
  */
 export async function getShipDayLinksSentAt(shipDate: string): Promise<string | null> {
@@ -48,8 +46,8 @@ export async function getShipDayLinksSentAt(shipDate: string): Promise<string | 
  * team session's real access token as the bearer, same session-attachment
  * pattern as `requestUploadUrl`'s `evidence` scope in `photos.ts` (default
  * to the anon key, upgrade to the session token when one exists) — this
- * function is only ever called right after a team member saves the boat
- * list, so a session should always be present, but there is no anon-key
+ * function is only ever called from the daily dashboard's send button, so a
+ * session should always be present, but there is no anon-key
  * fallback path in send-order-links itself (verify_jwt stays at its
  * default `true`), so a missing session simply fails as unauthorized.
  */

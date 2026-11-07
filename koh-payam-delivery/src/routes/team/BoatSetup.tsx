@@ -1,17 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import {
-  getOrCreateShipDay,
-  sendOrderLinks,
-  setBoats,
-  type UnreachedCustomer,
-} from '../../lib/api/shipDays'
+import { getOrCreateShipDay, setBoats } from '../../lib/api/shipDays'
 import { supabase } from '../../lib/supabase'
 import { Anchor } from '@phosphor-icons/react'
 import { PageHeader } from '../../components/ui/PageHeader'
 import { todayLocalISO } from '../../lib/format'
 import { EmptyState } from '../../components/ui/EmptyState'
 import { Notice, flash, type Flash } from '../../components/ui/Notice'
-import { LinkSendReport } from '../../components/LinkSendReport'
 
 type Boat = { id: string; name: string }
 
@@ -58,10 +52,9 @@ export default function BoatSetup() {
     setBoatsState((b) => b.filter((x) => x.id !== id))
   }
 
-  // Saving also sends the customers' LINE links: a second tap mid-save must
-  // not start a second send.
+  // LINE links are sent from the daily dashboard's "ส่งลิงก์ไลน์เลย" button,
+  // not from here: saving the boats only saves the boats.
   const [saving, setSaving] = useState(false)
-  const [unreached, setUnreached] = useState<UnreachedCustomer[]>([])
   const saveInFlight = useRef(false)
 
   async function save() {
@@ -71,22 +64,7 @@ export default function BoatSetup() {
     setMsg(undefined)
     try {
       await setBoats(shipDayId, boats)
-      // setBoats already succeeded at this point — a failure in the
-      // secondary sendOrderLinks step below must not make the boat save
-      // itself look like it failed (mirrors resolveClaim's "main action
-      // succeeded, secondary step failed" message pattern in claims.ts).
-      let text = 'บันทึกรายการเรือแล้ว'
-      let linksFailed = false
-      try {
-        const r = await sendOrderLinks(date)
-        if (!r.skipped) text += ` · ส่งลิงก์ไลน์ ${r.sent} ฉบับ`
-        if (r.unreached.length) text += ` · ยังไม่ได้รับ ${r.unreached.length} ราย`
-        setUnreached(r.unreached)
-      } catch (e) {
-        text += ' แต่ส่งลิงก์ไลน์ไม่สำเร็จ: ' + (e as Error).message
-        linksFailed = true
-      }
-      setMsg(linksFailed ? flash.warn(text) : flash.ok(text))
+      setMsg(flash.ok('บันทึกรายการเรือแล้ว'))
     } catch {
       setMsg(flash.error('บันทึกรายการเรือไม่สำเร็จ ลองใหม่อีกครั้ง'))
     } finally {
@@ -107,9 +85,6 @@ export default function BoatSetup() {
 
   return (
     <div className="flex flex-col gap-5">
-      {unreached.length > 0 && (
-        <LinkSendReport unreached={unreached} onClose={() => setUnreached([])} />
-      )}
       <PageHeader
         title="ตั้งค่าเรือประจำวัน"
         icon={Anchor}
