@@ -15,6 +15,11 @@ vi.mock('../../lib/api/payments', () => ({
   releaseCustomer: (...a: unknown[]) => releaseCustomer(...a),
 }))
 
+const role = { current: 'manager' }
+vi.mock('../../lib/auth', () => ({
+  useAuth: () => ({ profile: { id: 'u1', name: 'x', role: role.current } }),
+}))
+
 const b = (id: string, ship: string, amt: number) => ({
   id, makro_order_no: 'PO-' + id, customer_name_en: 'x', customer_phone: null, ship_date: ship,
   outstanding_amount: amt, payment_method: 'Pay On Delivery', payment_status: 'Unpaid',
@@ -26,6 +31,7 @@ const debts = [
 ]
 
 beforeEach(() => {
+  role.current = 'manager'
   listCustomerDebts.mockReset().mockResolvedValue(debts)
   listReleasedKeys.mockReset().mockResolvedValue(new Set())
   markBillPaid.mockClear()
@@ -119,4 +125,17 @@ test('a customer released for today shows so instead of the lock, and has no rel
   expect(within(rows[0]).queryByText('ล็อกอยู่')).not.toBeInTheDocument()
   await userEvent.click(within(rows[0]).getByRole('button', { name: /Old Debt/ }))
   expect(screen.queryByRole('button', { name: 'ปลดให้แพ็ครอบวันนี้' })).not.toBeInTheDocument()
+})
+
+test('the pier team chases payments: sees debts and marks a bill paid, but cannot release a lock', async () => {
+  role.current = 'pier'
+  renderPage()
+  const rows = await screen.findAllByRole('listitem')
+  expect(within(rows[0]).getByText('ล็อกอยู่')).toBeInTheDocument()
+  await userEvent.click(within(rows[0]).getByRole('button', { name: /Old Debt/ }))
+  await userEvent.click(screen.getAllByRole('button', { name: 'รับเงินแล้ว' })[0])
+  await userEvent.click(screen.getByRole('button', { name: 'ยืนยัน รับเงินแล้ว' }))
+  expect(markBillPaid).toHaveBeenCalledWith('1')
+  expect(screen.queryByRole('button', { name: 'ปลดให้แพ็ครอบวันนี้' })).not.toBeInTheDocument()
+  expect(screen.getByText(/ให้หัวหน้าหรือทีมออนไลน์ปลด/)).toBeInTheDocument()
 })
