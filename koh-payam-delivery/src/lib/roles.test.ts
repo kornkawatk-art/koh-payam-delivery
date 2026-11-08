@@ -63,3 +63,8 @@ test('the online team runs the day like the manager, except the audit log', () =
   expect(isLead('packer')).toBe(false)
   expect(usesBothApps('online')).toBe(true)
 })
+
+test('the pier team sees ยอดค้างชำระ to chase customers for payment', () => {
+  expect(canAccess('/debts', 'pier')).toBe(true)
+  expect(canAccess('/debts', 'packer')).toBe(false)
+})

@@ -8,6 +8,8 @@ import { Notice, flash, type Flash } from '../../components/ui/Notice'
 import { StatTile } from '../../components/ui/Stat'
 import { formatDateTH, formatTHB, todayLocalISO } from '../../lib/format'
 import { daysOwed, type CustomerDebt } from '../../lib/payments'
+import { useAuth } from '../../lib/auth'
+import { isLead } from '../../lib/roles'
 import {
   listCustomerDebts,
   listReleasedKeys,
@@ -40,6 +42,8 @@ const COLS = 'sm:grid sm:grid-cols-[minmax(0,1fr)_4.5rem_9rem_7.5rem_8rem_1rem] 
  */
 export default function Debts() {
   const today = todayLocalISO()
+  // the pier team chases payments too, but only the leads release a lock
+  const canRelease = isLead(useAuth().profile?.role)
   // undefined = loading, null = load failed
   const [debts, setDebts] = useState<CustomerDebt[] | null | undefined>(undefined)
   const [released, setReleased] = useState<Set<string>>(new Set())
@@ -172,6 +176,7 @@ export default function Debts() {
                 d={d}
                 today={today}
                 releasedToday={released.has(d.key)}
+                canRelease={canRelease}
                 onDone={(text) => {
                   setMsg(flash.ok(text))
                   load()
@@ -190,12 +195,14 @@ function DebtRow({
   d,
   today,
   releasedToday,
+  canRelease,
   onDone,
   onError,
 }: {
   d: CustomerDebt
   today: string
   releasedToday: boolean
+  canRelease: boolean
   onDone: (text: string) => void
   onError: (text: string) => void
 }) {
@@ -305,7 +312,13 @@ function DebtRow({
             ))}
           </div>
 
-          {locked && (
+          {locked && !canRelease && (
+            <p className="text-sm text-ink-soft">
+              ลูกค้ารายนี้ถูกล็อก — ห้ามแพ็ค/ส่งจนกว่าจะจ่าย ถ้าต้องส่งก่อน ให้หัวหน้าหรือทีมออนไลน์ปลด
+            </p>
+          )}
+
+          {locked && canRelease && (
             <div className="flex flex-wrap items-center gap-2">
               {!releasing ? (
                 <>

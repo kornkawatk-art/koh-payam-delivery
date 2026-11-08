@@ -50,7 +50,8 @@ export const NAV: { path: string; label: string; roles: Role[]; icon: Icon }[] =
     { path: '/pier', label: 'ที่ท่าเรือ', roles: ['pier', 'manager', 'online'], icon: MapPin },
     { path: '/foam', label: 'ลังโฟม', roles: ['pier', 'manager', 'online'], icon: Package },
     { path: '/claims', label: 'คิวเคลม', roles: ['manager', 'online'], icon: Flag },
-    { path: '/debts', label: 'ยอดค้างชำระ', roles: ['manager', 'online'], icon: Money },
+    // pier: chases customers and marks bills paid; releasing a lock stays with the leads (DB: 0037)
+    { path: '/debts', label: 'ยอดค้างชำระ', roles: ['pier', 'manager', 'online'], icon: Money },
     {
       path: '/line-contacts',
       label: 'ผู้ลงทะเบียน LINE',
