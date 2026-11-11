@@ -22,7 +22,7 @@ import { InfoItem, StatTile } from '../../components/ui/Stat'
 import { PhotoGallery } from '../../components/ui/PhotoGallery'
 import { splitFreshDry } from '../../lib/freshDry'
 import { useAuth } from '../../lib/auth'
-import { canEdit, isLead } from '../../lib/roles'
+import { canEdit, isBoss, isLead } from '../../lib/roles'
 import { Notice, flash, type Flash } from '../../components/ui/Notice'
 import { AmountDue } from '../../components/ui/AmountDue'
 import { groupedItemRows } from '../../components/ui/ItemGroupHeader'
@@ -180,7 +180,7 @@ export default function OrderDetail() {
           {makroVoid(order.makro_order_status) === 'returned'
             ? 'แม็คโครคืนสินค้าออเดอร์นี้แล้ว'
             : 'แม็คโครยกเลิกออเดอร์นี้แล้ว'}{' '}
-          — ห้ามส่งขึ้นเรือ{profile?.role === 'manager' ? ' (ลบออเดอร์ได้ที่ท้ายหน้า)' : ''}
+          — ห้ามส่งขึ้นเรือ{isBoss(profile?.role) ? ' (ลบออเดอร์ได้ที่ท้ายหน้า)' : ''}
         </p>
       )}
 
@@ -302,7 +302,7 @@ export default function OrderDetail() {
             <p className="flex items-center gap-1.5 font-semibold">
               <Warning size={16} weight="fill" aria-hidden="true" />
               ยังไม่ระบุเกาะ — ที่อยู่มีแค่ท่าเรือเทศบาลปากน้ำ
-              {profile?.role === 'manager'
+              {isBoss(profile?.role)
                 ? ' เลือกเกาะด้านล่าง (ถ้าเป็นลูกค้าบนฝั่ง ลบออเดอร์ได้ที่ท้ายหน้า)'
                 : isLead(profile?.role)
                   ? ' เลือกเกาะด้านล่าง (ถ้าเป็นลูกค้าบนฝั่ง ให้หัวหน้าลบออเดอร์)'
@@ -496,7 +496,7 @@ export default function OrderDetail() {
         )}
       </section>
 
-      {profile?.role === 'manager' && (
+      {isBoss(profile?.role) && (
         <section className="card flex flex-col gap-3 text-sm">
           <p className="section-title">พื้นที่อันตราย</p>
           {!deleteOpen ? (

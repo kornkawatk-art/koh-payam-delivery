@@ -47,7 +47,7 @@ export function useNavCounts(role: Role, pathname: string): NavCounts {
         { event: '*', schema: 'public', table: 'orders', filter: `ship_date=eq.${today}` },
         soon,
       )
-    if (role === 'manager' || role === 'online')
+    if (role === 'manager' || role === 'admin' || role === 'online')
       ch = ch
         .on('postgres_changes', { event: '*', schema: 'public', table: 'claims' }, soon)
         .on('postgres_changes', { event: '*', schema: 'public', table: 'line_contacts' }, soon)
