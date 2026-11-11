@@ -8,13 +8,13 @@ test('the logo is one labelled image at the requested size', () => {
   expect(img).toHaveAttribute('height', '36')
 })
 
-test('two logos on one page do not share a gradient id', () => {
+test('two logos on one page do not share a clip id', () => {
   const { container } = render(
     <>
       <AppLogo size={36} />
       <AppLogo size={44} />
     </>,
   )
-  const ids = Array.from(container.querySelectorAll('linearGradient')).map((g) => g.id)
+  const ids = Array.from(container.querySelectorAll('clipPath')).map((g) => g.id)
   expect(new Set(ids).size).toBe(2)
 })
