@@ -1,37 +1,44 @@
 import { useId } from 'react'
 
 /**
- * The app mark: a boat on a wave (deliveries by boat to the islands), in the
- * brand's stone-to-amber gradient. Same artwork as public/favicon.svg.
+ * The app mark: a map pin holding the island and the sea, on the brand's Andaman teal; the orange
+ * dot is where the goods go. Same artwork as public/favicon.svg. The logo keeps its own colours in
+ * both themes.
  */
 export function AppLogo({ size = 36, className = '' }: { size?: number; className?: string }) {
-  const grad = useId() // unique per instance: two logos on a page can't share a gradient id
+  const clip = useId() // unique per instance: two logos on a page can't share a clip id
   return (
     <svg
       role="img"
       aria-label="ระบบจัดส่งเกาะ"
       width={size}
       height={size}
-      viewBox="0 0 64 64"
+      viewBox="0 0 512 512"
       className={className}
     >
       <defs>
-        <linearGradient id={grad} x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0" stopColor="#1c1917" />
-          <stop offset="1" stopColor="#7c5214" />
-        </linearGradient>
+        <clipPath id={clip}>
+          <circle cx="256" cy="226" r="92" />
+        </clipPath>
       </defs>
-      <rect width="64" height="64" rx="14" fill={`url(#${grad})`} />
-      <path d="M18 34h28l-5 9H23z" fill="#fff" />
-      <rect x="30" y="18" width="3" height="16" fill="#fff" />
-      <path d="M33 19l9 12h-9z" fill="#f2c46d" />
+      <rect width="512" height="512" rx="112" fill="#0e5e6f" />
       <path
-        d="M12 48c4 0 4-3 8-3s4 3 8 3 4-3 8-3 4 3 8 3 4-3 8-3"
-        fill="none"
-        stroke="#f2c46d"
-        strokeWidth="3"
-        strokeLinecap="round"
+        d="M256 92 C176 92 116 152 116 230 C116 318 210 388 256 432 C302 388 396 318 396 230 C396 152 336 92 256 92Z"
+        fill="#eef4f4"
       />
+      <g clipPath={`url(#${clip})`}>
+        <rect x="150" y="120" width="220" height="220" fill="#5ec4d2" />
+        <path d="M176 250 C200 200 236 184 262 184 C296 184 320 214 336 250Z" fill="#0e5e6f" />
+        <rect x="150" y="250" width="220" height="100" fill="#0a4856" />
+        <path
+          d="M160 274 C180 264 200 264 220 274 S260 284 280 274 S320 264 352 274"
+          fill="none"
+          stroke="#eef4f4"
+          strokeWidth="10"
+          strokeLinecap="round"
+        />
+      </g>
+      <circle cx="318" cy="166" r="22" fill="#e8662a" />
     </svg>
   )
 }
