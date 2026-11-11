@@ -42,7 +42,7 @@ export function StatTile({
       >
         {label}
       </dt>
-      <dd className="num text-2xl font-semibold leading-tight tracking-tight text-ink">
+      <dd className="figure text-[1.625rem] text-ink">
         {value}
       </dd>
     </div>

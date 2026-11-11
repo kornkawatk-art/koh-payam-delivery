@@ -88,6 +88,43 @@ export const NAV: { path: string; label: string; roles: Role[]; icon: Icon }[] =
     },
   ]
 
+/** The role in Thai, as the team says it (never the code name) */
+export const ROLE_TH: Record<Role, string> = {
+  packer: 'คนแพ็ค',
+  pier: 'ทีมท่าเรือ',
+  manager: 'หัวหน้า',
+  admin: 'แอดมิน',
+  online: 'ทีมออนไลน์',
+  sale: 'เซล',
+  floor: 'เซลฟลอร์',
+}
+
+/** Short names for the phone's bottom bar */
+const TAB_LABEL: Record<string, string> = {
+  '/': 'วันนี้',
+  '/import': 'นำเข้า',
+  '/pier': 'ท่าเรือ',
+  '/foam': 'ลังโฟม',
+  '/debts': 'ค้างชำระ',
+  '/claims': 'เคลม',
+  '/shortage-report': 'ของขาด',
+}
+/** Each role's everyday pages, in the order they use them; everything else stays in the menu */
+const TAB_PATHS: Record<Role, string[]> = {
+  packer: ['/', '/import'],
+  pier: ['/pier', '/foam', '/debts', '/'],
+  manager: ['/', '/pier', '/claims', '/shortage-report'],
+  admin: ['/', '/pier', '/claims', '/shortage-report'],
+  online: ['/', '/pier', '/claims', '/debts'],
+  sale: ['/'],
+  floor: ['/', '/shortage-report'],
+}
+export function tabsFor(role: Role) {
+  return TAB_PATHS[role]
+    .filter((p) => canAccess(p, role))
+    .map((p) => ({ path: p, label: TAB_LABEL[p], icon: NAV.find((n) => n.path === p)!.icon }))
+}
+
 export function canAccess(path: string, role: Role): boolean {
   // sale: today's work and the order page only -- no pack pages, no other detail pages
   if (role === 'sale') return SALE_PATHS.includes(path)

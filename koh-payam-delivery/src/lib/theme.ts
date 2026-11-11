@@ -6,7 +6,7 @@
 export type Theme = 'light' | 'dark'
 
 const KEY = 'theme'
-const BAR: Record<Theme, string> = { light: '#fbfbfa', dark: '#121212' }
+const BAR: Record<Theme, string> = { light: '#eef4f4', dark: '#0b1619' }
 
 export function getTheme(): Theme {
   try {

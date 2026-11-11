@@ -7,6 +7,7 @@ import {
   type UnreachedCustomer,
 } from '../../lib/api/shipDays'
 import { supabase } from '../../lib/supabase'
+import { BoxLabel } from '../../components/ui/BoxLabel'
 import {
   House,
   Package,
@@ -17,6 +18,8 @@ import {
   CaretDown,
   CaretRight,
   ListBullets,
+  Boat,
+  Lifebuoy,
   Printer,
 } from '@phosphor-icons/react'
 import { StatusBadge } from '../../components/ui/StatusBadge'
@@ -293,92 +296,7 @@ export default function DailyDashboard() {
         }
       />
 
-      {isManager && <LastImportNote />}
-
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <div className="card flex flex-col gap-1 p-3 sm:p-4">
-          <span className="flex items-center gap-1.5 text-xs font-medium text-ink-soft">
-            <ListBullets size={14} className="text-ink-faint" aria-hidden="true" />
-            ออเดอร์ทั้งหมด
-          </span>
-          <span className="num text-2xl font-semibold tracking-tight text-ink">{counts.total}</span>
-        </div>
-        <ProgressTile
-          icon={<Package size={14} className="text-ink-faint" aria-hidden="true" />}
-          label="แพ็คแล้ว"
-          progressLabel="ความคืบหน้าการแพ็ค"
-          done={counts.packed}
-          total={counts.total}
-          barClass="bg-brand"
-        />
-        <ProgressTile
-          icon={<MapPin size={14} className="text-ink-faint" aria-hidden="true" />}
-          label="ถึงท่าเรือ"
-          progressLabel="ความคืบหน้าถึงท่าเรือ"
-          done={counts.atPier}
-          total={counts.total}
-          barClass="bg-brand"
-        />
-        <ProgressTile
-          icon={<CheckCircle size={14} weight="fill" className="text-ok" aria-hidden="true" />}
-          label="ส่งแล้ว"
-          progressLabel="ความคืบหน้าการส่ง"
-          done={counts.shipped}
-          total={counts.total}
-          barClass="bg-ok"
-        />
-      </div>
-      <MakroPickSummary rows={rows} />
-      {counts.pickups > 0 && (
-        <p className="-mt-2 text-sm text-ink-soft">
-          รับเองที่สาขา {counts.pickups} (รับแล้ว {counts.pickedUp})
-        </p>
-      )}
-
-      {editable && linksSentAt === null && rows.length > 0 && (
-        <div className="alert alert-warn">
-          <p className="flex flex-wrap items-center gap-1.5 font-semibold">
-            <Warning size={16} weight="fill" aria-hidden="true" />
-            ยังไม่ได้ส่งลิงก์ไลน์ให้ลูกค้าวันนี้
-            <button
-              type="button"
-              className="btn btn-warn btn-sm ml-1"
-              onClick={sendLinksNow}
-              disabled={linkSendBusy}
-            >
-              ส่งลิงก์ไลน์เลย
-            </button>
-          </p>
-          {linkSendMsg && <p className="mt-1 text-sm">{linkSendMsg}</p>}
-        </div>
-      )}
-
-      {linksSentAt !== null && linkSendMsg && (
-        <div className="alert alert-ok">
-          <p>{linkSendMsg}</p>
-        </div>
-      )}
-
-      {todayShort.length > 0 && (
-        <div className="alert alert-warn">
-          <p className="flex items-center gap-1.5 font-semibold">
-            <Warning size={16} weight="fill" aria-hidden="true" />
-            ของขาดวันนี้ {todayShort.length} รายการ
-          </p>
-          <ul className="mt-1.5 list-disc pl-5">
-            {todayShort.map((s) => (
-              <li key={s.key}>
-                <Link className="link" to={`/order/${s.orderId}`}>
-                  {s.productName} x{s.qty}
-                </Link>
-                <span className="text-sm"> · {s.customerName}</span>
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
-
-      <div className="flex items-center gap-2">
+      <div className="sticky top-[3.25rem] z-20 -mx-4 flex items-center gap-2 bg-paper/95 px-4 py-2 backdrop-blur sm:static sm:mx-0 sm:bg-transparent sm:p-0 lg:top-0">
         <input
           placeholder="ค้นหาชื่อลูกค้า / เลขออเดอร์"
           value={q}
@@ -394,6 +312,142 @@ export default function DailyDashboard() {
         </button>
       </div>
 
+      {isManager && <LastImportNote />}
+
+      <section aria-label="ขั้นตอนวันนี้" className="card p-4">
+        <ol className="grid grid-cols-4 gap-2">
+          <li className="relative flex flex-col gap-1">
+            <span className="flex items-center gap-1.5 text-xs font-medium text-ink-soft">
+              <ListBullets size={14} aria-hidden="true" />
+              ออเดอร์ทั้งหมด
+            </span>
+            <span className="figure text-[1.75rem] text-ink">{counts.total}</span>
+            <span className="mt-1 h-1.5 rounded-full bg-brand" aria-hidden="true" />
+          </li>
+          <RouteStop icon={<Package size={14} aria-hidden="true" />} label="แพ็คแล้ว" progressLabel="ความคืบหน้าการแพ็ค" done={counts.packed} total={counts.total} />
+          <RouteStop icon={<MapPin size={14} aria-hidden="true" />} label="ถึงท่าเรือ" progressLabel="ความคืบหน้าถึงท่าเรือ" done={counts.atPier} total={counts.total} />
+          <RouteStop icon={<Boat size={14} aria-hidden="true" />} label="ส่งแล้ว" progressLabel="ความคืบหน้าการส่ง" done={counts.shipped} total={counts.total} last />
+        </ol>
+      </section>
+      <MakroPickSummary rows={rows} />
+      {counts.pickups > 0 && (
+        <p className="-mt-2 text-sm text-ink-soft">
+          รับเองที่สาขา {counts.pickups} (รับแล้ว {counts.pickedUp})
+        </p>
+      )}
+
+      {(() => {
+        // what must be done before the boat leaves, in one list (each row goes away once done)
+        const list = (
+          <>
+          {editable && linksSentAt === null && rows.length > 0 && (
+            <div className="todo-row">
+              <p className="flex flex-wrap items-center gap-1.5 font-semibold">
+                <Warning size={16} weight="fill" aria-hidden="true" />
+                ยังไม่ได้ส่งลิงก์ไลน์ให้ลูกค้าวันนี้
+                <button
+                  type="button"
+                  className="btn btn-warn btn-sm ml-1"
+                  onClick={sendLinksNow}
+                  disabled={linkSendBusy}
+                >
+                  ส่งลิงก์ไลน์เลย
+                </button>
+              </p>
+              {linkSendMsg && <p className="mt-1 text-sm">{linkSendMsg}</p>}
+            </div>
+          )}
+
+          {linksSentAt !== null && linkSendMsg && (
+            <div className="todo-row todo-done">
+              <p>{linkSendMsg}</p>
+            </div>
+          )}
+
+          {todayShort.length > 0 && (
+            <div className="todo-row">
+              <p className="flex items-center gap-1.5 font-semibold">
+                <Warning size={16} weight="fill" aria-hidden="true" />
+                ของขาดวันนี้ {todayShort.length} รายการ
+              </p>
+              <ul className="mt-1.5 list-disc pl-5">
+                {todayShort.map((s) => (
+                  <li key={s.key}>
+                    <Link className="link" to={`/order/${s.orderId}`}>
+                      {s.productName} x{s.qty}
+                    </Link>
+                    <span className="text-sm"> · {s.customerName}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+
+
+          {editable && (
+            <div className="todo-row flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                className="btn btn-warn btn-sm"
+                disabled={stickerJobs.length === 0}
+                onClick={() => {
+                  setBulkMsg(undefined)
+                  setBulkOpen(true)
+                }}
+              >
+                <Printer size={16} aria-hidden="true" />
+                พิมพ์สติ๊กเกอร์ ({due.length} เจ้า · {dueStickers} ดวง)
+              </button>
+              {bulkMsg ? (
+                <span className="text-xs text-ink-soft">{bulkMsg}</span>
+              ) : stickerJobs.length === 0 ? (
+                <span className="text-xs text-ink-soft">ยังไม่มีออเดอร์ที่แพ็คเสร็จรอพิมพ์</span>
+              ) : (
+                due.length === 0 && <span className="text-xs text-ink-soft">พิมพ์ครบทุกเจ้าแล้ว</span>
+              )}
+            </div>
+          )}
+          {bulkOpen && (
+            <BulkStickerDialog
+              jobs={stickerJobs}
+              onClose={() => setBulkOpen(false)}
+              onPrinted={(warning) => {
+                setBulkOpen(false)
+                setBulkMsg(warning ?? 'ส่งสติ๊กเกอร์ไปพิมพ์แล้ว')
+                load()
+              }}
+            />
+          )}
+
+          {editable && candidates.length > 0 && (
+            <section aria-label="เบอร์เดียวกันหลายชื่อ" className="todo-row space-y-2">
+              <p className="text-sm font-medium">เบอร์เดียวกันแต่ชื่อร้านต่างกัน ปกติแพ็กแยก แพ็กรวมเฉพาะวันนี้ได้</p>
+              {candidates.map((c) => (
+                <div key={c.phone} className="flex flex-wrap items-center justify-between gap-2 text-sm">
+                  <span>
+                    <span className="font-mono">{c.phone}</span> · {c.names.join(' · ')}
+                  </span>
+                  <button type="button" className="btn btn-ok btn-sm" onClick={() => void toggleMerge(c.phone, true)}>
+                    แพ็กรวม
+                  </button>
+                </div>
+              ))}
+            </section>
+          )}
+          </>
+        )
+        if (!(editable || todayShort.length > 0 || (linksSentAt !== null && linkSendMsg))) return null
+        return (
+          <section aria-label="ต้องทำก่อนเรือออก" className="card flex flex-col gap-0 overflow-hidden p-0">
+            <h2 className="flex items-center gap-2 px-4 pb-1 pt-3 text-sm font-semibold text-warn-ink">
+              <Lifebuoy size={18} weight="fill" aria-hidden="true" />
+              ต้องทำก่อนเรือออก
+            </h2>
+            {list}
+          </section>
+        )
+      })()}
       {scanOpen && (
         <QrOrderScanner
           onFound={(order) => {
@@ -402,57 +456,6 @@ export default function DailyDashboard() {
           }}
           onClose={() => setScanOpen(false)}
         />
-      )}
-
-      {editable && (
-        <div className="flex flex-wrap items-center gap-2">
-          <button
-            type="button"
-            className="btn btn-warn btn-sm"
-            disabled={stickerJobs.length === 0}
-            onClick={() => {
-              setBulkMsg(undefined)
-              setBulkOpen(true)
-            }}
-          >
-            <Printer size={16} aria-hidden="true" />
-            พิมพ์สติ๊กเกอร์ ({due.length} เจ้า · {dueStickers} ดวง)
-          </button>
-          {bulkMsg ? (
-            <span className="text-xs text-ink-soft">{bulkMsg}</span>
-          ) : stickerJobs.length === 0 ? (
-            <span className="text-xs text-ink-soft">ยังไม่มีออเดอร์ที่แพ็คเสร็จรอพิมพ์</span>
-          ) : (
-            due.length === 0 && <span className="text-xs text-ink-soft">พิมพ์ครบทุกเจ้าแล้ว</span>
-          )}
-        </div>
-      )}
-      {bulkOpen && (
-        <BulkStickerDialog
-          jobs={stickerJobs}
-          onClose={() => setBulkOpen(false)}
-          onPrinted={(warning) => {
-            setBulkOpen(false)
-            setBulkMsg(warning ?? 'ส่งสติ๊กเกอร์ไปพิมพ์แล้ว')
-            load()
-          }}
-        />
-      )}
-
-      {editable && candidates.length > 0 && (
-        <section aria-label="เบอร์เดียวกันหลายชื่อ" className="card space-y-2 p-3">
-          <p className="text-sm font-medium">เบอร์เดียวกันแต่ชื่อร้านต่างกัน ปกติแพ็กแยก แพ็กรวมเฉพาะวันนี้ได้</p>
-          {candidates.map((c) => (
-            <div key={c.phone} className="flex flex-wrap items-center justify-between gap-2 text-sm">
-              <span>
-                <span className="font-mono">{c.phone}</span> · {c.names.join(' · ')}
-              </span>
-              <button type="button" className="btn btn-ok btn-sm" onClick={() => void toggleMerge(c.phone, true)}>
-                แพ็กรวม
-              </button>
-            </div>
-          ))}
-        </section>
       )}
       {mergeError && <p className="alert alert-danger">{mergeError}</p>}
 
@@ -617,28 +620,33 @@ function GroupPickBadge({ orders }: { orders: any[] }) {
   )
 }
 
-function ProgressTile({
+/**
+ * One stop on the day's route (packed, at the pier, on the boat): done of all, a bar that fills as
+ * the stop is reached, and a tick once every order is past it.
+ */
+function RouteStop({
   icon,
   label,
   progressLabel,
   done,
   total,
-  barClass,
+  last,
 }: {
   icon: ReactNode
   label: string
   progressLabel: string
   done: number
   total: number
-  barClass: string
+  last?: boolean
 }) {
+  const complete = total > 0 && done === total
   return (
-    <div className="card flex flex-col gap-1 p-3 sm:p-4">
-      <span className="flex items-center gap-1.5 text-xs font-medium text-ink-soft">
-        {icon}
+    <li className="relative flex flex-col gap-1">
+      <span className={'flex items-center gap-1.5 text-xs font-medium ' + (complete ? 'text-ok-ink' : 'text-ink-soft')}>
+        {complete ? <CheckCircle size={14} weight="fill" aria-hidden="true" /> : icon}
         {label}
       </span>
-      <span className="num text-2xl font-semibold tracking-tight text-ink">
+      <span className="figure text-[1.75rem] text-ink">
         {done}/{total}
       </span>
       <span
@@ -650,11 +658,11 @@ function ProgressTile({
         aria-valuenow={done}
       >
         <span
-          className={`block h-full rounded-full transition-[width] duration-500 ${barClass}`}
+          className={`block h-full rounded-full transition-[width] duration-500 motion-reduce:transition-none ${last || complete ? 'bg-ok' : 'bg-brand'}`}
           style={{ width: `${total ? (done / total) * 100 : 0}%` }}
         />
       </span>
-    </div>
+    </li>
   )
 }
 
@@ -812,7 +820,7 @@ function GroupRows({
             <span className="badge badge-brand">{os.length} PO</span>
           </button>
         </td>
-        <td data-label="ลูกค้า">
+        <td data-label="ลูกค้า" className="stack-title">
           <span className="font-medium">{group.name}</span>
           {released && <ReleasedBadge />}
           {showIsland &&
@@ -848,8 +856,12 @@ function GroupRows({
             <span className="badge badge-warn ml-1.5">เก็บเงิน</span>
           )}
         </td>
-        <td data-label="รวม" className="tnum">
-          {os.reduce((n, o) => n + o.paper_box_count + o.foam_box_count + o.piece_count, 0)}
+        <td data-label="รวม">
+          <BoxLabel
+            paper={os.reduce((n, o) => n + o.paper_box_count, 0)}
+            foam={os.reduce((n, o) => n + o.foam_box_count, 0)}
+            piece={os.reduce((n, o) => n + o.piece_count, 0)}
+          />
         </td>
         <td data-label="เรือ" className="whitespace-nowrap">
           {boats.length ? boats.join(', ') : '—'}
@@ -894,7 +906,7 @@ function OrderRow({
           {o.makro_order_no}
         </Link>
       </td>
-      <td data-label="ลูกค้า">
+      <td data-label="ลูกค้า" className="stack-title">
         {o.customer_name_en}
         {released && <ReleasedBadge />}
         {showIsland && <IslandBadge island={o.island} className="ml-1.5" />}
@@ -907,8 +919,8 @@ function OrderRow({
         <ShortBadge count={shortCount(o)} />
         {o.outstanding_amount > 0 && <span className="badge badge-warn ml-1.5">เก็บเงิน</span>}
       </td>
-      <td data-label="รวม" className="tnum">
-        {o.paper_box_count + o.foam_box_count + o.piece_count}
+      <td data-label="รวม">
+        <BoxLabel paper={o.paper_box_count} foam={o.foam_box_count} piece={o.piece_count} />
       </td>
       <td data-label="เรือ" className="whitespace-nowrap">
         {o.boat_name ?? '—'}

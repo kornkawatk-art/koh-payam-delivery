@@ -53,6 +53,6 @@ test('solid buttons darken to their -ink shade on hover (keeps text contrast)', 
 
 test('the installed-app colours match the new page background', () => {
   const manifest = JSON.parse(readFileSync(resolve(__dirname, '../../public/manifest.webmanifest'), 'utf8'))
-  expect(manifest.theme_color).toBe('#fbfbfa')
-  expect(manifest.background_color).toBe('#fbfbfa')
+  expect(manifest.theme_color).toBe('#eef4f4')
+  expect(manifest.background_color).toBe('#eef4f4')
 })
