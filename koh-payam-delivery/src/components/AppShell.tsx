@@ -1,8 +1,8 @@
 import { Suspense, useEffect, useState } from 'react'
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
-import { ArrowSquareOut, List, Moon, SignOut, Sun, UsersThree } from '@phosphor-icons/react'
+import { ArrowSquareOut, DotsThreeOutline, List, Moon, SignOut, Sun, UsersThree } from '@phosphor-icons/react'
 import { useAuth } from '../lib/auth'
-import { CLAIM_APP_URL, NAV, canAccess, usesBothApps } from '../lib/roles'
+import { CLAIM_APP_URL, NAV, ROLE_TH, canAccess, tabsFor, usesBothApps } from '../lib/roles'
 import { applyTheme, getTheme, setTheme, type Theme } from '../lib/theme'
 import { useAppUpdate } from '../lib/useAppUpdate'
 import { PageSkeleton } from './ui/Skeleton'
@@ -67,7 +67,7 @@ export default function AppShell() {
           <span className="font-semibold">ระบบจัดส่งเกาะ</span>
         </button>
         <span className="truncate text-sm text-ink-soft">
-          {profile?.name} · {role}
+          {profile?.name} <span className="badge badge-neutral ml-1">{ROLE_TH[role]}</span>
         </span>
       </header>
 
@@ -142,7 +142,7 @@ export default function AppShell() {
 
         <div className="border-t border-line p-3">
           <p className="truncate px-1 pb-2 text-xs text-ink-faint">
-            {profile?.name} · {role}
+            {profile?.name} <span className="badge badge-neutral ml-1">{ROLE_TH[role]}</span>
           </p>
           {/* same account works in the claim app */}
           {usesBothApps(role) && (
@@ -186,7 +186,7 @@ export default function AppShell() {
 
       {/* Content */}
       <div className="min-w-0 flex-1">
-        <main className="container-page py-6 sm:py-8">
+        <main className="container-page py-6 pb-28 sm:py-8 lg:pb-8">
           {/* pages load on demand -- keep the menu up while one arrives */}
           <Suspense fallback={<PageSkeleton />}>
             <Outlet />
@@ -194,10 +194,46 @@ export default function AppShell() {
         </main>
       </div>
 
+      {/* Phone: each role's everyday pages along the bottom, the rest behind เมนู */}
+      <nav aria-label="เมนูลัด" className="fixed inset-x-0 bottom-0 z-30 border-t border-line bg-surface/95 pb-[env(safe-area-inset-bottom)] backdrop-blur lg:hidden print:hidden">
+        <ul className="flex">
+          {tabsFor(role).map((t) => {
+            const Icon = t.icon
+            const on = t.path === '/' ? pathname === '/' : pathname.startsWith(t.path)
+            return (
+              <li key={t.path} className="flex-1">
+                <NavLink to={t.path} end={t.path === '/'} aria-current={on ? 'page' : undefined}
+                  className={'flex min-h-[3.75rem] flex-col items-center justify-center gap-0.5 text-xs ' + (on ? 'font-semibold text-brand-ink' : 'text-ink-soft')}>
+                  <span className={'relative flex h-7 w-12 items-center justify-center rounded-full ' + (on ? 'bg-brand-soft' : '')}>
+                    <Icon size={22} weight={on ? 'fill' : 'regular'} aria-hidden="true" />
+                    {!!counts[t.path] && (
+                      <span className={'absolute -right-1 -top-1 min-w-[1.125rem] rounded-full px-1 text-center text-[10px] font-semibold leading-[1.125rem] tnum ' + (URGENT_NAV_PATHS.includes(t.path) ? 'bg-danger text-on' : 'bg-line-strong text-ink')}>
+                        {counts[t.path]}
+                      </span>
+                    )}
+                  </span>
+                  {t.label}
+                </NavLink>
+              </li>
+            )
+          })}
+          <li className="flex-1">
+            <button type="button" aria-label={urgent > 0 ? `เมนูทั้งหมด (มีงานรอตัดสิน ${urgent})` : "เมนูทั้งหมด"} onClick={() => setOpen(true)} aria-expanded={open}
+              className="flex min-h-[3.75rem] w-full flex-col items-center justify-center gap-0.5 text-xs text-ink-soft">
+              <span className="relative flex h-7 w-12 items-center justify-center">
+                <DotsThreeOutline size={22} aria-hidden="true" />
+                {urgent > 0 && <span className="absolute right-1 top-0 h-2.5 w-2.5 rounded-full bg-danger ring-2 ring-surface" aria-hidden="true" />}
+              </span>
+              เมนู
+            </button>
+          </li>
+        </ul>
+      </nav>
+
       {updateAvailable && (
         <div
           role="alert"
-          className="fixed inset-x-3 bottom-3 z-50 mx-auto flex max-w-md items-center justify-between gap-3 rounded-xl border border-warn/30 bg-warn-soft px-4 py-3 text-sm text-warn-ink shadow-pop"
+          className="fixed inset-x-3 bottom-20 z-50 lg:bottom-3 mx-auto flex max-w-md items-center justify-between gap-3 rounded-xl border border-warn/30 bg-warn-soft px-4 py-3 text-sm text-warn-ink shadow-pop"
         >
           <span>มีเวอร์ชันใหม่ของแอป — รีเฟรชก่อนใช้งานต่อเพื่อให้ข้อมูลถูกต้อง</span>
           <button className="btn btn-warn btn-sm shrink-0" onClick={() => location.reload()}>

@@ -5,7 +5,7 @@ const meta = () => document.querySelector('meta[name="theme-color"]')!
 beforeEach(() => {
   localStorage.clear()
   document.documentElement.removeAttribute('data-theme')
-  document.head.innerHTML = '<meta name="theme-color" content="#fbfbfa" />'
+  document.head.innerHTML = '<meta name="theme-color" content="#eef4f4" />'
   vi.restoreAllMocks()
 })
 
@@ -34,8 +34,8 @@ test('remembers the choice on this device', () => {
 test('applyTheme sets and clears the html attribute and the browser bar colour', () => {
   applyTheme('dark')
   expect(document.documentElement.dataset.theme).toBe('dark')
-  expect(meta().getAttribute('content')).toBe('#121212')
+  expect(meta().getAttribute('content')).toBe('#0b1619')
   applyTheme(null)
   expect(document.documentElement.hasAttribute('data-theme')).toBe(false)
-  expect(meta().getAttribute('content')).toBe('#fbfbfa')
+  expect(meta().getAttribute('content')).toBe('#eef4f4')
 })

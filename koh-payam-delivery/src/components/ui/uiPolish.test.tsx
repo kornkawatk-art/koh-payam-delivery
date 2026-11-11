@@ -40,7 +40,7 @@ test('Notice: errors are announced as alerts, successes as status, each with its
   expect(screen.queryByRole('status')).not.toBeInTheDocument()
 })
 
-describe('numbers use the monospace number style', () => {
+describe('numbers keep their digits aligned (num) or use the cargo-label face (figure)', () => {
   test('AmountDue amount', () => {
     render(<AmountDue label="ยอดเก็บปลายทาง" amount={1250} />)
     expect(screen.getByText(/1,250/)).toHaveClass('num')
@@ -51,7 +51,7 @@ describe('numbers use the monospace number style', () => {
         <StatTile label="ลัง" value={7} />
       </dl>,
     )
-    expect(screen.getByText('7')).toHaveClass('num')
+    expect(screen.getByText('7')).toHaveClass('figure')
     render(<TotalCount total={12} />)
     expect(screen.getByText('12')).toHaveClass('num')
   })

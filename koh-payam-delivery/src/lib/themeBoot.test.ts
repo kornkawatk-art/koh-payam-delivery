@@ -28,7 +28,7 @@ test('the boot script exists', () => {
 })
 
 test('team pages start dark when this device chose dark', () => {
-  expect(boot('/', 'dark')).toEqual({ theme: 'dark', bar: '#121212' })
+  expect(boot('/', 'dark')).toEqual({ theme: 'dark', bar: '#0b1619' })
   expect(boot('/order/abc/pack', 'dark').theme).toBe('dark')
 })
 

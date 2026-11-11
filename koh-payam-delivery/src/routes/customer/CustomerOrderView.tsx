@@ -174,18 +174,32 @@ export default function CustomerOrderView() {
 
   return shell(
     <div className="card flex flex-col gap-5">
-      <header className="flex flex-col gap-3">
-        <h1 className="text-2xl font-semibold tracking-tight text-ink">
-          {t(lang, 'title')} · {data.orderNo}
-        </h1>
-        <dl className="grid grid-cols-2 gap-3 rounded-lg bg-paper px-3 py-2.5 text-sm">
+      {/* the cargo ticket: which order, for whom, on which boat and day, how many pieces */}
+      <header className="-mx-4 -mt-4 overflow-hidden rounded-t-xl bg-brand text-on sm:-mx-5 sm:-mt-5">
+        <div className="flex items-start justify-between gap-3 px-4 pb-3 pt-4 sm:px-5">
+          <h1 className="min-w-0 !text-on">
+            <span className="block text-xs font-medium opacity-80">{t(lang, 'title')}</span>
+            <span className="figure block truncate text-[1.75rem]">{data.orderNo}</span>
+          </h1>
+          {data.boatName && (
+            <p className="shrink-0 text-right">
+              <span className="flex items-center justify-end gap-1 text-xs font-medium opacity-80">
+                <Boat size={14} weight="fill" aria-hidden="true" />
+                {t(lang, 'boat')}
+              </span>
+              <span className="figure block text-xl">{data.boatName}</span>
+            </p>
+          )}
+        </div>
+        <div aria-hidden="true" className="mx-4 border-t-2 border-dashed border-on/40 sm:mx-5" />
+        <dl className="grid grid-cols-2 gap-3 px-4 pb-4 pt-3 text-sm sm:px-5">
           <div className="min-w-0">
-            <dt className="text-xs text-ink-faint">{t(lang, 'customer')}</dt>
-            <dd className="truncate font-medium text-ink">{data.customerNameEn}</dd>
+            <dt className="text-xs opacity-80">{t(lang, 'customer')}</dt>
+            <dd className="truncate font-semibold">{data.customerNameEn}</dd>
           </div>
           <div>
-            <dt className="text-xs text-ink-faint">{t(lang, 'ship_date')}</dt>
-            <dd className="font-medium text-ink">{formatDate(data.shipDate, lang)}</dd>
+            <dt className="text-xs opacity-80">{t(lang, 'ship_date')}</dt>
+            <dd className="font-semibold">{formatDate(data.shipDate, lang)}</dd>
           </div>
         </dl>
       </header>

@@ -93,10 +93,19 @@ test('evidence photo thumbnail can be tapped to enlarge, and dismissed', async (
 
 test('language toggle switches the header text to Thai and persists', async () => {
   renderAt()
-  expect(await screen.findByText(/Order · PO-1001/)).toBeInTheDocument()
+  expect(await screen.findByRole('heading', { level: 1, name: /Order\s*PO-1001/ })).toBeInTheDocument()
   await userEvent.click(screen.getByRole('button', { name: 'ไทย' }))
-  expect(await screen.findByText(/ออเดอร์ · PO-1001/)).toBeInTheDocument()
+  expect(await screen.findByRole('heading', { level: 1, name: /ออเดอร์\s*PO-1001/ })).toBeInTheDocument()
   expect(localStorage.getItem('cust_lang')).toBe('th')
+})
+
+test('the top of the page is a cargo ticket: order number, boat, customer and ship day', async () => {
+  renderAt()
+  const h = await screen.findByRole('heading', { level: 1, name: /Order\s*PO-1001/ })
+  const ticket = h.closest('header')!
+  expect(ticket).toHaveTextContent('เรือ 2')
+  expect(ticket).toHaveTextContent('Delivery date')
+  expect(ticket).toHaveTextContent('BLUE VIEW RESORT')
 })
 
 test('shows the box/piece counts as labeled tiles, including pieces', async () => {

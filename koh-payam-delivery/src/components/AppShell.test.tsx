@@ -130,3 +130,17 @@ test('the current page is clearly marked in the menu', () => {
   renderShell()
   expect(screen.getByRole('link', { name: /งานวันนี้/ })).toHaveClass('bg-line')
 })
+
+test('on the phone each role gets its everyday pages along the bottom, and the role reads in Thai', () => {
+  role.current = 'pier'
+  render(
+    <MemoryRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+      <AppShell />
+    </MemoryRouter>,
+  )
+  const bar = screen.getByRole('navigation', { name: 'เมนูลัด' })
+  expect([...bar.querySelectorAll('a')].map((a) => a.textContent)).toEqual(['ท่าเรือ', 'ลังโฟม', 'ค้างชำระ', 'วันนี้'])
+  expect(screen.getByRole('button', { name: 'เมนูทั้งหมด' })).toBeInTheDocument()
+  expect(screen.getAllByText('ทีมท่าเรือ').length).toBeGreaterThan(0)
+  expect(screen.queryByText(/· pier/)).not.toBeInTheDocument()
+})

@@ -8,63 +8,63 @@
      src/lib/theme.ts. Every --c-* needs both values (src/styles/tokens.test.ts). */
   :root {
     color-scheme: light;
-    --c-paper: 251 251 250; /* #fbfbfa */
+    --c-paper: 238 244 244; /* #eef4f4: sea mist */
     --c-surface: 255 255 255; /* #ffffff */
     --c-on: 255 255 255; /* #ffffff */
-    --c-ink: 23 23 23; /* #171717 */
-    --c-ink-soft: 106 106 106; /* #6a6a6a */
-    --c-ink-faint: 163 163 163; /* #a3a3a3 */
-    --c-line: 235 235 234; /* #ebebea */
-    --c-line-strong: 220 220 218; /* #dcdcda */
-    --c-brand: 154 106 28; /* #9a6a1c */
-    --c-brand-ink: 124 82 20; /* #7c5214 */
-    --c-brand-soft: 246 239 225; /* #f6efe1 */
-    --c-ok: 21 128 61; /* #15803d */
-    --c-ok-ink: 22 101 52; /* #166534 */
-    --c-ok-soft: 240 253 244; /* #f0fdf4 */
-    --c-warn: 180 83 9; /* #b45309 */
-    --c-warn-ink: 154 52 18; /* #9a3412 */
-    --c-warn-soft: 255 251 235; /* #fffbeb */
-    --c-danger: 185 28 28; /* #b91c1c */
-    --c-danger-ink: 153 27 27; /* #991b1b */
-    --c-danger-soft: 254 242 242; /* #fef2f2 */
-    --c-info: 29 78 216; /* #1d4ed8 */
-    --c-info-ink: 30 64 175; /* #1e40af */
-    --c-info-soft: 239 246 255; /* #eff6ff */
-    --c-chart-1: 139 92 246; /* #8b5cf6 */
-    --c-chart-2: 109 40 217; /* #6d28d9 */
-    --c-chart-3: 76 29 149; /* #4c1d95 */
+    --c-ink: 16 38 43; /* #10262b: deep water */
+    --c-ink-soft: 74 96 102; /* #4a6066: 6.6:1 on white */
+    --c-ink-faint: 110 130 136; /* #6e8288: 4:1 on white */
+    --c-line: 220 230 231; /* #dce6e7 */
+    --c-line-strong: 196 211 213; /* #c4d3d5 */
+    --c-brand: 14 94 111; /* #0e5e6f: Andaman sea */
+    --c-brand-ink: 10 72 86; /* #0a4856 */
+    --c-brand-soft: 225 239 241; /* #e1eff1 */
+    --c-ok: 31 122 77; /* #1f7a4d: on the boat */
+    --c-ok-ink: 21 94 58; /* #155e3a */
+    --c-ok-soft: 228 244 235; /* #e4f4eb */
+    --c-warn: 196 84 26; /* #c4541a: life-buoy orange, before the boat leaves */
+    --c-warn-ink: 140 52 12; /* #8c340c */
+    --c-warn-soft: 253 238 227; /* #fdeee3 */
+    --c-danger: 180 35 24; /* #b42318 */
+    --c-danger-ink: 140 24 16; /* #8c1810 */
+    --c-danger-soft: 253 236 234; /* #fdecea */
+    --c-info: 37 99 160; /* #2563a0 */
+    --c-info-ink: 26 74 122; /* #1a4a7a */
+    --c-info-soft: 232 241 249; /* #e8f1f9 */
+    --c-chart-1: 124 195 204; /* #7cc3cc */
+    --c-chart-2: 47 143 157; /* #2f8f9d */
+    --c-chart-3: 14 94 111; /* #0e5e6f */
     --c-dept-df2: 74 58 167; /* #4a3aa7 */
   }
 
   html[data-theme='dark'] {
     color-scheme: dark;
-    --c-paper: 18 18 18; /* #121212 */
-    --c-surface: 27 27 27; /* #1b1b1b */
-    --c-on: 15 15 15; /* #0f0f0f */
-    --c-ink: 237 237 237; /* #ededed */
-    --c-ink-soft: 161 161 161; /* #a1a1a1 */
-    --c-ink-faint: 108 108 108; /* #6c6c6c */
-    --c-line: 41 41 41; /* #292929 */
-    --c-line-strong: 56 56 56; /* #383838 */
-    --c-brand: 217 165 74; /* #d9a54a */
-    --c-brand-ink: 230 184 101; /* #e6b865 */
-    --c-brand-soft: 42 34 20; /* #2a2214 */
-    --c-ok: 74 222 128; /* #4ade80 */
-    --c-ok-ink: 134 239 172; /* #86efac */
-    --c-ok-soft: 19 38 26; /* #13261a */
-    --c-warn: 251 191 36; /* #fbbf24 */
-    --c-warn-ink: 252 211 77; /* #fcd34d */
-    --c-warn-soft: 42 34 16; /* #2a2210 */
+    --c-paper: 11 22 25; /* #0b1619 */
+    --c-surface: 20 34 38; /* #142226 */
+    --c-on: 11 22 25; /* #0b1619 */
+    --c-ink: 226 236 237; /* #e2eced */
+    --c-ink-soft: 160 180 184; /* #a0b4b8 */
+    --c-ink-faint: 116 136 141; /* #74888d */
+    --c-line: 36 54 59; /* #24363b */
+    --c-line-strong: 52 74 80; /* #344a50 */
+    --c-brand: 94 196 210; /* #5ec4d2 */
+    --c-brand-ink: 140 216 226; /* #8cd8e2 */
+    --c-brand-soft: 18 48 55; /* #123037 */
+    --c-ok: 74 214 140; /* #4ad68c */
+    --c-ok-ink: 134 232 178; /* #86e8b2 */
+    --c-ok-soft: 17 44 31; /* #112c1f */
+    --c-warn: 251 146 80; /* #fb9250 */
+    --c-warn-ink: 253 186 140; /* #fdba8c */
+    --c-warn-soft: 52 30 16; /* #341e10 */
     --c-danger: 248 113 113; /* #f87171 */
     --c-danger-ink: 252 165 165; /* #fca5a5 */
-    --c-danger-soft: 44 23 23; /* #2c1717 */
-    --c-info: 96 165 250; /* #60a5fa */
-    --c-info-ink: 147 197 253; /* #93c5fd */
-    --c-info-soft: 21 32 47; /* #15202f */
-    --c-chart-1: 139 92 246; /* #8b5cf6 */
-    --c-chart-2: 167 139 250; /* #a78bfa */
-    --c-chart-3: 196 181 253; /* #c4b5fd */
+    --c-danger-soft: 50 22 22; /* #321616 */
+    --c-info: 120 170 230; /* #78aae6 */
+    --c-info-ink: 164 198 240; /* #a4c6f0 */
+    --c-info-soft: 22 34 52; /* #162234 */
+    --c-chart-1: 47 127 139; /* #2f7f8b */
+    --c-chart-2: 79 179 193; /* #4fb3c1 */
+    --c-chart-3: 143 217 227; /* #8fd9e3 */
     --c-dept-df2: 139 127 224; /* #8b7fe0 */
   }
 
@@ -77,7 +77,6 @@
     @apply bg-paper text-ink font-sans antialiased;
     font-size: 16px;
     line-height: 1.6;
-    font-feature-settings: 'cv05' 1, 'cv08' 1, 'ss01' 1;
   }
 
   h1,
@@ -108,11 +107,19 @@
     font-variant-numeric: tabular-nums;
   }
 
-  /* PO numbers, phones, money, counts: monospace, digits aligned. */
+  /* PO numbers, phones, money, counts: the body face with aligned digits */
   .num,
   .tnum {
-    font-family: theme('fontFamily.mono');
     font-variant-numeric: tabular-nums;
+  }
+
+  /* Order numbers, box counts, boat names, headline figures: the cargo-label face */
+  .figure {
+    font-family: theme('fontFamily.display');
+    font-variant-numeric: tabular-nums;
+    font-weight: 600;
+    letter-spacing: 0;
+    line-height: 1.1;
   }
 
   input,
@@ -230,6 +237,29 @@
 
   .muted {
     @apply text-sm text-ink-soft;
+  }
+
+  /* A row of "ต้องทำก่อนเรือออก": an orange edge until it is done, green once it is */
+  .todo-row {
+    @apply border-t border-line px-4 py-3 text-sm;
+    box-shadow: inset 4px 0 0 rgb(var(--c-warn));
+  }
+  .todo-row.todo-done {
+    box-shadow: inset 4px 0 0 rgb(var(--c-ok));
+  }
+
+  /* the box sticker: total large, then paper / foam / piece */
+  .box-label {
+    @apply inline-flex w-fit items-center gap-2 rounded-md border border-ink/70 bg-surface px-2 py-0.5 text-xs;
+  }
+  .box-label .figure {
+    @apply text-base;
+  }
+  .box-label-lg {
+    @apply gap-3 border-2 px-3 py-1.5 text-sm;
+  }
+  .box-label-lg .figure {
+    @apply text-[1.75rem];
   }
 
   .card {
@@ -372,7 +402,7 @@
   }
 
   .data-table thead th {
-    @apply whitespace-nowrap border-b border-line bg-surface px-3 py-2.5 text-left font-mono text-[11px] font-medium uppercase tracking-wider text-ink-soft;
+    @apply whitespace-nowrap border-b border-line bg-surface px-3 py-2.5 text-left text-xs font-semibold text-ink-soft;
   }
 
   .data-table tbody td {
@@ -435,6 +465,18 @@
     .stack-table tbody td.stack-lead {
       @apply w-auto flex-1 justify-start text-left font-semibold;
       order: -1;
+    }
+
+    /* the customer is the card's title on a phone; the order number sits under it, small */
+    .stack-table tbody td.stack-title {
+      @apply w-full justify-start text-left text-base font-semibold;
+      order: -3;
+    }
+    .stack-table tbody td.stack-title::before {
+      display: none;
+    }
+    .stack-table tbody tr:has(td.stack-title) td.stack-lead {
+      @apply text-sm font-normal;
     }
 
     .stack-table tbody tr:last-child {
@@ -569,32 +611,32 @@
   /* Paper is always light: a sticker printed from dark mode matches light mode. */
   html[data-theme='dark'] {
     color-scheme: light;
-    --c-paper: 251 251 250; /* #fbfbfa */
+    --c-paper: 238 244 244; /* #eef4f4: sea mist */
     --c-surface: 255 255 255; /* #ffffff */
     --c-on: 255 255 255; /* #ffffff */
-    --c-ink: 23 23 23; /* #171717 */
-    --c-ink-soft: 106 106 106; /* #6a6a6a */
-    --c-ink-faint: 163 163 163; /* #a3a3a3 */
-    --c-line: 235 235 234; /* #ebebea */
-    --c-line-strong: 220 220 218; /* #dcdcda */
-    --c-brand: 154 106 28; /* #9a6a1c */
-    --c-brand-ink: 124 82 20; /* #7c5214 */
-    --c-brand-soft: 246 239 225; /* #f6efe1 */
-    --c-ok: 21 128 61; /* #15803d */
-    --c-ok-ink: 22 101 52; /* #166534 */
-    --c-ok-soft: 240 253 244; /* #f0fdf4 */
-    --c-warn: 180 83 9; /* #b45309 */
-    --c-warn-ink: 154 52 18; /* #9a3412 */
-    --c-warn-soft: 255 251 235; /* #fffbeb */
-    --c-danger: 185 28 28; /* #b91c1c */
-    --c-danger-ink: 153 27 27; /* #991b1b */
-    --c-danger-soft: 254 242 242; /* #fef2f2 */
-    --c-info: 29 78 216; /* #1d4ed8 */
-    --c-info-ink: 30 64 175; /* #1e40af */
-    --c-info-soft: 239 246 255; /* #eff6ff */
-    --c-chart-1: 139 92 246; /* #8b5cf6 */
-    --c-chart-2: 109 40 217; /* #6d28d9 */
-    --c-chart-3: 76 29 149; /* #4c1d95 */
+    --c-ink: 16 38 43; /* #10262b: deep water */
+    --c-ink-soft: 74 96 102; /* #4a6066: 6.6:1 on white */
+    --c-ink-faint: 110 130 136; /* #6e8288: 4:1 on white */
+    --c-line: 220 230 231; /* #dce6e7 */
+    --c-line-strong: 196 211 213; /* #c4d3d5 */
+    --c-brand: 14 94 111; /* #0e5e6f: Andaman sea */
+    --c-brand-ink: 10 72 86; /* #0a4856 */
+    --c-brand-soft: 225 239 241; /* #e1eff1 */
+    --c-ok: 31 122 77; /* #1f7a4d: on the boat */
+    --c-ok-ink: 21 94 58; /* #155e3a */
+    --c-ok-soft: 228 244 235; /* #e4f4eb */
+    --c-warn: 196 84 26; /* #c4541a: life-buoy orange, before the boat leaves */
+    --c-warn-ink: 140 52 12; /* #8c340c */
+    --c-warn-soft: 253 238 227; /* #fdeee3 */
+    --c-danger: 180 35 24; /* #b42318 */
+    --c-danger-ink: 140 24 16; /* #8c1810 */
+    --c-danger-soft: 253 236 234; /* #fdecea */
+    --c-info: 37 99 160; /* #2563a0 */
+    --c-info-ink: 26 74 122; /* #1a4a7a */
+    --c-info-soft: 232 241 249; /* #e8f1f9 */
+    --c-chart-1: 124 195 204; /* #7cc3cc */
+    --c-chart-2: 47 143 157; /* #2f8f9d */
+    --c-chart-3: 14 94 111; /* #0e5e6f */
     --c-dept-df2: 74 58 167; /* #4a3aa7 */
   }
 
