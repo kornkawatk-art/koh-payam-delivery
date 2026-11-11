@@ -113,7 +113,7 @@
     font-variant-numeric: tabular-nums;
   }
 
-  /* Order numbers, box counts, boat names, headline figures: the cargo-label face */
+  /* Order numbers, box counts, boat names, headline figures: the body face, semibold, aligned digits */
   .figure {
     font-family: theme('fontFamily.display');
     font-variant-numeric: tabular-nums;

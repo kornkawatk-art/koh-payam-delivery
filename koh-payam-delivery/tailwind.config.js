@@ -4,8 +4,8 @@ export default {
   theme: {
     extend: {
       fontFamily: {
-        // order numbers, box counts, boat names and headline figures (.figure): a cargo-label face
-        display: ['"Chakra Petch"', '"IBM Plex Sans Thai"', 'system-ui', 'sans-serif'],
+        // order numbers, box counts, boat names and headline figures (.figure): the body face, bolder
+        display: ['"IBM Plex Sans Thai"', 'system-ui', 'sans-serif'],
         // phones and codes that must not be misread (0 / O); Thai inside falls back to Plex
         mono: ['"IBM Plex Mono"', '"IBM Plex Sans Thai"', 'ui-monospace', 'monospace'],
         sans: [
