@@ -133,34 +133,19 @@ function OrderPageStub() {
   return <div>order detail page {id}</div>
 }
 
-test('summarises status progress for the day as icon-labeled count tiles', async () => {
+test('the day\'s route: the total on top, then one cell per stop with done/total, a bar and what is left', async () => {
   renderPage()
-  // "3/3" only ever appears in the packed-count chip -- unambiguous.
-  const packedCount = await screen.findByText('3/3')
-  const packedChip = packedCount.parentElement! // the tile wrapping the icon/label/count
-  expect(packedChip.textContent).toContain('แพ็คแล้ว')
-  // "ถึงท่าเรือ"/"ส่งแล้ว" also label status badges in the table below, so
-  // scope to the chip row specifically (the packed chip's own parent) rather
-  // than asserting a page-wide unique match.
-  const chipRow = packedChip.parentElement!
-  expect(within(chipRow).getByText('ถึงท่าเรือ')).toBeInTheDocument()
-  expect(within(chipRow).getByText('ส่งแล้ว')).toBeInTheDocument()
-  expect(within(chipRow).getByText('ออเดอร์ทั้งหมด')).toBeInTheDocument()
-  // ถึงท่าเรือ / ส่งแล้ว get the same X/total + bar (fixture: 3 POs, 1 shipped,
-  // and a shipped PO has necessarily passed the pier too).
-  expect(within(chipRow).getByRole('progressbar', { name: 'ความคืบหน้าถึงท่าเรือ' })).toHaveAttribute(
-    'aria-valuenow',
-    '1',
-  )
-  expect(within(chipRow).getByRole('progressbar', { name: 'ความคืบหน้าการส่ง' })).toHaveAttribute(
-    'aria-valuemax',
-    '3',
-  )
-  expect(within(chipRow).getAllByText('1/3')).toHaveLength(2)
-  expect(within(chipRow).getByRole('progressbar', { name: 'ความคืบหน้าการแพ็ค' })).toHaveAttribute(
-    'aria-valuenow',
-    '3',
-  )
+  const route = await screen.findByRole('region', { name: 'ขั้นตอนวันนี้' })
+  // the total heads the card (fixture: 3 POs, all packed, 1 at the pier and shipped)
+  expect(await within(route).findByText('ออเดอร์ทั้งหมด')).toBeInTheDocument()
+  const stops = within(route).getAllByRole('listitem')
+  expect(stops.map((s) => s.textContent)).toEqual(['แพ็คแล้ว3/3ครบแล้ว', 'ถึงท่าเรือ1/3เหลือ 2', 'ส่งแล้ว1/3เหลือ 2'])
+  // a stop every order passed turns green
+  expect(stops[0]).toHaveClass('bg-ok-soft')
+  expect(stops[1]).not.toHaveClass('bg-ok-soft')
+  expect(within(route).getByRole('progressbar', { name: 'ความคืบหน้าการแพ็ค' })).toHaveAttribute('aria-valuenow', '3')
+  expect(within(route).getByRole('progressbar', { name: 'ความคืบหน้าถึงท่าเรือ' })).toHaveAttribute('aria-valuenow', '1')
+  expect(within(route).getByRole('progressbar', { name: 'ความคืบหน้าการส่ง' })).toHaveAttribute('aria-valuemax', '3')
 })
 
 test('search filters rows client-side by customer name', async () => {
