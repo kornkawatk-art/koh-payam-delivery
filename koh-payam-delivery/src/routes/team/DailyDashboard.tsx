@@ -314,19 +314,21 @@ export default function DailyDashboard() {
 
       {isManager && <LastImportNote />}
 
-      <section aria-label="ขั้นตอนวันนี้" className="card p-4">
-        <ol className="grid grid-cols-4 gap-2">
-          <li className="relative flex flex-col gap-1">
-            <span className="flex items-center gap-1.5 text-xs font-medium text-ink-soft">
-              <ListBullets size={14} aria-hidden="true" />
-              ออเดอร์ทั้งหมด
-            </span>
-            <span className="figure text-[1.75rem] text-ink">{counts.total}</span>
-            <span className="mt-1 h-1.5 rounded-full bg-brand" aria-hidden="true" />
-          </li>
-          <RouteStop icon={<Package size={14} aria-hidden="true" />} label="แพ็คแล้ว" progressLabel="ความคืบหน้าการแพ็ค" done={counts.packed} total={counts.total} />
-          <RouteStop icon={<MapPin size={14} aria-hidden="true" />} label="ถึงท่าเรือ" progressLabel="ความคืบหน้าถึงท่าเรือ" done={counts.atPier} total={counts.total} />
-          <RouteStop icon={<Boat size={14} aria-hidden="true" />} label="ส่งแล้ว" progressLabel="ความคืบหน้าการส่ง" done={counts.shipped} total={counts.total} last />
+      <section aria-label="ขั้นตอนวันนี้" className="card overflow-hidden p-0">
+        <header className="flex items-center justify-between gap-3 border-b border-line px-4 py-2.5">
+          <span className="flex items-center gap-1.5 text-sm font-medium text-ink-soft">
+            <ListBullets size={16} aria-hidden="true" />
+            ออเดอร์ทั้งหมด
+          </span>
+          <span className="flex items-baseline gap-1">
+            <span className="figure text-2xl text-ink">{counts.total}</span>
+            <span className="text-sm text-ink-soft">ออเดอร์</span>
+          </span>
+        </header>
+        <ol className="grid grid-cols-3 divide-x divide-line">
+          <RouteStop icon={<Package size={16} aria-hidden="true" />} label="แพ็คแล้ว" progressLabel="ความคืบหน้าการแพ็ค" done={counts.packed} total={counts.total} />
+          <RouteStop icon={<MapPin size={16} aria-hidden="true" />} label="ถึงท่าเรือ" progressLabel="ความคืบหน้าถึงท่าเรือ" done={counts.atPier} total={counts.total} />
+          <RouteStop icon={<Boat size={16} aria-hidden="true" />} label="ส่งแล้ว" progressLabel="ความคืบหน้าการส่ง" done={counts.shipped} total={counts.total} />
         </ol>
       </section>
       <MakroPickSummary rows={rows} />
@@ -621,8 +623,9 @@ function GroupPickBadge({ orders }: { orders: any[] }) {
 }
 
 /**
- * One stop on the day's route (packed, at the pier, on the boat): done of all, a bar that fills as
- * the stop is reached, and a tick once every order is past it.
+ * One stop on the day's route (packed, at the pier, on the boat), in its own cell: done of all,
+ * a bar, and in words what is left. A stop every order has passed turns green and says ครบแล้ว;
+ * one still short says เหลือ N in orange, so the eye goes to where the day is stuck.
  */
 function RouteStop({
   icon,
@@ -630,27 +633,26 @@ function RouteStop({
   progressLabel,
   done,
   total,
-  last,
 }: {
   icon: ReactNode
   label: string
   progressLabel: string
   done: number
   total: number
-  last?: boolean
 }) {
   const complete = total > 0 && done === total
+  const left = Math.max(0, total - done)
   return (
-    <li className="relative flex flex-col gap-1">
-      <span className={'flex items-center gap-1.5 text-xs font-medium ' + (complete ? 'text-ok-ink' : 'text-ink-soft')}>
-        {complete ? <CheckCircle size={14} weight="fill" aria-hidden="true" /> : icon}
-        {label}
+    <li className={'flex min-w-0 flex-col gap-1 px-3 py-3 sm:px-4 ' + (complete ? 'bg-ok-soft' : '')}>
+      <span className={'flex items-center gap-1 text-xs font-semibold sm:text-sm ' + (complete ? 'text-ok-ink' : 'text-ink-soft')}>
+        {complete ? <CheckCircle size={16} weight="fill" aria-hidden="true" /> : icon}
+        <span className="truncate">{label}</span>
       </span>
-      <span className="figure text-[1.75rem] text-ink">
+      <span className={'figure whitespace-nowrap text-[1.375rem] sm:text-[1.75rem] ' + (complete ? 'text-ok-ink' : 'text-ink')}>
         {done}/{total}
       </span>
       <span
-        className="mt-1 h-1.5 overflow-hidden rounded-full bg-line"
+        className={'h-2 overflow-hidden rounded-full ' + (complete ? 'bg-ok/20' : 'bg-line')}
         role="progressbar"
         aria-label={progressLabel}
         aria-valuemin={0}
@@ -658,9 +660,12 @@ function RouteStop({
         aria-valuenow={done}
       >
         <span
-          className={`block h-full rounded-full transition-[width] duration-500 motion-reduce:transition-none ${last || complete ? 'bg-ok' : 'bg-brand'}`}
+          className={`block h-full rounded-full transition-[width] duration-500 motion-reduce:transition-none ${complete ? 'bg-ok' : 'bg-brand'}`}
           style={{ width: `${total ? (done / total) * 100 : 0}%` }}
         />
+      </span>
+      <span className={'text-xs font-medium ' + (complete ? 'text-ok-ink' : total === 0 ? 'text-ink-faint' : 'text-warn-ink')}>
+        {total === 0 ? 'ยังไม่มีออเดอร์' : complete ? 'ครบแล้ว' : `เหลือ ${left}`}
       </span>
     </li>
   )
