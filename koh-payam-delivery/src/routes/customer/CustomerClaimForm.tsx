@@ -219,6 +219,7 @@ export default function CustomerClaimForm({ token, items, lang, onDone }: Props)
         <PhotoCapture
           scope="claim"
           token={token}
+          lang={lang}
           max={5}
           onBusyChange={setPhotoBusy}
           onUploaded={(k) => setKeys((ks) => [...ks, k])}
