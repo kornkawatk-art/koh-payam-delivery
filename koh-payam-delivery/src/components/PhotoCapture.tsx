@@ -32,6 +32,44 @@ function withUploadTimeout<T>(work: Promise<T>, controller: AbortController): Pr
   })
 }
 
+/** The words on screen: the team app is Thai; the customer page passes its chosen language */
+const WORDS = {
+  th: {
+    noPick: 'ไม่ได้เลือกรูป กรุณาลองอีกครั้ง',
+    uploadFail: 'อัปโหลดรูปไม่สำเร็จ',
+    uploadSlow: 'อัปโหลดรูปไม่สำเร็จ (สัญญาณอินเทอร์เน็ตช้าหรือขาดหาย) กรุณาลองใหม่อีกครั้ง',
+    removeFail: 'ลบรูปไม่สำเร็จ',
+    openCamera: 'เปิดกล้อง',
+    orAttach: 'หรือแนบรูปจากเครื่อง (รูปที่ถ่ายไว้แล้ว):',
+    howTo: 'ถ่ายรูปด้วยกล้องมือถือก่อน แล้วกดปุ่มด้านล่างเพื่อแนบรูปที่ถ่ายไว้',
+    attach: 'แนบรูป',
+    count: (n: number, max?: number) => (max !== undefined ? `${n} / ${max} รูป` : `${n} รูป`),
+    uploading: 'กำลังอัปโหลดรูป กรุณารอสักครู่…',
+    uploaded: 'รูปที่อัปโหลด',
+    removeThis: 'ลบรูปนี้',
+    removeAsk: 'ลบรูปนี้?',
+    remove: 'ลบ',
+    cancel: 'ยกเลิก',
+  },
+  en: {
+    noPick: 'No photo was chosen. Please try again.',
+    uploadFail: 'Photo upload failed',
+    uploadSlow: 'Photo upload failed (the internet is slow or dropped). Please try again.',
+    removeFail: 'Could not remove the photo',
+    openCamera: 'Open camera',
+    orAttach: 'Or attach a photo you already took:',
+    howTo: "Take the photo with your phone's camera first, then tap the button below to attach it",
+    attach: 'Attach photos',
+    count: (n: number, max?: number) => (max !== undefined ? `${n} / ${max} photos` : `${n} photos`),
+    uploading: 'Uploading the photo, please wait…',
+    uploaded: 'Uploaded photo',
+    removeThis: 'Remove this photo',
+    removeAsk: 'Remove this photo?',
+    remove: 'Remove',
+    cancel: 'Cancel',
+  },
+}
+
 type Props = {
   scope: 'evidence' | 'claim'
   orderId?: string
@@ -71,6 +109,8 @@ type Props = {
    * mid-upload.
    */
   onBusyChange?: (busy: boolean) => void
+  /** The language of the words on screen (the customer page's EN/ไทย switch). Default Thai. */
+  lang?: 'th' | 'en'
 }
 
 /**
@@ -108,7 +148,9 @@ export default function PhotoCapture({
   max,
   stage = 'handoff',
   onBusyChange,
+  lang = 'th',
 }: Props) {
+  const w = WORDS[lang]
   const [keys, setKeys] = useState<string[]>(() => initialPhotos?.map((p) => p.key) ?? [])
   const [thumbs, setThumbs] = useState<string[]>(() => initialPhotos?.map((p) => p.url) ?? [])
   const [busy, setBusy] = useState(false)
@@ -149,7 +191,7 @@ export default function PhotoCapture({
     // is broken. If the browser handed back no file at all — a cancelled
     // picker — say so instead of quietly no-op'ing.
     if (picked.length === 0) {
-      setErr('ไม่ได้เลือกรูป กรุณาลองอีกครั้ง')
+      setErr(w.noPick)
       return
     }
     await uploadFiles(picked)
@@ -183,7 +225,7 @@ export default function PhotoCapture({
               headers: { 'content-type': contentType },
               signal: controller.signal,
             })
-            if (!put.ok) throw new Error('อัปโหลดรูปไม่สำเร็จ (' + put.status + ')')
+            if (!put.ok) throw new Error(w.uploadFail + ' (' + put.status + ')')
             doneKeys.push(key)
             doneThumbs.push(URL.createObjectURL(blob))
             onUploaded(key)
@@ -193,9 +235,9 @@ export default function PhotoCapture({
       }
     } catch (e2) {
       if (e2 instanceof UploadTimeoutError) {
-        setErr('อัปโหลดรูปไม่สำเร็จ (สัญญาณอินเทอร์เน็ตช้าหรือขาดหาย) กรุณาลองใหม่อีกครั้ง')
+        setErr(w.uploadSlow)
       } else {
-        setErr((e2 as Error).message || 'อัปโหลดรูปไม่สำเร็จ')
+        setErr((e2 as Error).message || w.uploadFail)
       }
     } finally {
       if (doneKeys.length) {
@@ -223,7 +265,7 @@ export default function PhotoCapture({
     } catch (e) {
       setKeys((k) => [...k.slice(0, i), key, ...k.slice(i)])
       setThumbs((t) => [...t.slice(0, i), removedThumb, ...t.slice(i)])
-      setErr((e as Error).message || 'ลบรูปไม่สำเร็จ')
+      setErr((e as Error).message || w.removeFail)
     } finally {
       setRemovingKey(null)
     }
@@ -239,13 +281,13 @@ export default function PhotoCapture({
           disabled={atMax || busy}
         >
           <Camera size={18} weight="bold" aria-hidden="true" />
-          เปิดกล้อง
+          {w.openCamera}
         </button>
       )}
       <p className="text-xs text-ink-faint">
         {camera
-          ? 'หรือแนบรูปจากเครื่อง (รูปที่ถ่ายไว้แล้ว):'
-          : 'ถ่ายรูปด้วยกล้องมือถือก่อน แล้วกดปุ่มด้านล่างเพื่อแนบรูปที่ถ่ายไว้'}
+          ? w.orAttach
+          : w.howTo}
       </p>
       <input
         key={inputGen}
@@ -254,10 +296,10 @@ export default function PhotoCapture({
         multiple
         disabled={atMax || busy}
         onChange={onPick}
-        aria-label="แนบรูป"
+        aria-label={w.attach}
       />
       <p className="text-sm text-ink-soft">
-        {capped ? `${keys.length} / ${max} รูป` : `${keys.length} รูป`}
+        {w.count(keys.length, capped ? max : undefined)}
       </p>
       {busy && (
         <p className="flex items-center gap-1.5 text-sm font-medium text-brand-ink">
@@ -275,7 +317,7 @@ export default function PhotoCapture({
               strokeLinecap="round"
             />
           </svg>
-          กำลังอัปโหลดรูป กรุณารอสักครู่…
+          {w.uploading}
         </p>
       )}
       {err && <p className="text-sm text-danger-ink">{err}</p>}
@@ -289,13 +331,13 @@ export default function PhotoCapture({
               <div className="relative">
                 <img
                   src={src}
-                  alt="รูปที่อัปโหลด"
+                  alt={w.uploaded}
                   className="h-20 w-20 rounded-lg border border-line object-cover"
                 />
                 {!confirming && (
                   <button
                     type="button"
-                    aria-label="ลบรูปนี้"
+                    aria-label={w.removeThis}
                     disabled={removing}
                     onClick={() => setConfirmingKey(key)}
                     className="absolute -right-1.5 -top-1.5 flex h-7 w-7 items-center justify-center rounded-full border border-line bg-surface text-danger-ink shadow-card transition-colors hover:bg-danger-soft disabled:opacity-50"
@@ -313,21 +355,21 @@ export default function PhotoCapture({
               </div>
               {confirming && (
                 <div className="flex flex-col items-center gap-1 text-xs">
-                  <span className="font-medium text-danger-ink">ลบรูปนี้?</span>
+                  <span className="font-medium text-danger-ink">{w.removeAsk}</span>
                   <div className="flex gap-1">
                     <button
                       type="button"
                       onClick={() => confirmRemove(key)}
                       className="btn btn-danger btn-sm !min-h-0 !py-1 !px-2 !text-xs"
                     >
-                      ลบ
+                      {w.remove}
                     </button>
                     <button
                       type="button"
                       onClick={() => setConfirmingKey(null)}
                       className="btn btn-secondary btn-sm !min-h-0 !py-1 !px-2 !text-xs"
                     >
-                      ยกเลิก
+                      {w.cancel}
                     </button>
                   </div>
                 </div>
