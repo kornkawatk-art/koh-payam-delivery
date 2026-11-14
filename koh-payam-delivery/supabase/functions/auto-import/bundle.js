@@ -665,7 +665,10 @@ async function autoImport(detailRows, orderRows, today) {
       orders.map((o) => o.makroOrderNo),
       shipDate
     );
-    const c = await commitImport(shipDate, orders, voided, [], { keepPaidMark: true });
+    const movable = movableNos(others, shipDate);
+    const atPier = new Set(others.filter((o) => o.status === "at_pier").map((o) => o.makro_order_no));
+    const move = [...movable].filter((no) => !atPier.has(no));
+    const c = await commitImport(shipDate, orders, voided, move, { keepPaidMark: true });
     voidedDropped.push(...c.dropped);
     voided = [];
     days.push({
@@ -674,7 +677,8 @@ async function autoImport(detailRows, orderRows, today) {
       created: c.created,
       synced: c.synced,
       skipped: c.skipped.length,
-      postponed: [...movableNos(others, shipDate)]
+      moved: c.moved,
+      postponed: [...movable].filter((no) => atPier.has(no))
     });
   }
   if (days.length === 0) await recordImport(0, 0);

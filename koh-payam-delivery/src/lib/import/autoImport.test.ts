@@ -77,11 +77,28 @@ test('city orders are left out', async () => {
   expect(r.notIsland).toBe(1)
 })
 
-test('postponed orders still on an earlier day are reported for a manager to tick, not moved', async () => {
-  listOrdersOnOtherDays.mockResolvedValue([{ id: 'o1', makro_order_no: 'P2', ship_date: '2026-10-28', status: 'packed' }])
+test('a PO Makro postponed to this day moves here by itself when it has not reached the pier', async () => {
+  listOrdersOnOtherDays.mockResolvedValue([{ id: 'o1', makro_order_no: 'P2', ship_date: '2026-10-28', status: 'imported' }])
+  commitImport.mockResolvedValue({ created: 0, synced: 0, moved: 1, skipped: [], refreshed: 0, dropped: [], flagged: [] })
+  const r = await autoImport([item('P2')], [order('P2', '29-Oct-2026')], TODAY)
+  expect(commitImport.mock.calls[0][3]).toEqual(['P2'])
+  expect(r.days[0]).toMatchObject({ moved: 1, postponed: [] })
+})
+
+test('a postponed PO already at the pier stays for a manager to decide, and is reported', async () => {
+  listOrdersOnOtherDays.mockResolvedValue([{ id: 'o1', makro_order_no: 'P2', ship_date: '2026-10-28', status: 'at_pier' }])
   const r = await autoImport([item('P2')], [order('P2', '29-Oct-2026')], TODAY)
   expect(commitImport.mock.calls[0][3]).toEqual([])
   expect(r.days[0].postponed).toEqual(['P2'])
+})
+
+test('a PO that already went out on an earlier day, or one the team postponed to a later day, never moves', async () => {
+  listOrdersOnOtherDays.mockResolvedValue([
+    { id: 'o1', makro_order_no: 'P2', ship_date: '2026-10-28', status: 'shipped' },
+    { id: 'o2', makro_order_no: 'P3', ship_date: '2026-11-02', status: 'packed' },
+  ])
+  await autoImport(['P2', 'P3'].map(item), [order('P2', '29-Oct-2026'), order('P3', '29-Oct-2026')], TODAY)
+  expect(commitImport.mock.calls[0][3]).toEqual([])
 })
 
 test('a run with nothing for today or tomorrow still notes the import, so it does not read as late', async () => {
