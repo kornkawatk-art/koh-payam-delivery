@@ -21,6 +21,10 @@ test('isUnpaidBill: only unpaid cash-on-delivery bills with money owing', () => 
   expect(isUnpaidBill(bill({ payment_status: 'Paid' }))).toBe(false)
   expect(isUnpaidBill(bill({ outstanding_amount: 0 }))).toBe(false)
   expect(isUnpaidBill(bill({ payment_method: 'Credit Sales' }))).toBe(false)
+  // Makro's short codes since Nov 2026
+  expect(isUnpaidBill(bill({ payment_method: 'POD' }))).toBe(true)
+  expect(isUnpaidBill(bill({ payment_method: 'CreditSales' }))).toBe(false)
+  expect(isUnpaidBill(bill({ payment_method: 'CC_PreAuth' }))).toBe(false)
   expect(isUnpaidBill(bill({ paid_marked_at: '2026-10-09T00:00:00Z' }))).toBe(false)
   expect(isUnpaidBill(bill({ is_pickup: true }))).toBe(false)
   expect(isUnpaidBill(bill({ makro_order_status: 'Canceled' }))).toBe(false)

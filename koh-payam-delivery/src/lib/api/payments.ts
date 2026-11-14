@@ -26,7 +26,8 @@ const billQuery = () =>
   supabase
     .from('orders')
     .select(BILL_COLS)
-    .ilike('payment_method', '%pay on delivery%')
+    // both Makro spellings (isCod): "Pay On Delivery", and "POD" since Nov 2026
+    .or('payment_method.ilike.*pay*on*delivery*,payment_method.ilike.pod')
     .gt('outstanding_amount', 0)
     .is('paid_marked_at', null)
     .eq('is_pickup', false)
