@@ -3,7 +3,9 @@ import type { RawRow } from './parseMakroFile'
 
 const commitImport = vi.fn()
 const listOrdersOnOtherDays = vi.fn()
+const applyVoided = vi.fn()
 vi.mock('../api/orders', () => ({
+  applyVoided: (...a: unknown[]) => applyVoided(...a),
   commitImport: (...a: unknown[]) => commitImport(...a),
   listOrdersOnOtherDays: (...a: unknown[]) => listOrdersOnOtherDays(...a),
 }))
@@ -40,7 +42,8 @@ const order = (no: string, date: string, o: Partial<RawRow> = {}): RawRow => ({
 })
 
 beforeEach(() => {
-  commitImport.mockReset().mockResolvedValue({ created: 1, synced: 0, moved: 0, skipped: [], refreshed: 0 })
+  commitImport.mockReset().mockResolvedValue({ created: 1, synced: 0, moved: 0, skipped: [], refreshed: 0, dropped: [], flagged: [] })
+  applyVoided.mockReset().mockResolvedValue({ dropped: [], flagged: [] })
   listOrdersOnOtherDays.mockReset().mockResolvedValue([])
   recordImport.mockReset()
   refreshPayments.mockReset().mockResolvedValue({ refreshed: 1, notInApp: [] })
@@ -126,4 +129,20 @@ test("a PO sale named in O2O Desk is imported for its day as a Myanmar-bound ord
   await autoImport([item('M1')], [order('M1', '29-Oct-2026', { 'Sub District': 'บางริ้น', 'Shipping Address': 'ระนอง' })], TODAY)
   expect(commitImport.mock.calls[0][1]).toEqual([expect.objectContaining({ makroOrderNo: 'M1', island: 'myanmar', boxLabel: 'ครูวิทย์' })])
   boxLabels = new Map()
+})
+
+test('POs Makro canceled are cleared out even when no day had anything to import', async () => {
+  applyVoided.mockResolvedValue({ dropped: ['P9'], flagged: [] })
+  const r = await autoImport([item('P9')], [order('P9', '29-Oct-2026', { 'Order Status': 'Canceled' })], TODAY)
+  expect(commitImport).not.toHaveBeenCalled()
+  expect(applyVoided).toHaveBeenCalledWith([{ makroOrderNo: 'P9', status: 'Canceled' }])
+  expect(r.voidedDropped).toEqual(['P9'])
+})
+
+test('canceled POs go along with the first day imported, and are not cleared twice', async () => {
+  commitImport.mockResolvedValue({ created: 1, synced: 0, moved: 0, skipped: [], refreshed: 0, dropped: ['P9'], flagged: [] })
+  const r = await autoImport(['P2', 'P9'].map(item), [order('P2', '29-Oct-2026'), order('P9', '29-Oct-2026', { 'Order Status': 'Canceled' })], TODAY)
+  expect(commitImport.mock.calls[0][2]).toEqual([{ makroOrderNo: 'P9', status: 'Canceled' }])
+  expect(applyVoided).not.toHaveBeenCalled()
+  expect(r.voidedDropped).toEqual(['P9'])
 })

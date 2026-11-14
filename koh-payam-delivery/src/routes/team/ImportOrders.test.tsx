@@ -70,7 +70,7 @@ beforeEach(() => {
   localStorage.clear()
   parseMakroFile.mockReset()
   buildImportMock.mockReset().mockReturnValue(baseResult)
-  commitImport.mockReset().mockResolvedValue({ created: 1, synced: 0, skipped: [] })
+  commitImport.mockReset().mockResolvedValue({ created: 1, synced: 0, skipped: [], dropped: [], flagged: [] })
   listOrdersOnOtherDays.mockReset().mockResolvedValue([])
 })
 
@@ -122,7 +122,7 @@ test('preview surfaces the shippedAllZero warning', async () => {
 })
 
 test('import calls commitImport(shipDate, orders) and reports created/synced', async () => {
-  commitImport.mockResolvedValue({ created: 3, synced: 2, skipped: [] })
+  commitImport.mockResolvedValue({ created: 3, synced: 2, skipped: [], dropped: [], flagged: [] })
   await uploadBoth()
   await userEvent.click(await screen.findByRole('button', { name: /ดูตัวอย่าง/i }))
   await userEvent.click(await screen.findByRole('button', { name: /นำเข้า 1 ออเดอร์/i }))

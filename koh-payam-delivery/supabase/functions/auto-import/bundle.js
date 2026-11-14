@@ -599,10 +599,7 @@ async function commitImport(shipDate, incoming, voided = [], move = [], payment 
       synced++;
     }
   }
-  for (const v of voided) {
-    const { error: eV } = await supabase.from("orders").update({ makro_order_status: v.status }).eq("makro_order_no", v.makroOrderNo);
-    if (eV) throw new Error(`\u0E2D\u0E31\u0E1B\u0E40\u0E14\u0E15\u0E2A\u0E16\u0E32\u0E19\u0E30\u0E41\u0E21\u0E47\u0E04\u0E42\u0E04\u0E23\u0E02\u0E2D\u0E07 ${v.makroOrderNo} \u0E44\u0E21\u0E48\u0E2A\u0E33\u0E40\u0E23\u0E47\u0E08: ${eV.message}`);
-  }
+  const { dropped, flagged } = await applyVoided(voided);
   await linkBackordersToDay(shipDate);
   await logAction("import", "ship_day", day.id, {
     shipDate,
@@ -615,7 +612,25 @@ async function commitImport(shipDate, incoming, voided = [], move = [], payment 
     incoming.length,
     incoming.reduce((n, o) => n + o.items.length, 0)
   );
-  return { created, synced, moved, skipped, refreshed };
+  return { created, synced, moved, skipped, refreshed, dropped, flagged };
+}
+async function applyVoided(voided) {
+  if (voided.length === 0) return { dropped: [], flagged: [] };
+  const { data, error } = await supabase.rpc("drop_voided_orders", {
+    p_nos: voided.map((v) => v.makroOrderNo),
+    p_statuses: voided.map((v) => v.status)
+  });
+  const missing = error && (error.code === "PGRST202" || /drop_voided_orders/.test(error.message ?? ""));
+  if (error && !missing) throw new Error("\u0E25\u0E1A\u0E2D\u0E2D\u0E40\u0E14\u0E2D\u0E23\u0E4C\u0E17\u0E35\u0E48\u0E41\u0E21\u0E47\u0E04\u0E42\u0E04\u0E23\u0E22\u0E01\u0E40\u0E25\u0E34\u0E01\u0E44\u0E21\u0E48\u0E2A\u0E33\u0E40\u0E23\u0E47\u0E08: " + error.message);
+  const dropped = new Set(error ? [] : data ?? []);
+  const flagged = [];
+  for (const v of voided) {
+    if (dropped.has(v.makroOrderNo)) continue;
+    const { data: hit, error: eV } = await supabase.from("orders").update({ makro_order_status: v.status }).eq("makro_order_no", v.makroOrderNo).select("id");
+    if (eV) throw new Error(`\u0E2D\u0E31\u0E1B\u0E40\u0E14\u0E15\u0E2A\u0E16\u0E32\u0E19\u0E30\u0E41\u0E21\u0E47\u0E04\u0E42\u0E04\u0E23\u0E02\u0E2D\u0E07 ${v.makroOrderNo} \u0E44\u0E21\u0E48\u0E2A\u0E33\u0E40\u0E23\u0E47\u0E08: ${eV.message}`);
+    if (hit && hit.length > 0) flagged.push(v.makroOrderNo);
+  }
+  return { dropped: [...dropped], flagged };
 }
 
 // src/lib/api/boxLabels.ts
@@ -642,6 +657,7 @@ async function autoImport(detailRows, orderRows, today) {
   const deliveryDate = (o) => moved.get(o.makroOrderNo) ?? o.expectedDate;
   const days = [];
   let voided = r.skippedVoid ?? [];
+  const voidedDropped = [];
   for (const shipDate of [today, nextDayISO(today)]) {
     const orders = r.orders.filter((o) => deliveryDate(o) === shipDate);
     if (orders.length === 0) continue;
@@ -650,6 +666,7 @@ async function autoImport(detailRows, orderRows, today) {
       shipDate
     );
     const c = await commitImport(shipDate, orders, voided, [], { keepPaidMark: true });
+    voidedDropped.push(...c.dropped);
     voided = [];
     days.push({
       shipDate,
@@ -661,10 +678,11 @@ async function autoImport(detailRows, orderRows, today) {
     });
   }
   if (days.length === 0) await recordImport(0, 0);
+  if (voided.length) voidedDropped.push(...(await applyVoided(voided)).dropped);
   const imported = new Set(r.orders.filter((o) => [today, nextDayISO(today)].includes(deliveryDate(o) ?? "")).map((o) => o.makroOrderNo));
   const rest = buildPaymentRefresh(orderRows, DEFAULT_ORDER_MAPPING).filter((p) => !imported.has(p.makroOrderNo));
   const { refreshed } = rest.length ? await refreshPayments(rest, { keepPaidMark: true }) : { refreshed: 0 };
-  return { days, notIsland: r.skippedNotIsland, paymentsRefreshed: refreshed };
+  return { days, notIsland: r.skippedNotIsland, paymentsRefreshed: refreshed, voidedDropped };
 }
 export {
   MOVED_DATE_COLUMN,
