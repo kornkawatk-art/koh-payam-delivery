@@ -5,7 +5,10 @@
 // - each order goes to its own delivery date -- Makro's moved date when it moved the delivery
 //   ("New Expected Delivery Date"), else the original one -- and only today's and tomorrow's are
 //   imported: the export spans 8 days, and earlier days are already done;
-// - postponed orders are never moved (that stays a manager's tick); they are only counted;
+// - a PO Makro postponed (it sits on an earlier day in the app, Makro now says this day) moves here
+//   by itself when it hasn't gone to the pier yet -- with its packing, photos, boxes and link, the same
+//   move as the manager's tick on the import screen; one already at the pier stays for a manager, and
+//   is only reported (postponed);
 // - every other order in the export (the earlier days) still gets Makro's latest payment facts, the same
 //   refresh as the "อัปเดตสถานะการจ่ายเงินอย่างเดียว" card: a bill paid after its delivery must stop
 //   locking the customer without anyone re-importing by hand;
@@ -26,7 +29,7 @@ import { refreshPayments } from '../api/paymentRefresh'
 import { listBoxLabelMap } from '../api/boxLabels'
 import { movableNos, nextDayISO } from '../postponed'
 
-export type AutoImportDay = { shipDate: string; orders: number; created: number; synced: number; skipped: number; postponed: string[] }
+export type AutoImportDay = { shipDate: string; orders: number; created: number; synced: number; skipped: number; moved: number; postponed: string[] }
 /** Makro's column for a delivery it moved to another day (blank when it did not) */
 export const MOVED_DATE_COLUMN = 'New Expected Delivery Date'
 
@@ -57,8 +60,12 @@ export async function autoImport(detailRows: RawRow[], orderRows: RawRow[], toda
       orders.map((o) => o.makroOrderNo),
       shipDate,
     )
+    // Makro moved these to this day; not yet at the pier -> follow Makro (at the pier: a manager decides)
+    const movable = movableNos(others, shipDate)
+    const atPier = new Set(others.filter((o) => o.status === 'at_pier').map((o) => o.makro_order_no))
+    const move = [...movable].filter((no) => !atPier.has(no))
     // void labels go on whatever day the PO sits; once is enough
-    const c = await commitImport(shipDate, orders, voided, [], { keepPaidMark: true })
+    const c = await commitImport(shipDate, orders, voided, move, { keepPaidMark: true })
     voidedDropped.push(...c.dropped)
     voided = []
     days.push({
@@ -67,7 +74,8 @@ export async function autoImport(detailRows: RawRow[], orderRows: RawRow[], toda
       created: c.created,
       synced: c.synced,
       skipped: c.skipped.length,
-      postponed: [...movableNos(others, shipDate)],
+      moved: c.moved,
+      postponed: [...movable].filter((no) => atPier.has(no)),
     })
   }
   // nothing island-bound today or tomorrow still counts as an up-to-date import
