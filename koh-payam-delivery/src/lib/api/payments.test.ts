@@ -39,6 +39,16 @@ vi.mock('../supabase', () => ({
           filters.push((r) => String(r[c] ?? '').toLowerCase().includes(needle))
           return b
         },
+        // PostgREST or(): "col.ilike.pattern,..." with * as the wildcard
+        or: (expr: string) => {
+          const alts = expr.split(',').map((a) => {
+            const [c, , pat] = a.split('.')
+            const re = new RegExp('^' + pat.split('*').map((x) => x.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('.*') + '$', 'i')
+            return (r: any) => re.test(String(r[c] ?? ''))
+          })
+          filters.push((r) => alts.some((f) => f(r)))
+          return b
+        },
         in: (c: string, vs: any[]) => (filters.push((r) => vs.includes(r[c])), b),
         order: () => b,
         range: (lo: number, hi: number) => {
@@ -147,6 +157,21 @@ test('listCustomerDebts groups unpaid bills per customer', async () => {
   const debts = await listCustomerDebts()
   expect(debts).toHaveLength(1)
   expect(debts[0]).toMatchObject({ name: 'JJ Payam', total: 600, oldestDays: 4, lockedToday: true })
+})
+
+test("listCustomerDebts: Makro's short code POD counts as cash on delivery; other codes don't", async () => {
+  db.orders = [
+    bill({ payment_method: 'POD' }),
+    bill({ id: 'q', customer_name_en: 'Paid By QR', customer_phone: '02', customer_phone_digits: '02', payment_method: 'QR_CODE' }),
+  ]
+  const debts = await listCustomerDebts()
+  expect(debts.map((d) => d.name)).toEqual(['JJ Payam'])
+})
+
+test('getCustomerLock: a POD bill from an earlier delivery locks the customer', async () => {
+  db.orders = [bill({ payment_method: 'POD' })]
+  db.payment_releases = []
+  expect((await getCustomerLock(JJ, '2026-10-12')).locked).toBe(true)
 })
 
 test('countLockedToday: locked, unreleased customers with an order today', async () => {

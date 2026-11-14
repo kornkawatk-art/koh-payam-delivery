@@ -19,7 +19,8 @@ export type Bill = {
   makro_order_status?: string | null
 }
 
-const isCod = (m: string | null | undefined) => /pay on delivery/i.test(m ?? '')
+// Makro wrote "Pay On Delivery" until Nov 2026, then switched to the short code "POD"
+export const isCod = (m: string | null | undefined) => /pay\s*on\s*delivery|^\s*pod\s*$/i.test(m ?? '')
 const isPaid = (s: string | null | undefined) => (s ?? '').trim().toLowerCase() === 'paid'
 
 export function isUnpaidBill(b: Bill): boolean {
