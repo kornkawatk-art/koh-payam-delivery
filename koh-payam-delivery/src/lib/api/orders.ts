@@ -55,8 +55,8 @@ export async function listOrdersOnOtherDays(
 // left at the pier goes back to packed.
 // Store pickups Makro marks "Picked up" arrive (or, on a re-import, become)
 // picked_up; `voided` -- POs Makro returned/canceled, which buildImport does
-// not import -- only has its Makro status recorded on POs already here, so
-// they carry a warning badge and can't board a boat.
+// not import -- go through applyVoided: removed from the app if nobody started
+// on them, otherwise badged and kept off the boats.
 export async function commitImport(
   shipDate: string,
   incoming: ParsedOrder[],
@@ -71,6 +71,9 @@ export async function commitImport(
   skipped: { makroOrderNo: string; shipDate: string }[]
   // POs on another day whose payment facts were refreshed (payment lock)
   refreshed: number
+  // POs Makro canceled/returned: removed from the app, or kept with the red badge (applyVoided)
+  dropped: string[]
+  flagged: string[]
 }> {
   const day = await getOrCreateShipDay(shipDate)
   const nos = incoming.map((o) => o.makroOrderNo)
@@ -223,15 +226,7 @@ export async function commitImport(
     }
   }
 
-  // Makro returned / canceled: not imported (buildImport skipped them), but a
-  // PO already here gets the status so it shows the warning and can't ship.
-  for (const v of voided) {
-    const { error: eV } = await supabase
-      .from('orders')
-      .update({ makro_order_status: v.status })
-      .eq('makro_order_no', v.makroOrderNo)
-    if (eV) throw new Error(`อัปเดตสถานะแม็คโครของ ${v.makroOrderNo} ไม่สำเร็จ: ${eV.message}`)
-  }
+  const { dropped, flagged } = await applyVoided(voided)
 
   await linkBackordersToDay(shipDate)
   await logAction('import', 'ship_day', day.id, {
@@ -245,7 +240,37 @@ export async function commitImport(
     incoming.length,
     incoming.reduce((n, o) => n + o.items.length, 0),
   )
-  return { created, synced, moved, skipped, refreshed }
+  return { created, synced, moved, skipped, refreshed, dropped, flagged }
+}
+
+// Makro returned / canceled: never imported (buildImport skips them). A PO already in the app
+// from before Makro canceled it is removed (drop_voided_orders, 0042) when nobody has started on
+// it yet -- still `imported`, no photos, boxes, claims or merged packing. One already started on
+// stays, with Makro's status recorded so it shows the red badge and can't board a boat.
+// Before 0042 is applied the RPC is missing: every PO just gets the badge, as before.
+export async function applyVoided(
+  voided: { makroOrderNo: string; status: string }[],
+): Promise<{ dropped: string[]; flagged: string[] }> {
+  if (voided.length === 0) return { dropped: [], flagged: [] }
+  const { data, error } = await supabase.rpc('drop_voided_orders', {
+    p_nos: voided.map((v) => v.makroOrderNo),
+    p_statuses: voided.map((v) => v.status),
+  })
+  const missing = error && (error.code === 'PGRST202' || /drop_voided_orders/.test(error.message ?? ''))
+  if (error && !missing) throw new Error('ลบออเดอร์ที่แม็คโครยกเลิกไม่สำเร็จ: ' + error.message)
+  const dropped = new Set<string>(error ? [] : ((data as string[] | null) ?? []))
+  const flagged: string[] = []
+  for (const v of voided) {
+    if (dropped.has(v.makroOrderNo)) continue
+    const { data: hit, error: eV } = await supabase
+      .from('orders')
+      .update({ makro_order_status: v.status })
+      .eq('makro_order_no', v.makroOrderNo)
+      .select('id')
+    if (eV) throw new Error(`อัปเดตสถานะแม็คโครของ ${v.makroOrderNo} ไม่สำเร็จ: ${eV.message}`)
+    if (hit && hit.length > 0) flagged.push(v.makroOrderNo)
+  }
+  return { dropped: [...dropped], flagged }
 }
 
 // Lookup by the Makro shipping-label QR code (plain text = makro_order_no).

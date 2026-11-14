@@ -20,7 +20,7 @@ import {
   DEFAULT_DETAIL_MAPPING,
   DEFAULT_ORDER_MAPPING,
 } from './buildImport'
-import { commitImport, listOrdersOnOtherDays } from '../api/orders'
+import { applyVoided, commitImport, listOrdersOnOtherDays } from '../api/orders'
 import { recordImport } from '../api/dataImports'
 import { refreshPayments } from '../api/paymentRefresh'
 import { listBoxLabelMap } from '../api/boxLabels'
@@ -30,7 +30,7 @@ export type AutoImportDay = { shipDate: string; orders: number; created: number;
 /** Makro's column for a delivery it moved to another day (blank when it did not) */
 export const MOVED_DATE_COLUMN = 'New Expected Delivery Date'
 
-export type AutoImportReport = { days: AutoImportDay[]; notIsland: number; paymentsRefreshed: number }
+export type AutoImportReport = { days: AutoImportDay[]; notIsland: number; paymentsRefreshed: number; voidedDropped: string[] }
 
 export async function autoImport(detailRows: RawRow[], orderRows: RawRow[], today: string): Promise<AutoImportReport> {
   const problems = [
@@ -49,6 +49,7 @@ export async function autoImport(detailRows: RawRow[], orderRows: RawRow[], toda
   const deliveryDate = (o: { makroOrderNo: string; expectedDate: string | null }) => moved.get(o.makroOrderNo) ?? o.expectedDate
   const days: AutoImportDay[] = []
   let voided = r.skippedVoid ?? []
+  const voidedDropped: string[] = []
   for (const shipDate of [today, nextDayISO(today)]) {
     const orders = r.orders.filter((o) => deliveryDate(o) === shipDate)
     if (orders.length === 0) continue
@@ -58,6 +59,7 @@ export async function autoImport(detailRows: RawRow[], orderRows: RawRow[], toda
     )
     // void labels go on whatever day the PO sits; once is enough
     const c = await commitImport(shipDate, orders, voided, [], { keepPaidMark: true })
+    voidedDropped.push(...c.dropped)
     voided = []
     days.push({
       shipDate,
@@ -70,10 +72,12 @@ export async function autoImport(detailRows: RawRow[], orderRows: RawRow[], toda
   }
   // nothing island-bound today or tomorrow still counts as an up-to-date import
   if (days.length === 0) await recordImport(0, 0)
+  // canceled POs still need clearing out even when no day was imported
+  if (voided.length) voidedDropped.push(...(await applyVoided(voided)).dropped)
 
   // the earlier (and later) days' POs already in the app: payment facts only (today's and tomorrow's were synced above)
   const imported = new Set(r.orders.filter((o) => [today, nextDayISO(today)].includes(deliveryDate(o) ?? '')).map((o) => o.makroOrderNo))
   const rest = buildPaymentRefresh(orderRows, DEFAULT_ORDER_MAPPING).filter((p) => !imported.has(p.makroOrderNo))
   const { refreshed } = rest.length ? await refreshPayments(rest, { keepPaidMark: true }) : { refreshed: 0 }
-  return { days, notIsland: r.skippedNotIsland, paymentsRefreshed: refreshed }
+  return { days, notIsland: r.skippedNotIsland, paymentsRefreshed: refreshed, voidedDropped }
 }

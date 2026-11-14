@@ -1,4 +1,5 @@
 import {
+  applyVoided,
   commitImport,
   listOrdersOnOtherDays,
   deleteOrder,
@@ -34,6 +35,8 @@ const state = {
   customerDayCalls: [] as any[],
   boatsData: [] as any[],
   boatsCalls: [] as any[],
+  rpcCalls: [] as any[],
+  rpcResult: { data: [] as any, error: null as null | { code?: string; message: string } },
 }
 
 vi.mock('../supabase', () => {
@@ -140,7 +143,15 @@ vi.mock('../supabase', () => {
     }
     return b
   }
-  return { supabase: { from: (t: string) => builder(t) } }
+  return {
+    supabase: {
+      from: (t: string) => builder(t),
+      rpc: (fn: string, args: unknown) => {
+        state.rpcCalls.push([fn, args])
+        return Promise.resolve(state.rpcResult)
+      },
+    },
+  }
 })
 
 vi.mock('./shipDays', () => ({
@@ -209,6 +220,8 @@ beforeEach(() => {
   state.customerDayCalls = []
   state.boatsData = []
   state.boatsCalls = []
+  state.rpcCalls = []
+  state.rpcResult = { data: [], error: null }
   logAction.mockClear()
   linkBackordersToDay.mockClear()
   syncShortageBackorders.mockClear()
@@ -216,7 +229,7 @@ beforeEach(() => {
 
 test('fresh import inserts orders + items and counts created', async () => {
   const r = await commitImport('2026-10-01', parsedOrders as any)
-  expect(r).toEqual({ created: 1, synced: 0, moved: 0, skipped: [], refreshed: 0 })
+  expect(r).toEqual({ created: 1, synced: 0, moved: 0, skipped: [], refreshed: 0, dropped: [], flagged: [] })
   const ordIns = state.inserted.find((i) => i.table === 'orders')
   expect(ordIns.rows).toMatchObject({
     makro_order_no: 'PO-1',
@@ -261,7 +274,7 @@ test('a finished import notes both Makro files for the "last imported" time', as
 test('re-import of an existing order syncs without touching protected columns', async () => {
   state.existing = [{ id: 'old1', makro_order_no: 'PO-1' }]
   const r = await commitImport('2026-10-01', parsedOrders as any)
-  expect(r).toEqual({ created: 0, synced: 1, moved: 0, skipped: [], refreshed: 0 })
+  expect(r).toEqual({ created: 0, synced: 1, moved: 0, skipped: [], refreshed: 0, dropped: [], flagged: [] })
 
   // orders row is not inserted again
   expect(state.inserted.some((i) => i.table === 'orders')).toBe(false)
@@ -531,6 +544,8 @@ test('a PO already imported on ANOTHER day is skipped: nothing is created, synce
     moved: 0,
     skipped: [{ makroOrderNo: 'PO-1', shipDate: '2026-09-19' }],
     refreshed: 0, // payment facts refresh is stubbed here (paymentRefresh.test)
+    dropped: [],
+    flagged: [],
   })
   expect(state.inserted.some((i) => i.table === 'orders' || i.table === 'order_items')).toBe(false)
   expect(state.updated.some((u) => u.table === 'orders')).toBe(false)
@@ -573,7 +588,7 @@ test('a PO that exists on THIS day (and also on another) still syncs in place --
   state.existing = [{ id: 'old1', makro_order_no: 'PO-1' }]
   state.elsewhere = [{ makro_order_no: 'PO-1', ship_date: '2026-09-19', status: 'shipped' }]
   const r = await commitImport('2026-10-01', parsedOrders as any)
-  expect(r).toEqual({ created: 0, synced: 1, moved: 0, skipped: [], refreshed: 0 })
+  expect(r).toEqual({ created: 0, synced: 1, moved: 0, skipped: [], refreshed: 0, dropped: [], flagged: [] })
 })
 
 test('in a mixed file only the already-imported POs are skipped; the new ones are created', async () => {
@@ -635,6 +650,39 @@ test('commitImport: a re-import never moves a shipped order back to picked_up', 
 test('commitImport: POs Makro returned / canceled get their Makro status recorded (for the warning badge)', async () => {
   await commitImport('2026-10-01', [], [{ makroOrderNo: 'PO-9', status: 'Returned' }])
   expect(orderUpdates()).toContainEqual({ makro_order_status: 'Returned' })
+})
+
+test('applyVoided: canceled POs nobody started on are removed; the rest keep the red badge', async () => {
+  state.rpcResult = { data: ['PO-8'], error: null }
+  const r = await applyVoided([
+    { makroOrderNo: 'PO-8', status: 'Canceled' },
+    { makroOrderNo: 'PO-9', status: 'Canceled' },
+  ])
+  expect(state.rpcCalls).toEqual([['drop_voided_orders', { p_nos: ['PO-8', 'PO-9'], p_statuses: ['Canceled', 'Canceled'] }]])
+  expect(orderUpdates()).toEqual([{ makro_order_status: 'Canceled' }]) // only PO-9
+  expect(r).toEqual({ dropped: ['PO-8'], flagged: ['PO-9'] })
+})
+
+test('applyVoided: a PO not in the app is neither dropped nor flagged', async () => {
+  state.updateData = []
+  const r = await applyVoided([{ makroOrderNo: 'PO-7', status: 'Canceled' }])
+  expect(r).toEqual({ dropped: [], flagged: [] })
+})
+
+test('applyVoided: before migration 0042 every PO just gets the badge, as before', async () => {
+  state.rpcResult = { data: null, error: { code: 'PGRST202', message: 'Could not find the function public.drop_voided_orders' } }
+  const r = await applyVoided([{ makroOrderNo: 'PO-9', status: 'Canceled' }])
+  expect(r).toEqual({ dropped: [], flagged: ['PO-9'] })
+})
+
+test('applyVoided: any other database error stops the import', async () => {
+  state.rpcResult = { data: null, error: { code: '42501', message: 'ไม่มีสิทธิ์' } }
+  await expect(applyVoided([{ makroOrderNo: 'PO-9', status: 'Canceled' }])).rejects.toThrow('ลบออเดอร์ที่แม็คโครยกเลิกไม่สำเร็จ')
+})
+
+test('applyVoided: nothing canceled, nothing called', async () => {
+  expect(await applyVoided([])).toEqual({ dropped: [], flagged: [] })
+  expect(state.rpcCalls).toEqual([])
 })
 
 test('markPickedUp closes an open store pickup and audits it', async () => {

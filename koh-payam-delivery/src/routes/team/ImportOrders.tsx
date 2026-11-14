@@ -169,7 +169,11 @@ export default function ImportOrders() {
         `นำเข้า ${r.created} ใหม่ · sync ${r.synced}` +
           (r.moved > 0 ? ` · ย้ายมาวันนี้ ${r.moved} (เลื่อนส่ง)` : '') +
           (r.skipped.length > 0 ? ` · ข้าม ${r.skipped.length} ที่เคยนำเข้าแล้ว` : '') +
-          (r.refreshed ? ` · อัปเดตการจ่ายเงิน ${r.refreshed}` : ''),
+          (r.refreshed ? ` · อัปเดตการจ่ายเงิน ${r.refreshed}` : '') +
+          (r.dropped.length > 0 ? ` · ลบออเดอร์ที่แม็คโครยกเลิก ${r.dropped.length} (${r.dropped.join(', ')})` : '') +
+          (r.flagged.length > 0
+            ? ` · เก็บไว้ ${r.flagged.length} ที่ยกเลิกแต่เริ่มแพ็กแล้ว ขึ้นป้ายแดง หัวหน้าลบเองได้ (${r.flagged.join(', ')})`
+            : ''),
       )
     } catch (e) {
       setError((e as Error).message)
@@ -314,7 +318,8 @@ export default function ImportOrders() {
           {(result.skippedVoid ?? []).length > 0 && (
             <p className="muted">
               ข้าม {result.skippedVoid.length} ออเดอร์ (แม็คโครคืน/ยกเลิก):{' '}
-              {result.skippedVoid.map((v) => v.makroOrderNo).join(', ')}
+              {result.skippedVoid.map((v) => v.makroOrderNo).join(', ')} — ถ้ามีอยู่ในแอปแล้วและยังไม่เริ่มแพ็ก
+              จะถูกลบออกตอนกดนำเข้า
             </p>
           )}
 
@@ -426,7 +431,7 @@ export default function ImportOrders() {
           <button
             className="btn btn-primary w-full sm:w-auto"
             onClick={doImport}
-            disabled={toImport.length === 0 || importing}
+            disabled={(toImport.length === 0 && (result.skippedVoid ?? []).length === 0) || importing}
           >
             {importing ? 'กำลังนำเข้า…' : `นำเข้า ${toImport.length} ออเดอร์`}
           </button>
