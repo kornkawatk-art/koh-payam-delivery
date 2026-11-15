@@ -91,7 +91,7 @@ export const NAV: { path: string; label: string; roles: Role[]; icon: Icon }[] =
 /** The role in Thai, as the team says it (never the code name) */
 export const ROLE_TH: Record<Role, string> = {
   packer: 'คนแพ็ค',
-  pier: 'ทีมท่าเรือ',
+  pier: 'ขนส่ง',
   manager: 'หัวหน้า',
   admin: 'แอดมิน',
   online: 'ทีมออนไลน์',

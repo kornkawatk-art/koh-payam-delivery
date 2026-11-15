@@ -141,6 +141,6 @@ test('on the phone each role gets its everyday pages along the bottom, and the r
   const bar = screen.getByRole('navigation', { name: 'เมนูลัด' })
   expect([...bar.querySelectorAll('a')].map((a) => a.textContent)).toEqual(['ท่าเรือ', 'ลังโฟม', 'ค้างชำระ', 'วันนี้'])
   expect(screen.getByRole('button', { name: 'เมนูทั้งหมด' })).toBeInTheDocument()
-  expect(screen.getAllByText('ทีมท่าเรือ').length).toBeGreaterThan(0)
+  expect(screen.getAllByText('ขนส่ง').length).toBeGreaterThan(0)
   expect(screen.queryByText(/· pier/)).not.toBeInTheDocument()
 })
