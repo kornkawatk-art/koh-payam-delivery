@@ -1,6 +1,10 @@
 import type { ShortageDeptGroup, ShortageReport } from './api/shortageReport'
 import { formatDateTH } from './format'
 import { islandName } from './islands'
+import { formatBaht } from './itemPrices'
+
+/** The price fields withValues() adds; absent when prices weren't loaded */
+type Priced = { unitPrice?: number | null; value?: number | null }
 
 /**
  * Quantity without a unit: weighed items are short by fractional kilos and
@@ -20,13 +24,15 @@ export const formatRangeTH = (from: string, to: string) =>
 export function buildLineSummary(group: ShortageDeptGroup, from: string, to: string): string {
   const lines = group.products.map((p, i) => {
     const code = p.itemId ? `[${p.itemId}] ` : ''
-    return `${i + 1}. ${code}${p.productName} — ขาด ${p.orderCount} ครั้ง (รวม ${formatQty(p.totalQty)})`
+    const v = (p as Priced).value
+    return `${i + 1}. ${code}${p.productName} — ขาด ${p.orderCount} ครั้ง (รวม ${formatQty(p.totalQty)}${v != null ? ` ≈ ${formatBaht(v)}` : ''})`
   })
+  const value = (group as { value?: number }).value
   return [
     `รายงานของขาด — แผนก ${group.label}`,
     `ช่วง ${formatRangeTH(from, to)}`,
     ...lines,
-    `รวม ${group.products.length} รายการ`,
+    `รวม ${group.products.length} รายการ${value ? ` มูลค่าคร่าวๆ ${formatBaht(value)}` : ''}`,
   ].join('\n')
 }
 
@@ -39,6 +45,9 @@ export function buildExcelRows(report: ShortageReport) {
       สินค้า: p.productName,
       จำนวนครั้งที่ขาด: p.orderCount,
       จำนวนที่ขาดรวม: p.totalQty,
+      // left blank where unknown: fill it in and upload this sheet back as the price list
+      ราคาต่อหน่วย: (p as Priced).unitPrice ?? '',
+      มูลค่าที่ขาดคร่าวๆ: (p as Priced).value ?? '',
     })),
   )
   const details = report.groups.flatMap((g) =>
@@ -52,6 +61,7 @@ export function buildExcelRows(report: ShortageReport) {
         รหัสสินค้า: p.itemId,
         สินค้า: p.productName,
         จำนวนที่ขาด: d.qty,
+        มูลค่าคร่าวๆ: (p as Priced).unitPrice != null ? Math.round(d.qty * (p as Priced).unitPrice! * 100) / 100 : '',
       })),
     ),
   )

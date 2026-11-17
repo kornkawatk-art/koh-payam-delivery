@@ -7,13 +7,19 @@ import {
   Copy,
   DownloadSimple,
   Info,
+  UploadSimple,
 } from '@phosphor-icons/react'
+import { getShortageReport, type ShortageReport as Report } from '../../lib/api/shortageReport'
+import { getItemPrices, saveItemPrices } from '../../lib/api/itemPrices'
 import {
-  getShortageReport,
-  type ShortageDeptGroup,
-  type ShortageProductRow,
-  type ShortageReport as Report,
-} from '../../lib/api/shortageReport'
+  formatBaht,
+  parsePriceSheet,
+  withValues,
+  type PricedGroup,
+  type PricedProduct,
+} from '../../lib/itemPrices'
+import { useAuth } from '../../lib/auth'
+import { isLead } from '../../lib/roles'
 import { DEPT_COLORS, type DeptGroupCode } from '../../lib/departments'
 import { buildLineSummary, downloadShortageExcel, formatQty } from '../../lib/shortageExport'
 import { SkeletonRows } from '../../components/ui/Skeleton'
@@ -71,11 +77,30 @@ const PRESETS: Preset[] = [
   },
 ]
 
+/** The file's bytes (FileReader: works where Blob.arrayBuffer doesn't) */
+const readFile = (f: File) =>
+  new Promise<ArrayBuffer>((resolve, reject) => {
+    const r = new FileReader()
+    r.onload = () => resolve(r.result as ArrayBuffer)
+    r.onerror = () => reject(new Error('อ่านไฟล์ไม่ได้'))
+    r.readAsArrayBuffer(f)
+  })
+
+/** Every item code in the report (the ones a price can be looked up for) */
+const itemIds = (r: Report) => r.groups.flatMap((g) => g.products.map((p) => p.itemId)).filter(Boolean)
+
 export default function ShortageReport() {
+  const lead = isLead(useAuth().profile?.role)
   const [[fromDate, toDate], setRange] = useState<[string, string]>(() =>
     PRESETS.find((p) => p.id === '30d')!.range(),
   )
-  const [report, setReport] = useState<Report | null>(null)
+  const [rawReport, setReport] = useState<Report | null>(null)
+  // null = prices not loaded (table missing or the request failed): the page simply shows no money
+  const [prices, setPrices] = useState<Map<string, number> | null>(null)
+  const [sortBy, setSortBy] = useState<'count' | 'value'>('count')
+  const [priceMsg, setPriceMsg] = useState<Flash>()
+  const [uploading, setUploading] = useState(false)
+  const fileRef = useRef<HTMLInputElement>(null)
   const [failed, setFailed] = useState(false)
   const [deptFilter, setDeptFilter] = useState<DeptGroupCode | 'ALL'>('ALL')
   const [openKey, setOpenKey] = useState<string | null>(null)
@@ -102,8 +127,12 @@ export default function ShortageReport() {
     setOpenKey(null)
     setShowAll(false)
     return getShortageReport(rangeFrom, rangeTo)
-      .then((r) => {
-        if (req === latest.current) setReport(r)
+      .then(async (r) => {
+        const p = await getItemPrices(itemIds(r)).catch(() => null)
+        if (req === latest.current) {
+          setReport(r)
+          setPrices(p)
+        }
       })
       .catch(() => {
         if (req === latest.current) setFailed(true)
@@ -125,6 +154,13 @@ export default function ShortageReport() {
     return f === fromDate && t === toDate
   })?.id
 
+  const report = useMemo(
+    () => (rawReport ? withValues(rawReport, prices ?? new Map()) : null),
+    [rawReport, prices],
+  )
+  const hasValue = !!report && report.pricedProducts > 0
+  const byValue = sortBy === 'value' && hasValue
+
   const visibleGroups = useMemo(
     () =>
       (report?.groups ?? []).filter((g) => deptFilter === 'ALL' || g.code === deptFilter),
@@ -137,9 +173,17 @@ export default function ShortageReport() {
       Math.max(1, ...(report?.groups ?? []).flatMap((g) => g.products.map((p) => p.orderCount))),
     [report],
   )
+  const maxValue = useMemo(
+    () => Math.max(1, ...(report?.groups ?? []).flatMap((g) => g.products.map((p) => p.value ?? 0))),
+    [report],
+  )
 
   const topDept = useMemo(() => (report ? deptBars(report)[0] : undefined), [report])
-  const ranked = useMemo(() => (report ? rankProducts(report, deptFilter) : []), [report, deptFilter])
+  const ranked = useMemo(() => {
+    const list = report ? rankProducts(report, deptFilter) : []
+    // most money first; products without a price keep their count order at the end
+    return byValue ? [...list].sort((a, b) => (b.value ?? -1) - (a.value ?? -1)) : list
+  }, [report, deptFilter, byValue])
   const deptLabel = useMemo(
     () => new Map((report?.groups ?? []).map((g) => [g.code, g.label] as const)),
     [report],
@@ -148,6 +192,39 @@ export default function ShortageReport() {
     () => (report ? shortageTrend(report, rangeFrom, rangeTo) : null),
     [report, rangeFrom, rangeTo],
   )
+
+  async function uploadPrices(file: File) {
+    setPriceMsg(undefined)
+    setUploading(true)
+    try {
+      const XLSX = await import('xlsx')
+      const wb = XLSX.read(await readFile(file))
+      let parsed: ReturnType<typeof parsePriceSheet> | null = null
+      let lastError: Error | null = null
+      for (const name of wb.SheetNames) {
+        try {
+          parsed = parsePriceSheet(XLSX.utils.sheet_to_json<unknown[]>(wb.Sheets[name], { header: 1 }))
+          if (parsed.rows.length > 0) break
+        } catch (e) {
+          lastError = e as Error
+        }
+      }
+      if (!parsed || parsed.rows.length === 0) throw lastError ?? new Error('ไม่มีแถวที่มีทั้งรหัสสินค้าและราคา')
+      await saveItemPrices(parsed.rows)
+      if (rawReport) setPrices(await getItemPrices(itemIds(rawReport)))
+      setPriceMsg(
+        flash.ok(
+          `บันทึกราคา ${parsed.rows.length.toLocaleString()} รายการแล้ว` +
+            (parsed.skipped ? ` (ข้าม ${parsed.skipped} แถวที่ไม่มีรหัสหรือราคา)` : ''),
+        ),
+      )
+    } catch (e) {
+      setPriceMsg(flash.error('อัปโหลดราคาไม่สำเร็จ: ' + (e as Error).message))
+    } finally {
+      setUploading(false)
+      if (fileRef.current) fileRef.current.value = ''
+    }
+  }
 
   async function exportExcel() {
     if (!report) return
@@ -165,15 +242,41 @@ export default function ShortageReport() {
         title="รายงานของขาด"
         icon={ChartBar}
         actions={
-          <button
-            type="button"
-            className="btn btn-secondary"
-            onClick={() => void exportExcel()}
-            disabled={!report || report.groups.length === 0}
-          >
-            <DownloadSimple size={18} aria-hidden="true" />
-            ดาวน์โหลด Excel
-          </button>
+          <>
+            {lead && (
+              <>
+                <input
+                  ref={fileRef}
+                  type="file"
+                  accept=".xlsx,.xls,.csv"
+                  className="hidden"
+                  aria-label="ไฟล์ราคาสินค้า"
+                  onChange={(e) => {
+                    const f = e.target.files?.[0]
+                    if (f) void uploadPrices(f)
+                  }}
+                />
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  onClick={() => fileRef.current?.click()}
+                  disabled={uploading}
+                >
+                  <UploadSimple size={18} aria-hidden="true" />
+                  {uploading ? 'กำลังบันทึกราคา…' : 'อัปโหลดราคา'}
+                </button>
+              </>
+            )}
+            <button
+              type="button"
+              className="btn btn-secondary"
+              onClick={() => void exportExcel()}
+              disabled={!report || report.groups.length === 0}
+            >
+              <DownloadSimple size={18} aria-hidden="true" />
+              ดาวน์โหลด Excel
+            </button>
+          </>
         }
       />
 
@@ -216,6 +319,7 @@ export default function ShortageReport() {
       </div>
 
       <Notice flash={exportMsg} />
+      <Notice flash={priceMsg} />
 
       {failed ? (
         <p className="alert alert-danger">โหลดรายงานของขาดไม่สำเร็จ</p>
@@ -232,6 +336,27 @@ export default function ShortageReport() {
           className={'flex flex-col gap-5 transition-opacity ' + (loading ? 'opacity-60' : '')}
           aria-busy={loading}
         >
+          {prices && (
+            <div className="flex flex-wrap items-end justify-between gap-x-4 gap-y-1 rounded-lg bg-brand-soft px-4 py-3 ring-1 ring-brand/25">
+              <div>
+                <p className="text-xs font-medium text-brand-ink">มูลค่าที่ขาด (ราคาคร่าวๆ)</p>
+                <p className="figure text-[2rem] leading-tight text-ink">
+                  {hasValue ? formatBaht(report.value) : '–'}
+                </p>
+              </div>
+              <p className="text-xs text-ink-soft">
+                {hasValue
+                  ? `คิดจาก ${report.pricedProducts} จาก ${report.productCount} รายการที่มีราคา`
+                  : lead
+                    ? 'ยังไม่มีราคา: กด "อัปโหลดราคา" แล้วเลือก Excel ที่มีคอลัมน์รหัสสินค้ากับราคา'
+                    : 'ยังไม่มีราคาสินค้า'}
+                {hasValue && report.pricedProducts < report.productCount && lead && (
+                  <> · ใส่ราคาที่ขาดได้ในคอลัมน์ "ราคาต่อหน่วย" ของไฟล์ที่ดาวน์โหลด แล้วอัปโหลดกลับ</>
+                )}
+              </p>
+            </div>
+          )}
+
           <dl className="grid grid-cols-2 gap-2 sm:grid-cols-4 sm:gap-3">
             <StatTile label="สินค้าที่ขาด" value={report.productCount} />
             <StatTile label="ขาดทั้งหมด (ครั้ง)" value={report.occurrenceCount} emphasis />
@@ -257,6 +382,7 @@ export default function ShortageReport() {
 
           {trend && <TrendColumnChart key={`${rangeFrom}_${rangeTo}`} trend={trend} />}
 
+          <div className="flex flex-wrap items-center gap-2">
           <div role="group" aria-label="มุมมอง" className="inline-flex w-fit overflow-hidden rounded-lg border border-line-strong">
             {(
               [
@@ -276,6 +402,29 @@ export default function ShortageReport() {
                 {label}
               </button>
             ))}
+          </div>
+          {hasValue && (
+            <div role="group" aria-label="เรียงตาม" className="inline-flex w-fit overflow-hidden rounded-lg border border-line-strong">
+              {(
+                [
+                  ['count', 'ขาดบ่อยสุด'],
+                  ['value', 'มูลค่าสูงสุด'],
+                ] as const
+              ).map(([v, label]) => (
+                <button
+                  key={v}
+                  type="button"
+                  aria-pressed={sortBy === v}
+                  onClick={() => setSortBy(v)}
+                  className={
+                    'min-h-[2.5rem] px-4 text-sm ' + (sortBy === v ? 'bg-ink font-semibold text-surface' : 'bg-surface text-ink-soft')
+                  }
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          )}
           </div>
 
           <div
@@ -310,6 +459,7 @@ export default function ShortageReport() {
                     rank={i + 1}
                     product={p}
                     maxCount={maxCount}
+                    maxValue={byValue ? maxValue : undefined}
                     deptName={deptLabel.get(p.dept)}
                     open={openKey === `${p.dept}:${p.key}`}
                     onToggle={() => setOpenKey((cur) => (cur === `${p.dept}:${p.key}` ? null : `${p.dept}:${p.key}`))}
@@ -335,6 +485,7 @@ export default function ShortageReport() {
                 from={rangeFrom}
                 to={rangeTo}
                 maxCount={maxCount}
+                maxValue={byValue ? maxValue : undefined}
                 openKey={openKey}
                 onToggle={(k) => setOpenKey((cur) => (cur === k ? null : k))}
               />
@@ -394,13 +545,15 @@ function DeptSection({
   from,
   to,
   maxCount,
+  maxValue,
   openKey,
   onToggle,
 }: {
-  group: ShortageDeptGroup
+  group: PricedGroup
   from: string
   to: string
   maxCount: number
+  maxValue?: number
   openKey: string | null
   onToggle: (key: string) => void
 }) {
@@ -435,6 +588,11 @@ function DeptSection({
           <p className="text-sm text-ink-soft">
             <span className="tnum font-semibold text-ink">{g.products.length}</span> รายการ · ขาด{' '}
             <span className="tnum font-semibold text-ink">{g.occurrenceCount}</span> ครั้ง
+            {g.value > 0 && (
+              <>
+                {' '}· ≈ <span className="tnum font-semibold text-ink">{formatBaht(g.value)}</span>
+              </>
+            )}
           </p>
         </div>
         <button type="button" className="btn btn-secondary btn-sm" onClick={() => void copySummary()}>
@@ -458,12 +616,13 @@ function DeptSection({
       )}
 
       <ol>
-        {g.products.map((p, i) => (
+        {(maxValue ? [...g.products].sort((a, b) => (b.value ?? -1) - (a.value ?? -1)) : g.products).map((p, i) => (
           <ProductRow
             key={p.key}
             rank={i + 1}
             product={p}
             maxCount={maxCount}
+            maxValue={maxValue}
             open={openKey === `${g.code}:${p.key}`}
             onToggle={() => onToggle(`${g.code}:${p.key}`)}
           />
@@ -477,13 +636,16 @@ function ProductRow({
   rank,
   product: p,
   maxCount,
+  maxValue,
   open,
   onToggle,
   deptName,
 }: {
   rank: number
-  product: ShortageProductRow
+  product: PricedProduct
   maxCount: number
+  /** set when ranking by value: the bar shows the value instead of how often */
+  maxValue?: number
   open: boolean
   onToggle: () => void
   /** shown in the across-departments list, where rows mix departments */
@@ -519,7 +681,7 @@ function ProductRow({
             <span
               className="block h-full rounded-full"
               style={{
-                width: `${(p.orderCount / maxCount) * 100}%`,
+                width: `${(maxValue ? (p.value ?? 0) / maxValue : p.orderCount / maxCount) * 100}%`,
                 backgroundColor: DEPT_COLORS[p.dept],
               }}
             />
@@ -530,6 +692,14 @@ function ProductRow({
             ขาด <span className="tnum text-xl font-semibold text-ink">{p.orderCount}</span> ครั้ง
           </span>
           <span className="tnum text-xs text-ink-soft">รวม {formatQty(p.totalQty)}</span>
+          {p.value != null && (
+            <span
+              className="tnum text-xs font-semibold text-ink"
+              title={`ราคาคร่าวๆ ${formatBaht(p.unitPrice!)} ต่อหน่วย`}
+            >
+              ≈ {formatBaht(p.value)}
+            </span>
+          )}
         </span>
         <CaretDown
           size={16}

@@ -19,10 +19,13 @@ export function deptBars(report: ShortageReport): DeptBar[] {
  * Every short product in one list, across departments (or one department):
  * most often short first, then the larger quantity, then by name.
  */
-export function rankProducts(report: ShortageReport, dept: DeptGroupCode | 'ALL' = 'ALL') {
+export function rankProducts<R extends ShortageReport>(
+  report: R,
+  dept: DeptGroupCode | 'ALL' = 'ALL',
+): R['groups'][number]['products'] {
   return report.groups
     .filter((g) => dept === 'ALL' || g.code === dept)
-    .flatMap((g) => g.products)
+    .flatMap((g) => g.products as R['groups'][number]['products'])
     .sort(
       (a, b) =>
         b.orderCount - a.orderCount || b.totalQty - a.totalQty || a.productName.localeCompare(b.productName, 'th'),

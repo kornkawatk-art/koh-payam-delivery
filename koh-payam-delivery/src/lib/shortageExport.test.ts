@@ -60,8 +60,8 @@ test('LINE summary: department heading, range, every product ranked with code, c
 test('Excel rows: one summary row per product, one detail row per order line sorted by date', () => {
   const { summary, details } = buildExcelRows(report)
   expect(summary).toEqual([
-    { แผนก: 'FZ', รหัสสินค้า: '100001', สินค้า: 'Fish sauce 700ml', จำนวนครั้งที่ขาด: 2, จำนวนที่ขาดรวม: 12 },
-    { แผนก: 'FZ', รหัสสินค้า: '', สินค้า: 'Loose pork', จำนวนครั้งที่ขาด: 1, จำนวนที่ขาดรวม: 0.45 },
+    { แผนก: 'FZ', รหัสสินค้า: '100001', สินค้า: 'Fish sauce 700ml', จำนวนครั้งที่ขาด: 2, จำนวนที่ขาดรวม: 12, ราคาต่อหน่วย: '', มูลค่าที่ขาดคร่าวๆ: '' },
+    { แผนก: 'FZ', รหัสสินค้า: '', สินค้า: 'Loose pork', จำนวนครั้งที่ขาด: 1, จำนวนที่ขาดรวม: 0.45, ราคาต่อหน่วย: '', มูลค่าที่ขาดคร่าวๆ: '' },
   ])
   expect(details.map((d) => [d.วันที่ส่ง, d.เลขออเดอร์, d.สินค้า])).toEqual([
     ['2026-09-01', 'PO-B', 'Fish sauce 700ml'],

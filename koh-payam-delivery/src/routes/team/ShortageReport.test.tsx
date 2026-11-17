@@ -9,6 +9,16 @@ vi.mock('../../lib/api/shortageReport', () => ({
   getShortageReport: (...a: unknown[]) => getShortageReport(...a),
 }))
 
+const getItemPrices = vi.fn()
+const saveItemPrices = vi.fn()
+vi.mock('../../lib/api/itemPrices', () => ({
+  getItemPrices: (...a: unknown[]) => getItemPrices(...a),
+  saveItemPrices: (...a: unknown[]) => saveItemPrices(...a),
+}))
+
+const auth = vi.hoisted(() => ({ role: 'manager' }))
+vi.mock('../../lib/auth', () => ({ useAuth: () => ({ profile: { role: auth.role } }) }))
+
 const downloadShortageExcel = vi.fn()
 vi.mock('../../lib/shortageExport', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../lib/shortageExport')>()),
@@ -74,6 +84,9 @@ const report: Report = {
 beforeEach(() => {
   getShortageReport.mockReset().mockResolvedValue(report)
   downloadShortageExcel.mockReset().mockResolvedValue(undefined)
+  getItemPrices.mockReset().mockResolvedValue(new Map())
+  saveItemPrices.mockReset().mockResolvedValue(undefined)
+  auth.role = 'manager'
 })
 
 const renderPage = () =>
@@ -246,7 +259,12 @@ test('"ดาวน์โหลด Excel" exports the loaded report for the chos
   await screen.findByText('มะพร้าว')
   await userEvent.click(screen.getByRole('button', { name: 'ดาวน์โหลด Excel' }))
   const [from, to] = getShortageReport.mock.lastCall!
-  expect(downloadShortageExcel).toHaveBeenCalledWith(report, from, to)
+  // the report as loaded, plus its (here empty) prices
+  expect(downloadShortageExcel).toHaveBeenCalledWith(
+    expect.objectContaining({ productCount: report.productCount, value: 0, pricedProducts: 0 }),
+    from,
+    to,
+  )
 })
 
 test('shows the empty state (and disables export) when the range has zero shortages', async () => {
@@ -306,4 +324,55 @@ test('a "from" date after the "to" date is swapped, and a cleared date keeps the
     expect(from).not.toBe('')
     expect(to).not.toBe('')
   }
+})
+
+test('with prices: shows the rough value, per product, and can rank by value', async () => {
+  getItemPrices.mockResolvedValue(new Map([['100001', 10]]))
+  renderPage()
+  await screen.findByText('มะพร้าว')
+  expect(screen.getByText('มูลค่าที่ขาด (ราคาคร่าวๆ)')).toBeInTheDocument()
+  expect(screen.getAllByText('฿80').length).toBeGreaterThan(0) // 8 x ฿10, the total and the row
+  expect(screen.getByText(/คิดจาก 1 จาก 3 รายการที่มีราคา/)).toBeInTheDocument()
+
+  await userEvent.click(screen.getByRole('button', { name: 'มูลค่าสูงสุด' }))
+  const first = screen.getByRole('region', { name: 'อันดับสินค้าที่ขาด' }).querySelector('li')!
+  expect(within(first).getByText('มะพร้าว')).toBeInTheDocument()
+})
+
+test('without prices: no ranking by value, and a lead is told how to add them', async () => {
+  renderPage()
+  await screen.findByText('มะพร้าว')
+  expect(screen.queryByRole('button', { name: 'มูลค่าสูงสุด' })).not.toBeInTheDocument()
+  expect(screen.getByText(/กด "อัปโหลดราคา"/)).toBeInTheDocument()
+})
+
+test('the price table failing to load just hides the money', async () => {
+  getItemPrices.mockRejectedValue(new Error('no table'))
+  renderPage()
+  await screen.findByText('มะพร้าว')
+  expect(screen.queryByText('มูลค่าที่ขาด (ราคาคร่าวๆ)')).not.toBeInTheDocument()
+})
+
+test('เซลฟลอร์ sees the value but cannot upload prices', async () => {
+  auth.role = 'floor'
+  renderPage()
+  await screen.findByText('มะพร้าว')
+  expect(screen.queryByRole('button', { name: 'อัปโหลดราคา' })).not.toBeInTheDocument()
+})
+
+test('uploading an Excel saves its prices and reloads them', async () => {
+  const XLSX = await import('xlsx')
+  const wb = XLSX.utils.book_new()
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([['รหัสสินค้า', 'สินค้า', 'ราคาต่อหน่วย'], [100001, 'มะพร้าว', 25], ['', '', '']]), 'ราคา')
+  const buf = XLSX.write(wb, { type: 'array', bookType: 'xlsx' }) as ArrayBuffer
+  const file = new File([buf], 'prices.xlsx')
+
+  renderPage()
+  await screen.findByText('มะพร้าว')
+  getItemPrices.mockResolvedValue(new Map([['100001', 25]]))
+  await userEvent.upload(screen.getByLabelText('ไฟล์ราคาสินค้า'), file)
+  await vi.waitFor(() => expect(screen.queryByText('กำลังบันทึกราคา…')).not.toBeInTheDocument())
+  await screen.findByText(/บันทึกราคา 1 รายการแล้ว/)
+  expect(saveItemPrices).toHaveBeenCalledWith([{ itemId: '100001', price: 25, productName: 'มะพร้าว' }])
+  expect(screen.getAllByText('฿200').length).toBeGreaterThan(0)
 })
