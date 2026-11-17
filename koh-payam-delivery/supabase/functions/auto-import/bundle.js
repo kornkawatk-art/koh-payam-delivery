@@ -22,7 +22,8 @@ var DEFAULT_DETAIL_MAPPING = {
   cancelledQty: "Cancelled Quantity",
   itemRemark: "Item Remark",
   itemId: "Item Id",
-  dept: "Dept"
+  dept: "Dept",
+  barcode: "Bar_Code"
 };
 var DEFAULT_ORDER_MAPPING = {
   orderNo: "Order Number",
@@ -35,7 +36,9 @@ var DEFAULT_ORDER_MAPPING = {
   paymentStatus: "Payment Status",
   outstandingAmount: "Outstanding Amount",
   customerPhone: "Customer Phone",
-  orderType: "Order Type"
+  orderType: "Order Type",
+  memberCard: "Member Card",
+  invoiceNo: "Invoice Number"
 };
 var FIELD_LABELS_DETAIL = {
   orderNo: "\u0E40\u0E25\u0E02\u0E17\u0E35\u0E48\u0E2D\u0E2D\u0E40\u0E14\u0E2D\u0E23\u0E4C",
@@ -46,7 +49,8 @@ var FIELD_LABELS_DETAIL = {
   cancelledQty: "\u0E08\u0E33\u0E19\u0E27\u0E19\u0E17\u0E35\u0E48\u0E22\u0E01\u0E40\u0E25\u0E34\u0E01",
   itemRemark: "\u0E2B\u0E21\u0E32\u0E22\u0E40\u0E2B\u0E15\u0E38\u0E23\u0E32\u0E22\u0E01\u0E32\u0E23",
   itemId: "\u0E23\u0E2B\u0E31\u0E2A\u0E2A\u0E34\u0E19\u0E04\u0E49\u0E32",
-  dept: "\u0E41\u0E1C\u0E19\u0E01 (Dept)"
+  dept: "\u0E41\u0E1C\u0E19\u0E01 (Dept)",
+  barcode: "\u0E1A\u0E32\u0E23\u0E4C\u0E42\u0E04\u0E49\u0E14 (Bar_Code)"
 };
 var FIELD_LABELS_ORDER = {
   orderNo: "\u0E40\u0E25\u0E02\u0E17\u0E35\u0E48\u0E2D\u0E2D\u0E40\u0E14\u0E2D\u0E23\u0E4C",
@@ -59,7 +63,9 @@ var FIELD_LABELS_ORDER = {
   paymentStatus: "\u0E2A\u0E16\u0E32\u0E19\u0E30\u0E01\u0E32\u0E23\u0E0A\u0E33\u0E23\u0E30\u0E40\u0E07\u0E34\u0E19",
   outstandingAmount: "\u0E22\u0E2D\u0E14\u0E04\u0E49\u0E32\u0E07\u0E0A\u0E33\u0E23\u0E30",
   customerPhone: "\u0E40\u0E1A\u0E2D\u0E23\u0E4C\u0E42\u0E17\u0E23\u0E25\u0E39\u0E01\u0E04\u0E49\u0E32",
-  orderType: "\u0E1B\u0E23\u0E30\u0E40\u0E20\u0E17\u0E2D\u0E2D\u0E40\u0E14\u0E2D\u0E23\u0E4C (\u0E2A\u0E48\u0E07/\u0E23\u0E31\u0E1A\u0E40\u0E2D\u0E07)"
+  orderType: "\u0E1B\u0E23\u0E30\u0E40\u0E20\u0E17\u0E2D\u0E2D\u0E40\u0E14\u0E2D\u0E23\u0E4C (\u0E2A\u0E48\u0E07/\u0E23\u0E31\u0E1A\u0E40\u0E2D\u0E07)",
+  memberCard: "\u0E40\u0E25\u0E02\u0E2A\u0E21\u0E32\u0E0A\u0E34\u0E01",
+  invoiceNo: "\u0E40\u0E25\u0E02\u0E43\u0E1A\u0E01\u0E33\u0E01\u0E31\u0E1A"
 };
 var DETAIL_REQUIRED = [
   "orderNo",
@@ -79,10 +85,20 @@ var ORDER_SOFT = [
   "paymentStatus",
   "outstandingAmount",
   "customerPhone",
-  "orderType"
+  "orderType",
+  "memberCard",
+  "invoiceNo"
 ];
-var DETAIL_SOFT = ["dept"];
+var DETAIL_SOFT = ["dept", "barcode"];
 var isNotMakroDirect = (orderNo) => /b$/i.test(orderNo.trim());
+function splitBarcodes(raw) {
+  const out = [];
+  for (const part of String(raw ?? "").split("||")) {
+    const code = part.replace(/\s+/g, "");
+    if (/^\d{6,20}$/.test(code) && !out.includes(code)) out.push(code);
+  }
+  return out;
+}
 function toNum(v) {
   const n = Number(String(v ?? "").replace(/,/g, "").trim());
   return Number.isFinite(n) ? n : 0;
@@ -164,6 +180,8 @@ function buildImport(detailRows, orderRows, dm, om, boxLabels = /* @__PURE__ */ 
     const paymentStatus = om.paymentStatus ? (r[om.paymentStatus] ?? "").trim() : "";
     const customerPhone = om.customerPhone ? (r[om.customerPhone] ?? "").trim() : "";
     const orderType = om.orderType ? (r[om.orderType] ?? "").trim() : "";
+    const memberCard = om.memberCard ? (r[om.memberCard] ?? "").trim() : "";
+    const invoiceNo = om.invoiceNo ? (r[om.invoiceNo] ?? "").trim() : "";
     payamOrders.set(orderNo, {
       makroOrderNo: orderNo,
       customerName: (r[om.customer] ?? "").trim(),
@@ -178,6 +196,8 @@ function buildImport(detailRows, orderRows, dm, om, boxLabels = /* @__PURE__ */ 
       island: island === "unknown" ? null : island,
       isPickup: /pick\s*-?\s*up/i.test(orderType),
       boxLabel,
+      memberCard: memberCard || null,
+      invoiceNo: invoiceNo || null,
       items: []
     });
   }
@@ -217,7 +237,8 @@ function buildImport(detailRows, orderRows, dm, om, boxLabels = /* @__PURE__ */ 
       lineNo: list.length + 1,
       isShort,
       isFresh,
-      dept: deptRaw
+      dept: deptRaw,
+      barcodes: dm.barcode ? splitBarcodes(r[dm.barcode]) : []
     });
     itemsByOrder.set(orderNo, list);
   }
@@ -524,6 +545,7 @@ async function commitImport(shipDate, incoming, voided = [], move = [], payment 
   const { refreshed } = await refreshPayments(incoming.filter((o) => elsewhere.has(o.makroOrderNo)), payment);
   let created = 0;
   let synced = 0;
+  const syncedAt = (/* @__PURE__ */ new Date()).toISOString();
   for (const o of orders) {
     const existingId = idByNo.get(o.makroOrderNo);
     if (!existingId) {
@@ -544,7 +566,10 @@ async function commitImport(shipDate, incoming, voided = [], move = [], payment 
         customer_phone: o.customerPhone,
         island: o.island,
         is_pickup: o.isPickup,
-        box_label: o.boxLabel ?? null
+        box_label: o.boxLabel ?? null,
+        member_card: o.memberCard ?? null,
+        invoice_no: o.invoiceNo ?? null,
+        synced_at: syncedAt
       }).select("id").single();
       if (error) throw new Error(`\u0E2A\u0E23\u0E49\u0E32\u0E07\u0E2D\u0E2D\u0E40\u0E14\u0E2D\u0E23\u0E4C ${o.makroOrderNo} \u0E44\u0E21\u0E48\u0E2A\u0E33\u0E40\u0E23\u0E47\u0E08: ${error.message}`);
       const orderId = ins.id;
@@ -563,6 +588,10 @@ async function commitImport(shipDate, incoming, voided = [], move = [], payment 
         // Makro's own fact -- a re-import keeps it current (unlike island,
         // which a manager may have picked by hand)
         is_pickup: o.isPickup,
+        // the delivery note's header and "ข้อมูล ณ" (a blank cell never wipes what was there)
+        ...o.memberCard ? { member_card: o.memberCard } : {},
+        ...o.invoiceNo ? { invoice_no: o.invoiceNo } : {},
+        synced_at: syncedAt,
         // sale's box name (O2O Desk) stays current; such a PO ships to Myanmar
         ...o.boxLabel ? { box_label: o.boxLabel, ...o.island === "myanmar" ? { island: "myanmar" } : {} } : {},
         // the customer collected it -- close it, unless it already went further
@@ -599,6 +628,7 @@ async function commitImport(shipDate, incoming, voided = [], move = [], payment 
       synced++;
     }
   }
+  await saveItemBarcodes(incoming);
   const { dropped, flagged } = await applyVoided(voided);
   await linkBackordersToDay(shipDate);
   await logAction("import", "ship_day", day.id, {
@@ -613,6 +643,21 @@ async function commitImport(shipDate, incoming, voided = [], move = [], payment 
     incoming.reduce((n, o) => n + o.items.length, 0)
   );
   return { created, synced, moved, skipped, refreshed, dropped, flagged };
+}
+async function saveItemBarcodes(orders) {
+  const byId = /* @__PURE__ */ new Map();
+  for (const o of orders)
+    for (const it of o.items) if (it.itemId && it.barcodes?.length) byId.set(it.itemId, it.barcodes);
+  if (!byId.size) return;
+  const now = (/* @__PURE__ */ new Date()).toISOString();
+  const rows = Array.from(byId, ([item_id, barcodes]) => ({ item_id, barcodes, updated_at: now }));
+  for (let i = 0; i < rows.length; i += 500) {
+    const { error } = await supabase.from("item_barcodes").upsert(rows.slice(i, i + 500), { onConflict: "item_id" });
+    if (error) {
+      console.error("saving item barcodes failed", error.message);
+      return;
+    }
+  }
 }
 async function applyVoided(voided) {
   if (voided.length === 0) return { dropped: [], flagged: [] };

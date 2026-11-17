@@ -25,6 +25,8 @@ const AuditLog = lazyPage(() => import('./routes/team/AuditLog'))
 const ShortageReport = lazyPage(() => import('./routes/team/ShortageReport'))
 const CustomerAliases = lazyPage(() => import('./routes/team/CustomerAliases'))
 const OrderDetail = lazyPage(() => import('./routes/team/OrderDetail'))
+const DeliveryNotePage = lazyPage(() => import('./routes/team/DeliveryNotePage'))
+const CustomerDeliveryNote = lazyPage(() => import('./routes/customer/CustomerDeliveryNote'))
 const PackOrder = lazyPage(() => import('./routes/team/PackOrder'))
 const PackGroup = lazyPage(() => import('./routes/team/PackGroup'))
 const CustomerOrderView = lazyPage(() => import('./routes/customer/CustomerOrderView'))
@@ -67,11 +69,23 @@ export default function App() {
           <Route path="/login" element={<Login />} />
           {/* Customer order link — no team session; the link_token is the only credential. */}
           <Route path="/o/:token" element={<CustomerOrderView />} />
+          <Route path="/o/:token/note" element={<CustomerDeliveryNote />} />
           <Route path="/help" element={<CustomerHelp />} />
           {/* LIFF registration page — opened inside LINE's in-app browser; no team session, no link_token. */}
           <Route path="/liff/register" element={<LineRegister />} />
           <Route path="/2fa/setup" element={<TwoFactorSetup />} />
           <Route path="/2fa" element={<TwoFactorChallenge />} />
+          {/* ใบส่งของ: plain A4, outside the app shell so it prints as paper */}
+          <Route
+            path="/order/:id/note"
+            element={
+              <RequireAuth>
+                <RequireRole path="/order">
+                  <DeliveryNotePage />
+                </RequireRole>
+              </RequireAuth>
+            }
+          />
           <Route
             element={
               <RequireAuth>

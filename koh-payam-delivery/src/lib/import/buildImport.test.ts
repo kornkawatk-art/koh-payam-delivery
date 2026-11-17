@@ -751,3 +751,38 @@ test('buildImport: a box name on an island PO keeps its island but carries the n
   const r = buildImport(detail, order, DEFAULT_DETAIL_MAPPING, DEFAULT_ORDER_MAPPING, new Map([['P-001', 'ร้านป้าแดง']]))
   expect(r.orders.find((o) => o.makroOrderNo === 'P-001')).toMatchObject({ island: 'payam', boxLabel: 'ร้านป้าแดง' })
 })
+
+test('buildImport reads the delivery-note fields: barcodes per line, member card and invoice per PO', () => {
+  const order = {
+    'Order Number': 'P-900',
+    'Customer Name': 'PAYAM SHOP',
+    'Sub District': 'เกาะพยาม',
+    'Shipping Address': 'x',
+    'Member Card': '076 04289130 130',
+    'Invoice Number': 'INV-1',
+  }
+  const line = (id: string, codes: string) => ({
+    'Order Number': 'P-900',
+    'Product Name': `item ${id}`,
+    'Order Quantity': '2',
+    'Shipped Quantity': '2',
+    'Cancelled Quantity': '0',
+    'Item Id': id,
+    Bar_Code: codes,
+  })
+  const r = buildImport(
+    [line('100516', '21005169 || 2500001005168 || 8855199532670'), line('32825', '')],
+    [order],
+    DEFAULT_DETAIL_MAPPING,
+    DEFAULT_ORDER_MAPPING,
+  )
+  const o = r.orders[0]
+  expect(o.memberCard).toBe('076 04289130 130')
+  expect(o.invoiceNo).toBe('INV-1')
+  expect(o.items.map((i) => i.barcodes)).toEqual([['21005169', '2500001005168', '8855199532670'], []])
+})
+
+test('a file without the new columns still imports (they are optional)', () => {
+  const problems = validateMapping('detail', ['Order Number', 'Product Name', 'Order Quantity', 'Shipped Quantity', 'Cancelled Quantity', 'Shortage Quantity', 'Item Remark', 'Item Id'], DEFAULT_DETAIL_MAPPING)
+  expect(problems).toEqual([])
+})

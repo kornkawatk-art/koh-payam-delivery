@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link, useParams, useNavigate } from 'react-router-dom'
-import { Anchor, MapPin, Package, Warning } from '@phosphor-icons/react'
+import { Anchor, MapPin, Package, Receipt, Warning } from '@phosphor-icons/react'
 import {
   getOrder,
   regenTokenLink,
@@ -402,7 +402,20 @@ export default function OrderDetail() {
       </div>
 
       <section className="flex flex-col gap-2">
-        <p className="section-title">รายการสินค้า</p>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <p className="section-title">รายการสินค้า</p>
+          {/* ใบส่งของ: the A4 note with barcodes that goes in the box (Thai or Myanmar) */}
+          <div className="flex gap-2">
+            <Link className="btn btn-secondary btn-sm" to={`/order/${id}/note?lang=th`}>
+              <Receipt size={16} aria-hidden="true" />
+              ใบส่งของ ไทย
+            </Link>
+            <Link className="btn btn-secondary btn-sm" to={`/order/${id}/note?lang=my`}>
+              <Receipt size={16} aria-hidden="true" />
+              ใบส่งของ พม่า
+            </Link>
+          </div>
+        </div>
         <div className="table-wrap">
           <table className="data-table stack-table">
             <thead>

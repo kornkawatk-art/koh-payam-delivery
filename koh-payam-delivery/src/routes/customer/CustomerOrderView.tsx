@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState, type ReactNode } from 'react'
 import { Link, useLocation, useParams } from 'react-router-dom'
-import { Boat, CheckCircle, Warning } from '@phosphor-icons/react'
+import { Boat, CheckCircle, Receipt, Warning } from '@phosphor-icons/react'
 import { t, type Lang } from './i18n'
 import OrderStatusTimeline from '../../components/OrderStatusTimeline'
 import CustomerClaimForm from './CustomerClaimForm'
@@ -53,6 +53,8 @@ type OrderView = {
   claimDeadlineAt: string | null
   canClaim: boolean
   claims: Claim[]
+  // ใบส่งของ: present once Makro has filled in what it shipped (order-view)
+  deliveryNote?: unknown | null
 }
 
 function readLang(): Lang {
@@ -260,7 +262,15 @@ export default function CustomerOrderView() {
       </section>
 
       <section className="flex flex-col gap-2">
-        <h2 className="section-title">{t(lang, 'items')}</h2>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h2 className="section-title">{t(lang, 'items')}</h2>
+          {data.deliveryNote ? (
+            <Link className="btn btn-secondary btn-sm" to={`/o/${token}/note`}>
+              <Receipt size={16} aria-hidden="true" />
+              {t(lang, 'delivery_note')}
+            </Link>
+          ) : null}
+        </div>
         <div className="table-wrap table-flat">
           <table className="data-table stack-table">
             <thead>
