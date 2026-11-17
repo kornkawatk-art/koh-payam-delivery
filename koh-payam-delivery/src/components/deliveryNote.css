@@ -1,0 +1,322 @@
+/* ใบส่งของ: an A4 paper document. Fixed ink colours (not the app's theme tokens), so it reads and
+   prints the same from dark mode. On screen it sits on a grey desk at paper width; printed, the
+   page box takes over. */
+
+.dn-desk {
+  min-height: 100vh;
+  background: #e7ecec;
+  padding: 16px;
+}
+
+.dn-toolbar {
+  max-width: 210mm;
+  margin: 0 auto 12px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.dn-sheet {
+  --ink: #111c1f;
+  --soft: #4d5d61;
+  --rule: #b9c4c6;
+  --rule-strong: #1d2b2e;
+  --short: #fbe7d6;
+  --short-ink: #8a3200;
+  max-width: 210mm;
+  margin: 0 auto;
+  background: #fff;
+  color: var(--ink);
+  padding: 12mm 11mm 14mm;
+  box-shadow: 0 1px 3px rgb(0 0 0 / 0.12);
+  font-family: 'IBM Plex Sans Thai', system-ui, sans-serif;
+  font-size: 10.5pt;
+  line-height: 1.35;
+}
+
+.dn-sheet[lang='my'] {
+  font-family: 'Noto Sans Myanmar', 'IBM Plex Sans Thai', system-ui, sans-serif;
+}
+
+/* product names are always Thai: keep the Thai face on them in the Myanmar note too */
+.dn-sheet .dn-th {
+  font-family: 'IBM Plex Sans Thai', system-ui, sans-serif;
+}
+
+.dn-en {
+  display: block;
+  font-family: 'IBM Plex Sans Thai', system-ui, sans-serif;
+  font-size: 7pt;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  color: var(--soft);
+  line-height: 1.2;
+}
+
+.dn-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 8mm;
+  padding-bottom: 3mm;
+  border-bottom: 1.5pt solid var(--rule-strong);
+}
+
+.dn-title {
+  font-size: 19pt;
+  font-weight: 700;
+  line-height: 1.15;
+}
+.dn-title .dn-en {
+  font-size: 8.5pt;
+  letter-spacing: 0.18em;
+  margin-top: 1mm;
+}
+
+.dn-shop {
+  font-size: 8.5pt;
+  color: var(--soft);
+  margin-top: 2mm;
+}
+
+.dn-po {
+  text-align: right;
+}
+.dn-po-no {
+  font-family: 'IBM Plex Mono', ui-monospace, monospace;
+  font-size: 16pt;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+}
+
+.dn-facts {
+  display: grid;
+  grid-template-columns: 1.3fr 1fr 1fr;
+  gap: 2.5mm 6mm;
+  padding: 3mm 0;
+  margin: 0;
+}
+.dn-facts dt {
+  font-size: 8pt;
+  color: var(--soft);
+}
+.dn-facts dt .dn-en {
+  display: inline;
+  margin-left: 1.2mm;
+}
+.dn-facts dd {
+  margin: 0.3mm 0 0;
+  font-weight: 600;
+  font-size: 10.5pt;
+}
+.dn-facts .dn-customer {
+  font-size: 12.5pt;
+}
+
+.dn-table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+}
+.dn-table thead {
+  display: table-header-group; /* repeats on every printed page */
+}
+.dn-table tr {
+  break-inside: avoid;
+  page-break-inside: avoid;
+}
+
+/* the slim line that repeats at the top of each page: whose note this is */
+.dn-repeat th {
+  text-align: left;
+  font-weight: 500;
+  font-size: 8pt;
+  color: var(--soft);
+  padding: 0 0 1.5mm;
+}
+.dn-repeat b {
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.dn-cols th {
+  text-align: left;
+  vertical-align: bottom;
+  font-size: 8.5pt;
+  font-weight: 600;
+  padding: 1.6mm 1.5mm;
+  border-top: 1pt solid var(--rule-strong);
+  border-bottom: 1pt solid var(--rule-strong);
+}
+.dn-cols th.num {
+  text-align: right;
+}
+
+.dn-table td {
+  padding: 1.7mm 1.5mm;
+  border-bottom: 0.5pt solid var(--rule);
+  vertical-align: top;
+}
+.dn-table td.num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+.dn-table td.no {
+  color: var(--soft);
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.dn-code {
+  font-family: 'IBM Plex Mono', ui-monospace, monospace;
+  font-size: 10pt;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+}
+.dn-code + .dn-code {
+  margin-top: 0.4mm;
+}
+.dn-item-id {
+  font-family: 'IBM Plex Mono', ui-monospace, monospace;
+  font-size: 8pt;
+  color: var(--soft);
+  margin-top: 0.6mm;
+}
+/* no barcode on file: the 6-digit code is all there is, so it takes the barcode's place */
+.dn-item-id.alone {
+  font-size: 10pt;
+  color: var(--ink);
+  margin-top: 0;
+}
+
+.dn-row-short td {
+  background: var(--short);
+}
+.dn-row-short td.dn-short {
+  color: var(--short-ink);
+}
+.dn-zero {
+  color: var(--rule);
+  font-weight: 400;
+}
+
+.dn-foot {
+  margin-top: 4mm;
+  display: flex;
+  justify-content: space-between;
+  gap: 6mm;
+  font-size: 9pt;
+  break-inside: avoid;
+}
+.dn-totals {
+  display: flex;
+  gap: 6mm;
+}
+.dn-totals b {
+  font-size: 12pt;
+}
+.dn-hint {
+  margin-top: 3mm;
+  font-size: 8.5pt;
+  color: var(--soft);
+  border-left: 2pt solid var(--short-ink);
+  padding-left: 2.5mm;
+  break-inside: avoid;
+}
+
+@media screen and (max-width: 640px) {
+  .dn-desk {
+    padding: 8px 0;
+  }
+  .dn-toolbar {
+    padding: 0 12px;
+  }
+  .dn-sheet {
+    padding: 16px 12px;
+    font-size: 10pt;
+  }
+  .dn-facts {
+    grid-template-columns: 1fr 1fr;
+  }
+  .dn-facts .dn-wide {
+    grid-column: span 2;
+  }
+  .dn-head {
+    flex-direction: column;
+    gap: 2mm;
+  }
+  .dn-po {
+    text-align: left;
+  }
+  .dn-col-no {
+    width: 6mm !important;
+  }
+  .dn-col-q {
+    width: 12.5mm !important;
+  }
+  .dn-col-code {
+    width: 29mm !important;
+  }
+  .dn-cols th {
+    padding: 1.4mm 0.8mm;
+  }
+  .dn-cols th .dn-en {
+    font-size: 6pt;
+    letter-spacing: 0;
+  }
+  .dn-code {
+    font-size: 8.5pt;
+  }
+}
+
+/* A4, with the page number in the bottom margin of every printed page (named pages: one per language) */
+.dn-sheet[lang='th'] {
+  page: note-th;
+}
+.dn-sheet[lang='my'] {
+  page: note-my;
+}
+@page note-th {
+  size: A4 portrait;
+  margin: 11mm 10mm 13mm;
+  @bottom-right {
+    content: 'แผ่นที่ / Page ' counter(page) ' / ' counter(pages);
+    font: 8pt 'IBM Plex Sans Thai', sans-serif;
+    color: #4d5d61;
+  }
+}
+@page note-my {
+  size: A4 portrait;
+  margin: 11mm 10mm 13mm;
+  @bottom-right {
+    content: 'စာမျက်နှာ / Page ' counter(page) ' / ' counter(pages);
+    font: 8pt 'Noto Sans Myanmar', 'IBM Plex Sans Thai', sans-serif;
+    color: #4d5d61;
+  }
+}
+
+@media print {
+  .dn-desk {
+    background: #fff;
+    padding: 0;
+    min-height: 0;
+  }
+  .dn-toolbar,
+  .dn-no-print {
+    display: none !important;
+  }
+  .dn-sheet {
+    max-width: none;
+    margin: 0;
+    padding: 0;
+    box-shadow: none;
+  }
+  .dn-sheet,
+  .dn-sheet * {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+}

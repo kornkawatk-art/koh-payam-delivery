@@ -6,6 +6,7 @@ const item = (p: Partial<ParsedItem> & { itemId: string; productName?: string })
   orderedQty: 2,
   shippedQty: 2,
   shortageQty: 0,
+  barcodes: [],
   itemRemark: '',
   lineNo: 1,
   isShort: false,

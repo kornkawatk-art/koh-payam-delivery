@@ -124,6 +124,7 @@ export async function commitImport(
 
   let created = 0
   let synced = 0
+  const syncedAt = new Date().toISOString()
   for (const o of orders) {
     const existingId = idByNo.get(o.makroOrderNo)
     if (!existingId) {
@@ -147,6 +148,9 @@ export async function commitImport(
           island: o.island,
           is_pickup: o.isPickup,
           box_label: o.boxLabel ?? null,
+          member_card: o.memberCard ?? null,
+          invoice_no: o.invoiceNo ?? null,
+          synced_at: syncedAt,
         })
         .select('id')
         .single()
@@ -171,6 +175,10 @@ export async function commitImport(
           // Makro's own fact -- a re-import keeps it current (unlike island,
           // which a manager may have picked by hand)
           is_pickup: o.isPickup,
+          // the delivery note's header and "ข้อมูล ณ" (a blank cell never wipes what was there)
+          ...(o.memberCard ? { member_card: o.memberCard } : {}),
+          ...(o.invoiceNo ? { invoice_no: o.invoiceNo } : {}),
+          synced_at: syncedAt,
           // sale's box name (O2O Desk) stays current; such a PO ships to Myanmar
           ...(o.boxLabel ? { box_label: o.boxLabel, ...(o.island === 'myanmar' ? { island: 'myanmar' } : {}) } : {}),
           // the customer collected it -- close it, unless it already went further
@@ -226,6 +234,7 @@ export async function commitImport(
     }
   }
 
+  await saveItemBarcodes(incoming)
   const { dropped, flagged } = await applyVoided(voided)
 
   await linkBackordersToDay(shipDate)
@@ -241,6 +250,26 @@ export async function commitImport(
     incoming.reduce((n, o) => n + o.items.length, 0),
   )
   return { created, synced, moved, skipped, refreshed, dropped, flagged }
+}
+
+/**
+ * Every item's barcodes from the file, one row per item code (the delivery note reads them; migration 0044).
+ * Best effort: a failure here never fails the import -- the note falls back to the 6-digit code.
+ */
+async function saveItemBarcodes(orders: ParsedOrder[]) {
+  const byId = new Map<string, string[]>()
+  for (const o of orders)
+    for (const it of o.items) if (it.itemId && it.barcodes?.length) byId.set(it.itemId, it.barcodes)
+  if (!byId.size) return
+  const now = new Date().toISOString()
+  const rows = Array.from(byId, ([item_id, barcodes]) => ({ item_id, barcodes, updated_at: now }))
+  for (let i = 0; i < rows.length; i += 500) {
+    const { error } = await supabase.from('item_barcodes').upsert(rows.slice(i, i + 500), { onConflict: 'item_id' })
+    if (error) {
+      console.error('saving item barcodes failed', error.message)
+      return
+    }
+  }
 }
 
 // Makro returned / canceled: never imported (buildImport skips them). A PO already in the app

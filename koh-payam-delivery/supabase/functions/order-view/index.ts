@@ -155,6 +155,38 @@ Deno.serve(async (req) => {
     console.error('order-view foam balance', e)
   }
 
+  // ใบส่งของ (migration 0044): barcodes per item. Best effort -- before 0044 the note shows 6-digit codes.
+  const barcodes = new Map<string, string[]>()
+  const itemIds = [...new Set(items.map((i) => String(i.makro_item_id ?? '')).filter(Boolean))]
+  if (itemIds.length) {
+    const { data: codes, error: eB } = await admin.from('item_barcodes').select('item_id,barcodes').in('item_id', itemIds)
+    if (eB) console.error('order-view barcodes', eB.message)
+    for (const r of (codes ?? []) as Array<{ item_id: string; barcodes: string[] }>) barcodes.set(r.item_id, r.barcodes ?? [])
+  }
+  // Shown only once Makro has filled in what it shipped: before that every line reads 0 delivered.
+  const deliveryNote = items.some((i) => Number(i.qty_shipped) > 0)
+    ? {
+        orderNo: o.makro_order_no,
+        customerName: o.customer_name_en,
+        memberCard: o.member_card ?? null,
+        invoiceNo: o.invoice_no ?? null,
+        shipDate: o.ship_date,
+        island: o.island ?? null,
+        boatName: boat?.name ?? null,
+        boxes: { paper: o.paper_box_count ?? 0, foam: o.foam_box_count ?? 0, piece: o.piece_count ?? 0 },
+        syncedAt: o.synced_at ?? null,
+        items: items.map((i, n) => ({
+          lineNo: Number(i.line_no ?? n + 1),
+          itemId: (i.makro_item_id as string) || null,
+          productName: i.product_name,
+          barcodes: i.makro_item_id ? (barcodes.get(String(i.makro_item_id)) ?? []) : [],
+          ordered: Number(i.qty_ordered),
+          shipped: Number(i.qty_shipped),
+          isShort: i.status === 'short',
+        })),
+      }
+    : null
+
   const body = {
     orderNo: o.makro_order_no,
     customerNameEn: o.customer_name_en,
@@ -195,6 +227,7 @@ Deno.serve(async (req) => {
       .map((p) => `${base}/${p.r2_key}`),
     claimDeadlineAt,
     canClaim,
+    deliveryNote,
     claims: claims.map((c) => ({
       id: c.id,
       type: c.type,

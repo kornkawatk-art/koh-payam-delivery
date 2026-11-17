@@ -293,6 +293,8 @@ test('re-import of an existing order syncs without touching protected columns', 
     paid_marked_at: null,
     paid_marked_by: null,
     customer_phone: '0826289533',
+    // when Makro's file last touched this PO: the delivery note's "ข้อมูล ณ"
+    synced_at: expect.any(String),
   })
   for (const k of [
     'status',

@@ -14,6 +14,7 @@ export type DetailMapping = {
   itemRemark: string
   itemId: string
   dept: string
+  barcode: string
 }
 
 export type OrderMapping = {
@@ -28,6 +29,8 @@ export type OrderMapping = {
   outstandingAmount: string
   customerPhone: string
   orderType: string
+  memberCard: string
+  invoiceNo: string
 }
 
 export const DEFAULT_DETAIL_MAPPING: DetailMapping = {
@@ -40,6 +43,7 @@ export const DEFAULT_DETAIL_MAPPING: DetailMapping = {
   itemRemark: 'Item Remark',
   itemId: 'Item Id',
   dept: 'Dept',
+  barcode: 'Bar_Code',
 }
 
 export const DEFAULT_ORDER_MAPPING: OrderMapping = {
@@ -54,6 +58,8 @@ export const DEFAULT_ORDER_MAPPING: OrderMapping = {
   outstandingAmount: 'Outstanding Amount',
   customerPhone: 'Customer Phone',
   orderType: 'Order Type',
+  memberCard: 'Member Card',
+  invoiceNo: 'Invoice Number',
 }
 
 export const FIELD_LABELS_DETAIL: Record<keyof DetailMapping, string> = {
@@ -66,6 +72,7 @@ export const FIELD_LABELS_DETAIL: Record<keyof DetailMapping, string> = {
   itemRemark: 'หมายเหตุรายการ',
   itemId: 'รหัสสินค้า',
   dept: 'แผนก (Dept)',
+  barcode: 'บาร์โค้ด (Bar_Code)',
 }
 
 export const FIELD_LABELS_ORDER: Record<keyof OrderMapping, string> = {
@@ -80,6 +87,8 @@ export const FIELD_LABELS_ORDER: Record<keyof OrderMapping, string> = {
   outstandingAmount: 'ยอดค้างชำระ',
   customerPhone: 'เบอร์โทรลูกค้า',
   orderType: 'ประเภทออเดอร์ (ส่ง/รับเอง)',
+  memberCard: 'เลขสมาชิก',
+  invoiceNo: 'เลขใบกำกับ',
 }
 
 // คอลัมน์ที่ต้องมีเสมอ (ที่เหลือมี fallback ในโค้ด จึงไม่บังคับ)
@@ -104,11 +113,13 @@ const ORDER_SOFT: (keyof OrderMapping)[] = [
   'outstandingAmount',
   'customerPhone',
   'orderType',
+  'memberCard',
+  'invoiceNo',
 ]
 // Dept exists in the real Makro OrderDetailExport but must never block import
 // if a future/older file variant lacks it -- an unclassified line just
 // defaults to dry (see the isFresh computation below), it never blocks.
-const DETAIL_SOFT: (keyof DetailMapping)[] = ['dept']
+const DETAIL_SOFT: (keyof DetailMapping)[] = ['dept', 'barcode']
 
 // --- Parsed shapes ------------------------------------------------------------
 
@@ -125,6 +136,8 @@ export type ParsedItem = {
   // Raw Makro "Dept" number as text ('' when the file has none); grouped
   // into department owners by src/lib/departments.ts for the shortage report.
   dept: string
+  // every code in the file's Bar_Code cell ("a || b || c"), as written; [] when none
+  barcodes: string[]
 }
 
 export type ParsedOrder = {
@@ -144,6 +157,8 @@ export type ParsedOrder = {
   isPickup: boolean
   // the name sale gave this PO's boxes in O2O Desk (box_labels); printed on the stickers instead of the short name
   boxLabel: string | null
+  memberCard: string | null
+  invoiceNo: string | null
   items: ParsedItem[]
 }
 
@@ -167,6 +182,16 @@ export type BuildResult = {
  * (A, C, ...) are ordinary orders.
  */
 export const isNotMakroDirect = (orderNo: string) => /b$/i.test(orderNo.trim())
+
+/** "21005169 || 2500001005168 || 8855199532670" -> each code, digits only, no repeats */
+export function splitBarcodes(raw: string | undefined): string[] {
+  const out: string[] = []
+  for (const part of String(raw ?? '').split('||')) {
+    const code = part.replace(/\s+/g, '')
+    if (/^\d{6,20}$/.test(code) && !out.includes(code)) out.push(code)
+  }
+  return out
+}
 
 function toNum(v: string | undefined): number {
   const n = Number(String(v ?? '').replace(/,/g, '').trim())
@@ -302,6 +327,8 @@ export function buildImport(
     const paymentStatus = om.paymentStatus ? (r[om.paymentStatus] ?? '').trim() : ''
     const customerPhone = om.customerPhone ? (r[om.customerPhone] ?? '').trim() : ''
     const orderType = om.orderType ? (r[om.orderType] ?? '').trim() : ''
+    const memberCard = om.memberCard ? (r[om.memberCard] ?? '').trim() : ''
+    const invoiceNo = om.invoiceNo ? (r[om.invoiceNo] ?? '').trim() : ''
     payamOrders.set(orderNo, {
       makroOrderNo: orderNo,
       customerName: (r[om.customer] ?? '').trim(),
@@ -316,6 +343,8 @@ export function buildImport(
       island: island === 'unknown' ? null : island,
       isPickup: /pick\s*-?\s*up/i.test(orderType),
       boxLabel,
+      memberCard: memberCard || null,
+      invoiceNo: invoiceNo || null,
       items: [],
     })
   }
@@ -375,6 +404,7 @@ export function buildImport(
       isShort,
       isFresh,
       dept: deptRaw,
+      barcodes: dm.barcode ? splitBarcodes(r[dm.barcode]) : [],
     })
     itemsByOrder.set(orderNo, list)
   }
