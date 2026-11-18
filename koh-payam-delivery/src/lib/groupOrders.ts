@@ -4,6 +4,7 @@ type Groupable = {
   makro_order_no: string
   customer_name_en: string
   customer_phone?: string | null
+  box_label?: string | null
 }
 
 export type DayEntry<T extends Groupable> =
@@ -25,13 +26,15 @@ export { normCustomerName } from '../../supabase/functions/_shared/customerKey'
  * name become one group; everything else stays a single entry. Entries keep
  * the order in which their first PO appeared; POs inside a group are sorted
  * by order number, which is also how the pack page picks its "primary" PO.
+ * A PO with a box name from sale (box_label) never groups: its stickers carry that name, not the shop's.
  * `merged`: phones a team member chose to pack as one for this day (pack_merges, 0038) although their
  * shop names differ -- those group by phone alone, named "A + B".
  */
 export function groupByPhone<T extends Groupable>(orders: T[], merged: ReadonlySet<string> = new Set()): DayEntry<T>[] {
   const keyOf = (o: T) => {
     const phone = (o.customer_phone ?? '').trim()
-    if (!phone) return ''
+    // a PO sale named in O2O Desk (box_labels) packs and labels on its own, under that name (0039)
+    if (!phone || o.box_label) return ''
     return merged.has(phone) ? `${phone}|*` : `${phone}|${normCustomerName(o.customer_name_en)}`
   }
   const byKey = new Map<string, T[]>()
@@ -75,7 +78,7 @@ export function mergeCandidates<T extends Groupable>(orders: T[], merged: Readon
   const byPhone = new Map<string, T[]>()
   for (const o of orders) {
     const phone = (o.customer_phone ?? '').trim()
-    if (phone && !merged.has(phone)) byPhone.set(phone, [...(byPhone.get(phone) ?? []), o])
+    if (phone && !o.box_label && !merged.has(phone)) byPhone.set(phone, [...(byPhone.get(phone) ?? []), o])
   }
   return [...byPhone]
     .map(([phone, os]) => ({ phone, names: shopNames([...os].sort((a, b) => a.makro_order_no.localeCompare(b.makro_order_no))) }))

@@ -345,7 +345,8 @@ export async function listOrdersForCustomerDay(shipDate: string, phone: string, 
     .eq('customer_phone', phone)
     .order('makro_order_no')
   if (error) throw new Error('โหลดออเดอร์ของลูกค้าไม่สำเร็จ: ' + error.message)
-  const rows = (data ?? []) as any[]
+  // POs sale named in O2O Desk pack on their own pages (see groupByPhone), never in a customer's group
+  const rows = ((data ?? []) as any[]).filter((o) => !o.box_label)
   if (!name) return rows
   const want = normCustomerName(name)
   return rows.filter((o) => normCustomerName(o.customer_name_en) === want)

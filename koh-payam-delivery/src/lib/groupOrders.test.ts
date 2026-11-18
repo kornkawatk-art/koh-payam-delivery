@@ -112,3 +112,15 @@ test('mergeCandidates: phones with 2+ different shop names that day, not merged 
     o('5', 'PO-5', 'P', '083'), o('6', 'PO-6', 'Q', '083'), o('7', 'PO-7', 'M', null), o('8', 'PO-8', 'N', null)]
   expect(mergeCandidates(day, new Set(['083']))).toEqual([{ phone: '081', names: ['SHOP A', 'SHOP B'] }])
 })
+
+test('POs with a box name from sale never group, even with the same phone and shop', () => {
+  const r = groupByPhone([
+    { ...o('1', 'PO-1', 'PIER', '081'), box_label: 'A' },
+    { ...o('2', 'PO-2', 'PIER', '081'), box_label: 'MK1' },
+    o('3', 'PO-3', 'PIER', '081'),
+    o('4', 'PO-4', 'PIER', '081'),
+  ])
+  expect(r.map((e) => e.kind)).toEqual(['single', 'single', 'group'])
+  expect(entryOrders(r[2]).map((x) => x.makro_order_no)).toEqual(['PO-3', 'PO-4'])
+  expect(mergeCandidates([{ ...o('1', 'PO-1', 'X', '081'), box_label: 'A' }, o('2', 'PO-2', 'Y', '081')], new Set())).toEqual([])
+})
