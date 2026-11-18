@@ -157,6 +157,12 @@ export default function OrderDetail() {
           <MakroPickBadge status={order.makro_order_status} packStatus={order.status} />
         </div>
       </header>
+      {order.box_label && (
+        <section aria-label="ชื่อหน้าลัง" className="card flex flex-col gap-1">
+          <p className="text-sm text-ink-soft">ชื่อหน้าลัง (จาก sale) · เขียน/พิมพ์ชื่อนี้บนลัง</p>
+          <p className="text-3xl font-bold">{order.box_label}</p>
+        </section>
+      )}
 
       {isLead(profile?.role) && canMoveShipDay(order.status) && (
         <div className="flex flex-wrap items-center gap-2">

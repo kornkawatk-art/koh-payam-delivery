@@ -862,3 +862,18 @@ test("a phone with a shop that still owes is not offered for packing as one (the
   await screen.findByText('SHOP A')
   expect(screen.queryByRole('region', { name: 'เบอร์เดียวกันหลายชื่อ' })).not.toBeInTheDocument()
 })
+
+test("shows the box name sale set in O2O Desk on the order's row, and finds the order by it", async () => {
+  vi.mocked(listOrdersForDay).mockResolvedValueOnce([
+    { id: '7', makro_order_no: 'PO-7', customer_name_en: 'MUANG NGERN PIER', island: 'myanmar', box_label: 'MK1',
+      status: 'imported', boat_id: null, paper_box_count: 0, foam_box_count: 0, piece_count: 0 },
+    { id: '8', makro_order_no: 'PO-8', customer_name_en: 'BLUE VIEW', island: 'payam',
+      status: 'imported', boat_id: null, paper_box_count: 0, foam_box_count: 0, piece_count: 0 },
+  ])
+  renderPage()
+  await screen.findByText('MK1')
+  expect(screen.getByText('หน้าลัง')).toBeInTheDocument()
+  await userEvent.type(screen.getByPlaceholderText(/ค้นหาชื่อลูกค้า/), 'mk1')
+  expect(screen.getByRole('link', { name: 'PO-7' })).toBeInTheDocument()
+  expect(screen.queryByRole('link', { name: 'PO-8' })).not.toBeInTheDocument()
+})

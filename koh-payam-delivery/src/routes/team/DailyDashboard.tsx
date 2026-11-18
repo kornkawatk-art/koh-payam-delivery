@@ -209,7 +209,8 @@ export default function DailyDashboard() {
           entryOrders(e).some(
             (o) =>
               o.customer_name_en.toLowerCase().includes(s) ||
-              o.makro_order_no.toLowerCase().includes(s),
+              o.makro_order_no.toLowerCase().includes(s) ||
+              (o.box_label ?? '').toLowerCase().includes(s),
           )),
       )
       // combined orders (one customer, several POs) first in every section, then the single POs;
@@ -298,7 +299,7 @@ export default function DailyDashboard() {
 
       <div className="sticky top-[3.25rem] z-20 -mx-4 flex items-center gap-2 bg-paper/95 px-4 py-2 backdrop-blur sm:static sm:mx-0 sm:bg-transparent sm:p-0 lg:top-0">
         <input
-          placeholder="ค้นหาชื่อลูกค้า / เลขออเดอร์"
+          placeholder="ค้นหาชื่อลูกค้า / เลขออเดอร์ / ชื่อหน้าลัง"
           value={q}
           onChange={(e) => setQ(e.target.value)}
         />
@@ -893,6 +894,17 @@ function ShortBadge({ count }: { count: number }) {
   )
 }
 
+// the name sale gave this PO's boxes in O2O Desk (0039): the packer writes / prints exactly this on the boxes
+function BoxNameTag({ name }: { name?: string | null }) {
+  if (!name) return null
+  return (
+    <span className="mt-1 flex w-fit items-baseline gap-1.5 rounded-md border-2 border-ink px-2 py-0.5">
+      <span className="text-xs text-ink-soft">หน้าลัง</span>
+      <span className="text-base font-bold">{name}</span>
+    </span>
+  )
+}
+
 function OrderRow({
   order: o,
   indent,
@@ -915,6 +927,7 @@ function OrderRow({
         {o.customer_name_en}
         {released && <ReleasedBadge />}
         {showIsland && <IslandBadge island={o.island} className="ml-1.5" />}
+        <BoxNameTag name={o.box_label} />
       </td>
       <td data-label="สถานะ">
         <StatusBadge status={o.status} />
